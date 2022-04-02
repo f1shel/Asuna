@@ -1,7 +1,7 @@
 _*/
 bin_*/
 .idea/
-downloaded_resources/
 cmake-build-*/
 build/
 test/
+asuna/third_party/downloaded_resources
