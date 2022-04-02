@@ -1,0 +1,7 @@
+_*/
+bin_*/
+.idea/
+downloaded_resources/
+cmake-build-*/
+build/
+test/
