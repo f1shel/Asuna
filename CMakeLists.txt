@@ -43,13 +43,18 @@ set(CMAKE_CXX_STANDARD 17)
 _add_project_definitions(${PROJNAME})
 
 file(GLOB ENTRY
-    ${PROJNAME}/main.cpp
-)
+    ${PROJNAME}/main.cpp)
+
+file(GLOB SRC_TRACER
+    ${PROJNAME}/tracer/*.h
+    ${PROJNAME}/tracer/*.cpp)
 
 source_group("asuna" FILES ${ENTRY})
+source_group("asuna\\tracer" FILES ${SRC_TRACER})
 
 add_executable(${PROJNAME}
-    ${ENTRY})
+    ${ENTRY}
+    ${SRC_TRACER})
 
 target_sources(${PROJNAME} PUBLIC ${COMMON_SOURCE_FILES})
 target_sources(${PROJNAME} PUBLIC ${PACKAGE_SOURCE_FILES})
