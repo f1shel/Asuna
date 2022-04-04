@@ -13,6 +13,7 @@ using namespace std;
 void Tracer::init()
 {
     m_context.init();
+    m_pipelineGraphic.init(&m_context);
 }
 
 void Tracer::run()
@@ -48,6 +49,8 @@ void Tracer::run()
                 // Rendering to the swapchain framebuffer the rendered image and apply a tonemapper
                 vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+                m_pipelineGraphic.run();
+
                 // Rendering UI
                 ImGui::Render();
                 ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
@@ -66,5 +69,6 @@ void Tracer::run()
 
 void Tracer::deinit()
 {
+    m_pipelineGraphic.deinit();
     m_context.deinit();
 }

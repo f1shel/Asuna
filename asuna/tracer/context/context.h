@@ -42,6 +42,18 @@ public:
         m_glfw = NULL;
         glfwTerminate();
     }
+public:
+    // TODO: this design is quite awful and bullshit,
+    // I must write getxxx() to throw out protected member
+    VkExtent2D& getAppSize() {
+        return m_size;
+    }
+    uint32_t& getAppGraphicsQueueIndex() {
+        return m_graphicsQueueIndex;
+    }
+    VkCommandPool& getAppCmdPool() {
+        return m_cmdPool;
+    }
 private:
     void createGlfwWindow() {
         const size_t defaultWindowWidth = 400;

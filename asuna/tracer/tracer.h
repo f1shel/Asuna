@@ -1,7 +1,7 @@
 #pragma once
 
-#include "context.h"
-#include "pipeline.h"
+#include "context/context.h"
+#include "pipeline/pipeline_graphic.h"
 
 class Tracer {
 public:
@@ -9,6 +9,8 @@ public:
     void run();
     void deinit();
 private:
+    // context
     ContextAware m_context;
-
+    // pipelines
+    PipelineGraphic m_pipelineGraphic;
 };
