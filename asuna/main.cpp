@@ -1,16 +1,9 @@
-#include "tracer/asuna_tracer.h"
-#include <chrono>
+#include "tracer/tracer.h"
 
 int main() {
-    AsunaTracer asuna;
+    Tracer asuna;
     asuna.init();
-
-    // Main loop
-    while (!asuna.glfwShouldClose()) {
-        asuna.glfwPoll();
-        if (asuna.isMinimized()) continue;
-    }
-
-    asuna.destroy();
+    asuna.run();
+    asuna.deinit();
     return 0;
 }

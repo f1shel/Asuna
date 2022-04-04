@@ -22,4 +22,27 @@ The binary file is placed in the `Asuna/bin_x64` or `Asuna/bin_x86` folder.
 
 ## Documentation
 
-tbd.
++ **Initializing**: window, surface, context, device, allocator
+
++ **Parsing scene**: interpret scene file and generate meta data
+
++ **Allocating scene resources**: convert meta data to gpu resources
+
++ **Building pipeline**
+
++ **Binding pipeline and resources**
+
++ **Rendering** 
+
+```c++
+class AsunaTracer : public AppBaseVk {
+	class Context; ----------------
+    ----- class Scene;--------- | |
+    | --- class Resources; <--|-| |
+    |-|-> class Pipeline;  <------|
+    void run();
+};
+```
+
+  
+

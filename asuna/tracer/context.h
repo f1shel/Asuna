@@ -1,40 +1,70 @@
-#include "asuna_tracer.h"
+#pragma once
+
+#include <backends/imgui_impl_glfw.h>
+#include <imgui.h>
+#include <GLFW/glfw3.h>
+
+#include <nvvk/appbase_vk.hpp>
+#include <nvvk/resourceallocator_vk.hpp>
+#include <nvvk/debug_util_vk.hpp>
+#include <nvvk/gizmos_vk.hpp>
+#include <nvvk/context_vk.hpp>
+#include <nvvk/structs_vk.hpp>
 
 #include <iostream>
-using namespace std;
 
-#include <nvvk/structs_vk.hpp>
-#include <nvvk/context_vk.hpp>
-#include <nvvk/gizmos_vk.hpp>
-
-void AsunaTracer::init()
+class ContextAware : public nvvk::AppBaseVk
 {
-    // Create glfw window
-    const size_t defaultWindowWidth = 400;
-    const size_t defaultWindowHeight = 300;
-    {
+public:
+    GLFWwindow* m_glfw = NULL;
+    // Allocator for buffer, images, acceleration structures
+    nvvk::ResourceAllocatorDedicated m_alloc;
+    // Debugger to name objects
+    nvvk::DebugUtil m_debug;
+    // Vulkan context
+    nvvk::Context m_vkcontext{};
+    // Filesystem searching root
+    std::vector<std::string> m_root{};
+public:
+    void init() {
+        createGlfwWindow();
+        initializeVulkan();
+        createAppContext();
+        // Search path for shaders and other media
+        m_root.emplace_back(NVPSystem::exePath());
+        m_root.emplace_back(NVPSystem::exePath() + PROJECT_RELDIRECTORY);
+    }
+    void deinit() {
+        m_root.clear();
+        m_alloc.deinit();
+        AppBaseVk::destroy();
+        glfwDestroyWindow(m_glfw);
+        m_glfw = NULL;
+        glfwTerminate();
+    }
+private:
+    void createGlfwWindow() {
+        const size_t defaultWindowWidth = 400;
+        const size_t defaultWindowHeight = 300;
         // Check initialization of glfw library
         if (!glfwInit()) {
-            std::cerr << "[!] GLFW Error: Failed to initalize" << std::endl;
+            std::cerr << "[!] Context Error: failed to initalize glfw" << std::endl;
             exit(1);
         }
         // Create a window without OpenGL context
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        window = glfwCreateWindow(defaultWindowWidth, defaultWindowHeight, PROJECT_NAME, nullptr, nullptr);
+        m_glfw = glfwCreateWindow(defaultWindowWidth, defaultWindowHeight, PROJECT_NAME, nullptr, nullptr);
         // Check glfw support for Vulkan
         if (!glfwVulkanSupported()) {
-            std::cerr << "[!] GLFW Error: Vulkan not supported" << std::endl;
+            std::cerr << "[!] Context Error: glfw does not support vulkan" << std::endl;
             exit(1);
         }
         assert(glfwVulkanSupported() == 1);
     }
-    // Initalize Vulkan
-    nvvk::Context vkContext{};
-    // Vulkan context creation
-    {
+    void initializeVulkan() {
         nvvk::ContextCreateInfo contextInfo;
-        // Using Vulkan 1.2
-        contextInfo.setVersion(1, 2);
+        // Using Vulkan 1.3
+        contextInfo.setVersion(1, 3);
         // Set up Vulkan extensions required by glfw(surface, win32, linux, ..)
         uint32_t count{ 0 };
         const char** reqExtensions = glfwGetRequiredInstanceExtensions(&count);
@@ -68,53 +98,30 @@ void AsunaTracer::init()
         putenv("DEBUG_PRINTF_TO_STDOUT=1");
 #endif  // _WIN32
         // Create the Vulkan instance and then first compatible device based on info
-        vkContext.init(contextInfo);
+        m_vkcontext.init(contextInfo);
         // Device must support acceleration structures and ray tracing pipelines:
         if (asFeatures.accelerationStructure != VK_TRUE || rtPipelineFeatures.rayTracingPipeline != VK_TRUE) {
             std::cerr << "[!] Vulkan: device does not support acceleration structures and ray tracing pipelines" << std::endl;
             exit(1);
         }
     }
-    // Window need to be opened to get the surface on which we will draw
-    const VkSurfaceKHR surface = this->getVkSurface(vkContext.m_instance, window);
-    vkContext.setGCTQueueWithPresent(surface);
-    // Creation of the application
-    nvvk::AppBaseVkCreateInfo info;
-    info.instance = vkContext.m_instance;
-    info.device = vkContext.m_device;
-    info.physicalDevice = vkContext.m_physicalDevice;
-    info.size = { defaultWindowWidth, defaultWindowHeight };
-    info.surface = surface;
-    info.window = window;
-    info.queueIndices.push_back(vkContext.m_queueGCT.familyIndex);
-    this->create(info);
-    // Mini coordinate system at left bottom corner
-    nvvk::AxisVK vkAxis;
-    vkAxis.init(this->getDevice(), this->getRenderPass());
-}
-
-void AsunaTracer::create(const nvvk::AppBaseVkCreateInfo& info)
-{
-    AppBaseVk::create(info);
-    m_alloc.init(m_instance, m_device, m_physicalDevice);
-    m_debug.setup(m_device);
-}
-
-void AsunaTracer::destroy()
-{
-    m_alloc.deinit();
-    AppBaseVk::destroy();
-    glfwDestroyWindow(window);
-    window = NULL;
-    glfwTerminate();
-}
-
-bool AsunaTracer::glfwShouldClose()
-{
-    return glfwWindowShouldClose(window);
-}
-
-void AsunaTracer::glfwPoll()
-{
-    glfwPollEvents();
-}
+    void createAppContext() {
+        // Window need to be opened to get the surface on which we will draw
+        const VkSurfaceKHR surface = getVkSurface(m_vkcontext.m_instance, m_glfw);
+        m_vkcontext.setGCTQueueWithPresent(surface);
+        // Creation of the application
+        nvvk::AppBaseVkCreateInfo info;
+        info.instance = m_vkcontext.m_instance;
+        info.device = m_vkcontext.m_device;
+        info.physicalDevice = m_vkcontext.m_physicalDevice;
+        int width, height;
+        glfwGetWindowSize(m_glfw, &width, &height);
+        info.size = { (unsigned)width, (unsigned)height };
+        info.surface = surface;
+        info.window = m_glfw;
+        info.queueIndices.push_back(m_vkcontext.m_queueGCT.familyIndex);
+        create(info);
+        m_alloc.init(m_instance, m_device, m_physicalDevice);
+        m_debug.setup(m_device);
+    }
+};
