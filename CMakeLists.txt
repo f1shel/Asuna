@@ -82,6 +82,11 @@ file(GLOB SRC_ASSETS_SHADERS_GRAPHIC
     ${PROJNAME}/assets/shaders/graphic/*.vert
 )
 
+file(GLOB SRC_ASSETS_SHADERS_POST
+    ${PROJNAME}/assets/shaders/post/*.frag
+    ${PROJNAME}/assets/shaders/post/*.vert
+)
+
 source_group("asuna" FILES ${ENTRY})
 source_group("asuna\\tracer" FILES ${SRC_TRACER})
 source_group("asuna\\tracer\\context" FILES ${SRC_TRACER_CONTEXT})
@@ -91,6 +96,7 @@ source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
 source_group("asuna\\assets\\hostdevice" FILES ${SRC_ASSETS_HOSTDEVICE})
 source_group("asuna\\assets\\shaders\\raytrace" FILES ${SRC_ASSETS_SHADERS_RAYTRACE})
 source_group("asuna\\assets\\shaders\\graphic" FILES ${SRC_ASSETS_SHADERS_GRAPHIC})
+source_group("asuna\\assets\\shaders\\post" FILES ${SRC_ASSETS_SHADERS_POST})
 
 # GLSL to SPIR-V custom build
 set(SAMPLES_BASESAMPLE_DEPENDENCIES OFF CACHE BOOL "Create dependies on GLSL files")
@@ -118,6 +124,18 @@ compile_glsl(
     HEADER ON
     DEPENDENCY ON
 )
+compile_glsl(
+    SOURCE_FILES
+        ${SRC_ASSETS_SHADERS_POST}
+    HEADER_FILES
+        ${SRC_ASSETS_HOSTDEVICE}
+    DST
+        "${PROJNAME}/assets/@autogen"
+    VULKAN_TARGET
+        "vulkan1.3"
+    HEADER ON
+    DEPENDENCY ON
+)
 
 add_executable(${PROJNAME}
     ${ENTRY}
@@ -130,6 +148,7 @@ add_executable(${PROJNAME}
 
 target_sources(${PROJNAME} PUBLIC
     ${SRC_ASSETS_SHADERS_GRAPHIC}
+    ${SRC_ASSETS_SHADERS_POST}
     ${SRC_ASSETS_SHADERS_RAYTRACE})
 
 target_sources(${PROJNAME} PUBLIC ${COMMON_SOURCE_FILES})

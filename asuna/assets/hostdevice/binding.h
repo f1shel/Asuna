@@ -35,4 +35,9 @@ START_BINDING(BindingsRaytrace)
 eBindingRaytraceImage = 0 // Ray tracer image
 END_BINDING();
 
+START_BINDING(BindingsPost)
+eBindingPostImage = 0
+END_BINDING();
+
+
 #endif

@@ -4,6 +4,7 @@
 #include "scene/scene.h"
 #include "pipeline/pipeline_graphic.h"
 #include "pipeline/pipeline_raytrace.h"
+#include "pipeline/pipeline_post.h"
 
 class Tracer {
 public:
@@ -18,4 +19,5 @@ private:
     // pipelines
     PipelineGraphic m_pipelineGraphic;
     PipelineRaytrace m_pipelineRaytrace;
+    PipelinePost m_pipelinePost;
 };

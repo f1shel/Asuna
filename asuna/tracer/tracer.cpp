@@ -1,5 +1,4 @@
 #include "tracer.h"
-#include "pipeline/pipeline_raytrace.h"
 
 #include <iostream>
 using namespace std;
@@ -21,6 +20,9 @@ void Tracer::init()
     PipelineCorrelatedRaytrace* pPipCorrRaytrace = (PipelineCorrelatedRaytrace*)pPipCorrGraphic;
     pPipCorrRaytrace->m_pPipGraphic = &m_pipelineGraphic;
     m_pipelineRaytrace.init(pPipCorrRaytrace);
+    PipelineCorrelatedPost* pPipCorrPost = (PipelineCorrelatedPost*)pPipCorrRaytrace;
+    m_pipelinePost.init(pPipCorrPost);
+    delete pPipCorrGraphic;
 }
 
 void Tracer::run()
@@ -59,7 +61,7 @@ void Tracer::run()
                 // Rendering to the swapchain framebuffer the rendered image and apply a tonemapper
                 vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-                m_pipelineGraphic.run(cmdBuf);
+                m_pipelinePost.run(cmdBuf);
 
                 // Rendering UI
                 ImGui::Render();
