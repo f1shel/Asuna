@@ -1,15 +1,23 @@
 #pragma once
 
 #include "../context/context.h"
+#include "../scene/scene.h"
 
 #include <nvvk/descriptorsets_vk.hpp>
+
+class PipelineCorrelated
+{
+public:
+    ContextAware* m_pContext = nullptr;
+    SceneAware* m_pScene = nullptr;
+};
 
 // All it needs to create a pipeline
 class PipelineAware
 {
 public:
-    virtual void init(ContextAware* pContext) = 0;
-    virtual void run() = 0;
+    virtual void init(PipelineCorrelated* pPipCorr) = 0;
+    virtual void run(const VkCommandBuffer& cmdBuf) = 0;
     virtual void deinit() {
         assert((m_pContext != nullptr) && "[!] Pipeline Error: failed to find belonging context when deinit.");
 
@@ -28,6 +36,7 @@ public:
     };
 public:
     ContextAware* m_pContext = nullptr;
+    SceneAware* m_pScene = nullptr;
     VkPipeline m_pipeline{ VK_NULL_HANDLE };
     VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
     VkDescriptorSet m_dstSet{ VK_NULL_HANDLE };

@@ -1,4 +1,5 @@
 #include "tracer.h"
+#include "pipeline/pipeline_raytrace.h"
 
 #include <iostream>
 using namespace std;
@@ -13,7 +14,13 @@ using namespace std;
 void Tracer::init()
 {
     m_context.init();
-    m_pipelineGraphic.init(&m_context);
+    PipelineCorrelated* pPipCorrGraphic = new PipelineCorrelatedRaytrace;
+    pPipCorrGraphic->m_pContext = &m_context;
+    pPipCorrGraphic->m_pScene = &m_scene;
+    m_pipelineGraphic.init(pPipCorrGraphic);
+    PipelineCorrelatedRaytrace* pPipCorrRaytrace = (PipelineCorrelatedRaytrace*)pPipCorrGraphic;
+    pPipCorrRaytrace->m_pPipGraphic = &m_pipelineGraphic;
+    m_pipelineRaytrace.init(pPipCorrRaytrace);
 }
 
 void Tracer::run()
@@ -36,8 +43,11 @@ void Tracer::run()
         VkCommandBufferBeginInfo beginInfo = nvvk::make<VkCommandBufferBeginInfo>();
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         
-        vkBeginCommandBuffer(cmdBuf, &beginInfo);
         {
+            vkBeginCommandBuffer(cmdBuf, &beginInfo);
+            {
+                m_pipelineRaytrace.run(cmdBuf);
+            }
             {
                 VkRenderPassBeginInfo postRenderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
                 postRenderPassBeginInfo.clearValueCount = 2;
@@ -49,7 +59,7 @@ void Tracer::run()
                 // Rendering to the swapchain framebuffer the rendered image and apply a tonemapper
                 vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-                m_pipelineGraphic.run();
+                m_pipelineGraphic.run(cmdBuf);
 
                 // Rendering UI
                 ImGui::Render();

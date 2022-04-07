@@ -1,7 +1,9 @@
 #pragma once
 
 #include "context/context.h"
+#include "scene/scene.h"
 #include "pipeline/pipeline_graphic.h"
+#include "pipeline/pipeline_raytrace.h"
 
 class Tracer {
 public:
@@ -11,6 +13,9 @@ public:
 private:
     // context
     ContextAware m_context;
+    // scene
+    SceneAware m_scene;
     // pipelines
     PipelineGraphic m_pipelineGraphic;
+    PipelineRaytrace m_pipelineRaytrace;
 };

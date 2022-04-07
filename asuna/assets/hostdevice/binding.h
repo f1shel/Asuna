@@ -26,12 +26,13 @@ using uint = unsigned int;
 #define END_ENUM() 
 #endif
 
-START_BINDING(GraphicBindings)
-eGraphicBindingCamera = 0 // Global uniform containing camera matrices
+START_BINDING(BindingsGraphic)
+eBindingGraphicCamera = 0 // Global uniform containing camera matrices
 END_BINDING();
 
-START_BINDING(RaytraceBindings)
-eRaytraceBindingImage = 0 // Ray tracer image
+START_BINDING(BindingsRaytrace)
+//eBindingRaytraceTlas = 0, // Top level acceleration structure,
+eBindingRaytraceImage = 0 // Ray tracer image
 END_BINDING();
 
 #endif

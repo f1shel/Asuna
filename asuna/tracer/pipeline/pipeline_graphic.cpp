@@ -18,21 +18,19 @@ using namespace std;
 #include "../../assets/@autogen/graphic.idle.vert.h"
 #include "../../assets/@autogen/graphic.idle.frag.h"
 
-void PipelineGraphic::init(ContextAware* pContext)
+void PipelineGraphic::init(PipelineCorrelated* pPipCorr)
 {
-    LOGI("[ ] Pipeline: creation\n");
-    m_pContext = pContext;
-    {
-        // Graphic
-        // 创建光栅化管线
-        nvh::Stopwatch sw_;
-        createOffscreenResources();
-        createGraphicDescriptorSetLayout();
-        createGraphicPipeline();
-        createCameraBuffer();
-        updateGraphicDescriptorSet();
-        LOGI("[ ] Pipeline: - %6.2fms Graphic\n", sw_.elapsed());
-    }
+    m_pContext = pPipCorr->m_pContext;
+    //m_pScene = pPipCorr->m_pScene;
+    // Graphic
+    // 创建光栅化管线
+    nvh::Stopwatch sw_;
+    createOffscreenResources();
+    createGraphicDescriptorSetLayout();
+    createGraphicPipeline();
+    createCameraBuffer();
+    updateGraphicDescriptorSet();
+    LOGI("[ ] Pipeline: %6.2fms Graphic pipeline creation\n", sw_.elapsed());
 }
 
 void PipelineGraphic::deinit()
@@ -140,7 +138,7 @@ void PipelineGraphic::createGraphicDescriptorSetLayout()
     nvvk::DescriptorSetBindings& bind = m_dstSetLayoutBind;
 
     // Camera matrices
-    bind.addBinding(GraphicBindings::eGraphicBindingCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+    bind.addBinding(BindingsGraphic::eBindingGraphicCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
 
 
@@ -207,7 +205,7 @@ void PipelineGraphic::updateGraphicDescriptorSet()
 
     // Camera matrices and scene description
     VkDescriptorBufferInfo dbiUnif{ m_bCamera.buffer, 0, VK_WHOLE_SIZE };
-    writes.emplace_back(bind.makeWrite(m_dstSet, GraphicBindings::eGraphicBindingCamera, &dbiUnif));
+    writes.emplace_back(bind.makeWrite(m_dstSet, BindingsGraphic::eBindingGraphicCamera, &dbiUnif));
 
     // Writing the information
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
