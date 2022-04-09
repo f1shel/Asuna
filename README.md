@@ -3,10 +3,10 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 
 ## Dependencies
 
-+ C++ compiler. `MSVC 19.29.30141.0` was tested.
++ C++ compiler. `MSVC 19.31.31105` was tested.
 + [CMake](https://cmake.org/download/). `Version 3.23` was tested.
-+ [NVIDIA driver](https://www.nvidia.com/Download/index.aspx). Should be released on or after December 15th, 2020, for the implementations of the new official versions of the Vulkan ray tracing extensions. `RTX 3060 Ti` with Driver `Version 472.12` was tested. *Whether this project supports non NVIDIA graphics cards has not been determined.*
-+ [Vulkan SDK](https://vulkan.lunarg.com/). Should be greater than `Version 1.3.204.0`. `Version 1.3.204.1` was tested.
++ [NVIDIA driver](https://www.nvidia.com/Download/index.aspx). Should be released on or after December 15th, 2020, for the implementations of the new official versions of the Vulkan ray tracing extensions. `RTX 3060 Ti` with Driver `Version 512.15` was tested. *Whether this project supports non NVIDIA graphics cards has not been determined.*
++ [Vulkan SDK](https://vulkan.lunarg.com/). `Version 1.3.204.1` was tested.
 
 ## Build
 
@@ -36,10 +36,9 @@ The binary file is placed in the `Asuna/bin_x64` or `Asuna/bin_x86` folder.
 
 ```c++
 class AsunaTracer : public AppBaseVk {
-	class Context; ----------------
-    ----- class Scene;--------- | |
-    | --- class Resources; <--|-| |
-    |-|-> class Pipeline;  <------|
+	class Context; ----------------|
+    class Scene;   ----------|     |
+    class Pipeline;   <------|-----|
     void run();
 };
 ```

@@ -1,5 +1,5 @@
-#ifndef ASUNA_BINDING_H
-#define ASUNA_BINDING_H
+#ifndef BINDING_H
+#define BINDING_H
 
 #ifdef __cplusplus
 #include "nvmath/nvmath.h"
@@ -31,8 +31,8 @@ eBindingGraphicCamera = 0 // Global uniform containing camera matrices
 END_BINDING();
 
 START_BINDING(BindingsRaytrace)
-//eBindingRaytraceTlas = 0, // Top level acceleration structure,
-eBindingRaytraceImage = 0 // Ray tracer image
+eBindingRaytraceTlas = 0, // Top level acceleration structure,
+eBindingRaytraceImage = 1 // Ray tracer image
 END_BINDING();
 
 START_BINDING(BindingsPost)

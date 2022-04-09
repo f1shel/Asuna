@@ -12,7 +12,6 @@
 
 #include <cstdint>
 #include <vector>
-using namespace std;
 
 // autogen shaders
 #include "../../assets/@autogen/graphic.idle.vert.h"
@@ -35,31 +34,34 @@ void PipelineGraphic::init(PipelineCorrelated* pPipCorr)
 
 void PipelineGraphic::deinit()
 {
-    PipelineAware::deinit();
-
     auto& m_alloc = m_pContext->m_alloc;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
-    auto& m_cmdPool = m_pContext->getAppCmdPool();
+    auto m_device = m_pContext->getDevice();
+    auto m_cmdPool = m_pContext->getCommandPool();
 
     vkFreeCommandBuffers(m_device, m_cmdPool, 1, &m_recordedCmdBuffer);
     m_recordedCmdBuffer = VK_NULL_HANDLE;
     
     m_alloc.destroy(m_tColor);
     m_alloc.destroy(m_tDepth);
+    m_alloc.destroy(m_bCamera);
     vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
     vkDestroyFramebuffer(m_device, m_offscreenFramebuffer, nullptr);
     m_offscreenRenderPass = VK_NULL_HANDLE;
     m_offscreenFramebuffer = VK_NULL_HANDLE;
+
+    m_pcGraphic = { 0 };
+
+    PipelineAware::deinit();
 }
 
 void PipelineGraphic::createOffscreenResources()
 {
     auto& m_alloc = m_pContext->m_alloc;
     auto& m_debug = m_pContext->m_debug;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
-    auto& m_physicalDevice = m_pContext->m_vkcontext.m_physicalDevice;
+    auto m_device = m_pContext->getDevice();
+    auto m_physicalDevice = m_pContext->getPhysicalDevice();
     auto m_size = m_pContext->getSize();
-    auto m_graphicsQueueIndex = m_pContext->getAppGraphicsQueueIndex();
+    auto m_graphicsQueueIndex = m_pContext->getQueueFamily();
 
     m_alloc.destroy(m_tColor);
     m_alloc.destroy(m_tDepth);
@@ -133,7 +135,7 @@ void PipelineGraphic::createOffscreenResources()
 // TODO: nbtxt
 void PipelineGraphic::createGraphicDescriptorSetLayout()
 {
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     nvvk::DescriptorSetBindings& bind = m_dstSetLayoutBind;
 
@@ -151,7 +153,7 @@ void PipelineGraphic::createGraphicDescriptorSetLayout()
 void PipelineGraphic::createGraphicPipeline()
 {
     auto& m_debug = m_pContext->m_debug;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     // Creating the Pipeline Layout
     VkPushConstantRange pushConstantRanges = {
@@ -199,7 +201,7 @@ void PipelineGraphic::createCameraBuffer()
 void PipelineGraphic::updateGraphicDescriptorSet()
 {
     auto& bind = m_dstSetLayoutBind;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     std::vector<VkWriteDescriptorSet> writes;
 

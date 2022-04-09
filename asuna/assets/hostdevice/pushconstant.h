@@ -1,5 +1,5 @@
-#ifndef TTLL_PUSHCONSTANT_H
-#define TTLL_PUSHCONSTANT_H
+#ifndef PUSHCONSTANT_H
+#define PUSHCONSTANT_H
 
 #include "binding.h"
 

@@ -24,6 +24,7 @@ public:
         vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_dstSet, 0, nullptr);
         vkCmdDraw(cmdBuf, 3, 1, 0, 0);
     };
+    virtual void deinit();
 private:
     // Accompanied graphic pipeline
     PipelineGraphic* m_pPipGraphic = nullptr;

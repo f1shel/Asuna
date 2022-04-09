@@ -9,7 +9,6 @@
 
 #include <cstdint>
 #include <vector>
-using namespace std;
 
 void PipelinePost::init(PipelineCorrelated* pPipCorr)
 {
@@ -25,9 +24,16 @@ void PipelinePost::init(PipelineCorrelated* pPipCorr)
     LOGI("[ ] Pipeline: %6.2fms Post pipeline creation\n", sw_.elapsed());
 }
 
+void PipelinePost::deinit()
+{
+    m_pPipGraphic = nullptr;
+    
+    PipelineAware::deinit();
+}
+
 void PipelinePost::createPostDescriptorSetLayout()
 {
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     // The descriptor layout is the description of the data that is passed to the vertex or the  fragment program.
     nvvk::DescriptorSetBindings& bind = m_dstSetLayoutBind;
@@ -40,7 +46,7 @@ void PipelinePost::createPostDescriptorSetLayout()
 void PipelinePost::createPostPipeline()
 {
     auto& m_debug = m_pContext->m_debug;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     //// Push constants in the fragment shader
     //VkPushConstantRange pushConstantRanges = { VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Tonemapper) };
@@ -69,7 +75,7 @@ void PipelinePost::createPostPipeline()
 
 void PipelinePost::updatePostDescriptorSet()
 {
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     wds.dstSet = m_dstSet;

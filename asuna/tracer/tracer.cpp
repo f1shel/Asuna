@@ -1,7 +1,6 @@
 #include "tracer.h"
 
 #include <iostream>
-using namespace std;
 
 #include <nvvk/structs_vk.hpp>
 #include <nvvk/context_vk.hpp>
@@ -13,15 +12,22 @@ using namespace std;
 void Tracer::init()
 {
     m_context.init();
+
+    m_scene.init(&m_context);
+    m_scene.create("scenes/dragon_singleton/scene.json");
+    
     PipelineCorrelated* pPipCorrGraphic = new PipelineCorrelatedRaytrace;
     pPipCorrGraphic->m_pContext = &m_context;
     pPipCorrGraphic->m_pScene = &m_scene;
     m_pipelineGraphic.init(pPipCorrGraphic);
+    
     PipelineCorrelatedRaytrace* pPipCorrRaytrace = (PipelineCorrelatedRaytrace*)pPipCorrGraphic;
     pPipCorrRaytrace->m_pPipGraphic = &m_pipelineGraphic;
     m_pipelineRaytrace.init(pPipCorrRaytrace);
+    
     PipelineCorrelatedPost* pPipCorrPost = (PipelineCorrelatedPost*)pPipCorrRaytrace;
     m_pipelinePost.init(pPipCorrPost);
+    
     delete pPipCorrGraphic;
 }
 
@@ -47,6 +53,9 @@ void Tracer::run()
         
         {
             vkBeginCommandBuffer(cmdBuf, &beginInfo);
+            {
+                m_pipelineGraphic.run(cmdBuf);
+            }
             {
                 m_pipelineRaytrace.run(cmdBuf);
             }
@@ -82,5 +91,8 @@ void Tracer::run()
 void Tracer::deinit()
 {
     m_pipelineGraphic.deinit();
+    m_pipelineRaytrace.deinit();
+    m_pipelinePost.deinit();
+    m_scene.deinit();
     m_context.deinit();
 }

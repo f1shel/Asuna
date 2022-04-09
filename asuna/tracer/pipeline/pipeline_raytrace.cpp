@@ -2,10 +2,14 @@
 
 #include <nvh/timesampler.hpp>
 #include "nvvk/shaders_vk.hpp"
+#include <nvvk/buffers_vk.hpp>
 
 #include "../../assets/@autogen/raytrace.uvtest.rgen.h"
 #include "../../assets/@autogen/raytrace.uvtest.rchit.h"
 #include "../../assets/@autogen/raytrace.uvtest.rmiss.h"
+#include "../../assets/@autogen/raytrace.intersectiontest.rgen.h"
+#include "../../assets/@autogen/raytrace.intersectiontest.rchit.h"
+#include "../../assets/@autogen/raytrace.intersectiontest.rmiss.h"
 
 void PipelineRaytrace::init(PipelineCorrelated* pPipCorr)
 {
@@ -26,14 +30,23 @@ void PipelineRaytrace::init(PipelineCorrelated* pPipCorr)
 
 void PipelineRaytrace::deinit()
 {
+    m_blas.clear();
+    m_tlas.clear();
+    m_pPipGraphic = nullptr;
+    m_pcRaytrace = { 0 };
+
+    m_rtBuilder.destroy();
+    m_sbt.destroy();
+
+    PipelineAware::deinit();
 }
 
 void PipelineRaytrace::initRayTracing()
 {
     auto& m_alloc = m_pContext->m_alloc;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
-    auto& m_physicalDevice = m_pContext->m_vkcontext.m_physicalDevice;
-    auto m_graphicsQueueIndex = m_pContext->getAppGraphicsQueueIndex();
+    auto m_device = m_pContext->getDevice();
+    auto m_physicalDevice = m_pContext->getPhysicalDevice();
+    auto m_graphicsQueueIndex = m_pContext->getQueueFamily();
 
     // Requesting ray tracing properties
     VkPhysicalDeviceProperties2 prop2 = nvvk::make<VkPhysicalDeviceProperties2>();;
@@ -44,32 +57,90 @@ void PipelineRaytrace::initRayTracing()
     m_sbt.setup(m_device, m_graphicsQueueIndex, &m_alloc, m_rtProperties);
 }
 
-// TODO: add geometry
-void PipelineRaytrace::createBottomLevelAS()
+static nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice device, const MeshAlloc& meshAlloc)
 {
-    // BLAS - Storing each primitive in a geometry
-    m_blas.clear();
-    //m_rtBuilder.buildBlas(m_blas, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR
-    //    | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR);
+    // BLAS builder requires raw device addresses.
+    VkDeviceAddress vertexAddress = nvvk::getBufferDeviceAddress(device, meshAlloc.m_bVertices.buffer);
+    VkDeviceAddress indexAddress = nvvk::getBufferDeviceAddress(device, meshAlloc.m_bIndices.buffer);
+
+    uint32_t maxPrimitiveCount = meshAlloc.m_nIndices / 3;
+
+    // Describe buffer as array of Vertex.
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
+    triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
+    triangles.vertexData.deviceAddress = vertexAddress;
+    triangles.vertexStride = sizeof(Vertex);
+    // Describe index data (32-bit unsigned int)
+    triangles.indexType = VK_INDEX_TYPE_UINT32;
+    triangles.indexData.deviceAddress = indexAddress;
+    // Indicate identity transform by setting transformData to null device pointer.
+    //triangles.transformData = {};
+    triangles.maxVertex = meshAlloc.m_nVertices;
+
+    // Identify the above data as containing opaque triangles.
+    VkAccelerationStructureGeometryKHR asGeom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+    asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    asGeom.geometry.triangles = triangles;
+
+    // The entire array will be used to build the BLAS.
+    VkAccelerationStructureBuildRangeInfoKHR offset;
+    offset.firstVertex = 0;
+    offset.primitiveCount = maxPrimitiveCount;
+    offset.primitiveOffset = 0;
+    offset.transformOffset = 0;
+
+    // Our blas is made from only one geometry, but could be made of many geometries
+    nvvk::RaytracingBuilderKHR::BlasInput input;
+    input.asGeometry.emplace_back(asGeom);
+    input.asBuildOffsetInfo.emplace_back(offset);
+
+    return input;
 }
 
-// TODO: add geometry
+void PipelineRaytrace::createBottomLevelAS()
+{
+    auto m_device = m_pContext->getDevice();
+    // BLAS - Storing each primitive in a geometry
+    m_blas.reserve(m_pScene->getMeshesNum());
+    for (uint32_t meshId = 0; meshId < m_pScene->getMeshesNum(); meshId++)
+    {
+        auto blas = MeshBufferToBlas(m_device, * m_pScene->getMeshAlloc(meshId));
+        // We could add more geometry in each BLAS, but we add only one for now
+        m_blas.push_back(blas);
+    }
+    m_rtBuilder.buildBlas(m_blas, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR
+        | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR);
+}
+
 void PipelineRaytrace::createTopLevelAS()
 {
-    m_tlas.clear();
-    //m_rtBuilder.buildTlas(m_tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
-    //    | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    m_tlas.reserve(m_pScene->getInstancesNum());
+    for (auto pInst : m_pScene->getInstances())
+    {
+        VkAccelerationStructureInstanceKHR rayInst{};
+        rayInst.transform = nvvk::toTransformMatrixKHR(pInst->m_transform);
+        rayInst.instanceCustomIndex = pInst->m_meshIndex; // gl_InstanceCustomIndexEXT
+        rayInst.accelerationStructureReference = m_rtBuilder.getBlasDeviceAddress(pInst->m_meshIndex);
+        rayInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        rayInst.mask = 0xFF;       //  Only be hit if rayMask & instance.mask != 0
+        rayInst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
+        m_tlas.emplace_back(rayInst);
+    }
+
+    m_rtBuilder.buildTlas(m_tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
+        | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
 }
 
 void PipelineRaytrace::createRtDescriptorSetLayout()
 {
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     // This descriptor set, holds the top level acceleration structure and the output image
     nvvk::DescriptorSetBindings& bind = m_dstSetLayoutBind;
 
     // Create Binding Set
-    //bind.addBinding(BindingsRaytrace::eBindingRaytraceTlas, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL);
+    bind.addBinding(BindingsRaytrace::eBindingRaytraceTlas, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL);
     bind.addBinding(BindingsRaytrace::eBindingRaytraceImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL);
     m_dstPool = bind.createPool(m_device);
     m_dstLayout = bind.createLayout(m_device);
@@ -79,7 +150,7 @@ void PipelineRaytrace::createRtDescriptorSetLayout()
 void PipelineRaytrace::createRtPipeline()
 {
     auto& m_debug = m_pContext->m_debug;
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
 
     // Creating all shaders
     enum StageIndices
@@ -95,22 +166,26 @@ void PipelineRaytrace::createRtPipeline()
         nvvk::make<VkPipelineShaderStageCreateInfo>();
     stage.pName = "main";  // All the same entry point
     // Raygen
-    stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rgen, sizeof(raytrace_uvtest_rgen));
+    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rgen, sizeof(raytrace_uvtest_rgen));
+    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rgen, sizeof(raytrace_intersectiontest_rgen));
     stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     stages[eRaygen] = stage;
     NAME2_VK(stage.module, "Raygen");
     // Miss
-    stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
+    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
+    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rmiss, sizeof(raytrace_intersectiontest_rmiss));
     stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
     stages[eRayMiss] = stage;
     NAME2_VK(stage.module, "RayMiss");
     // Miss
-    stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
+    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
+    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rmiss, sizeof(raytrace_intersectiontest_rmiss));
     stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
     stages[eShadowMiss] = stage;
     NAME2_VK(stage.module, "ShadowMiss");
     // Closet hit
-    stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rchit, sizeof(raytrace_uvtest_rchit));
+    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rchit, sizeof(raytrace_uvtest_rchit));
+    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rchit, sizeof(raytrace_intersectiontest_rchit));
     stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
     stages[eClosestHit] = stage;
     NAME2_VK(stage.module, "Closethit");
@@ -161,18 +236,18 @@ void PipelineRaytrace::createRtPipeline()
 // TODO: add geometry
 void PipelineRaytrace::updateRtDescriptorSet()
 {
-    auto& m_device = m_pContext->m_vkcontext.m_device;
+    auto m_device = m_pContext->getDevice();
     // This descriptor set, holds the top level acceleration structure and the output image
     nvvk::DescriptorSetBindings& bind = m_dstSetLayoutBind;
     // Write to descriptors
-    //VkAccelerationStructureKHR tlas = m_rtBuilder.getAccelerationStructure();
-    //VkWriteDescriptorSetAccelerationStructureKHR descASInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR };
-    //descASInfo.accelerationStructureCount = 1;
-    //descASInfo.pAccelerationStructures = &tlas;
+    VkAccelerationStructureKHR tlas = m_rtBuilder.getAccelerationStructure();
+    VkWriteDescriptorSetAccelerationStructureKHR descASInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR };
+    descASInfo.accelerationStructureCount = 1;
+    descASInfo.pAccelerationStructures = &tlas;
     VkDescriptorImageInfo imageInfo{ {}, m_pPipGraphic->m_tColor.descriptor.imageView, VK_IMAGE_LAYOUT_GENERAL};
 
     std::vector<VkWriteDescriptorSet> writes;
-    //writes.emplace_back(bind.makeWrite(m_dstSet, BindingsRaytrace::eBindingRaytraceTlas, &descASInfo));
+    writes.emplace_back(bind.makeWrite(m_dstSet, BindingsRaytrace::eBindingRaytraceTlas, &descASInfo));
     writes.emplace_back(bind.makeWrite(m_dstSet, BindingsRaytrace::eBindingRaytraceImage, &imageInfo));
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }

@@ -15,7 +15,7 @@ private:
     // context
     ContextAware m_context;
     // scene
-    SceneAware m_scene;
+    Scene m_scene;
     // pipelines
     PipelineGraphic m_pipelineGraphic;
     PipelineRaytrace m_pipelineRaytrace;

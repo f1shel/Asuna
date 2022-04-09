@@ -1,5 +1,5 @@
-#ifndef ASUNA_VERTEX_H
-#define ASUNA_VERTEX_H
+#ifndef VERTEX_H
+#define VERTEX_H
 
 #include "binding.h"
 

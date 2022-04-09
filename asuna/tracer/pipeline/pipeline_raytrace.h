@@ -27,7 +27,7 @@ public:
             sizeof(PushConstantRaytrace), &m_pcRaytrace);
 
         const auto& regions = m_sbt.getRegions();
-        auto& size = m_pContext->getAppSize();
+        auto& size = m_pContext->getSize();
         vkCmdTraceRaysKHR(cmdBuf, &regions[0], &regions[1], &regions[2], &regions[3], size.width, size.height, 1);
     };
 private:
@@ -45,17 +45,17 @@ private:
 private:
     // Accompanied graphic pipeline
     PipelineGraphic* m_pPipGraphic = nullptr;
-    // Shading binding table wrapper
-    nvvk::SBTWrapper m_sbt;
     // Pipeline properties
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties =
     { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+    // Shading binding table wrapper
+    nvvk::SBTWrapper m_sbt;
     // Pipeline builder
     nvvk::RaytracingBuilderKHR m_rtBuilder;
     // Top level acceleration structures
-    std::vector<VkAccelerationStructureInstanceKHR> m_tlas;
+    std::vector<VkAccelerationStructureInstanceKHR> m_tlas{};
     // Bottom level acceleration structures
-    std::vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas;
+    std::vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};
     // Push constant
-    PushConstantRaytrace m_pcRaytrace;
+    PushConstantRaytrace m_pcRaytrace{ 0 };
 };

@@ -9,7 +9,7 @@ class PipelineCorrelated
 {
 public:
     ContextAware* m_pContext = nullptr;
-    SceneAware* m_pScene = nullptr;
+    Scene* m_pScene = nullptr;
 };
 
 // All it needs to create a pipeline
@@ -22,7 +22,7 @@ public:
         assert((m_pContext != nullptr) && "[!] Pipeline Error: failed to find belonging context when deinit.");
 
         auto& m_alloc = m_pContext->m_alloc;
-        auto& m_device = m_pContext->m_vkcontext.m_device;
+        auto m_device = m_pContext->getDevice();
 
         vkDestroyPipeline(m_device, m_pipeline, nullptr);
         vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
@@ -33,10 +33,13 @@ public:
         m_dstPool = VK_NULL_HANDLE;
         m_dstLayout = VK_NULL_HANDLE;
         m_dstSetLayoutBind = {};
+
+        m_pContext = nullptr;
+        m_pScene = nullptr;
     };
 public:
     ContextAware* m_pContext = nullptr;
-    SceneAware* m_pScene = nullptr;
+    Scene* m_pScene = nullptr;
     VkPipeline m_pipeline{ VK_NULL_HANDLE };
     VkPipelineLayout m_pipelineLayout{ VK_NULL_HANDLE };
     VkDescriptorSet m_dstSet{ VK_NULL_HANDLE };
