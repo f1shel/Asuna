@@ -10,5 +10,5 @@ layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
 void main() {
-	payload.radiance = vec3(1.0,0.0,0.0);
+	payload.radiance = vec3(gl_HitTEXT/10.0);
 }

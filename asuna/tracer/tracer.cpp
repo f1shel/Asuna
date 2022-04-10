@@ -14,7 +14,7 @@ void Tracer::init()
     m_context.init();
 
     m_scene.init(&m_context);
-    m_scene.create("scenes/dragon_singleton/scene.json");
+    m_scene.create("../scenes/dragon_singleton/scene.json");
     
     PipelineCorrelated* pPipCorrGraphic = new PipelineCorrelatedRaytrace;
     pPipCorrGraphic->m_pContext = &m_context;

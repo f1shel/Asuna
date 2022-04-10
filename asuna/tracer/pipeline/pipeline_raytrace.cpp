@@ -192,7 +192,7 @@ void PipelineRaytrace::createRtPipeline()
     // Shader groups
     VkRayTracingShaderGroupCreateInfoKHR group =
         nvvk::make<VkRayTracingShaderGroupCreateInfoKHR>();
-    std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups;
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
 
     // Raygen
     group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
@@ -200,6 +200,17 @@ void PipelineRaytrace::createRtPipeline()
     group.closestHitShader = VK_SHADER_UNUSED_KHR;
     group.generalShader = eRaygen;
     group.intersectionShader = VK_SHADER_UNUSED_KHR;
+    shaderGroups.push_back(group);
+
+    // Miss
+    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.generalShader = eRayMiss;
+    shaderGroups.push_back(group);
+
+    // closest hit shader
+    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    group.generalShader = VK_SHADER_UNUSED_KHR;
+    group.closestHitShader = eClosestHit;
     shaderGroups.push_back(group);
 
     // Push constant: we want to be able to update constants used by the shaders
