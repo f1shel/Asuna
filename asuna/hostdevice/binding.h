@@ -27,7 +27,8 @@ using uint = unsigned int;
 #endif
 
 START_BINDING(BindingsGraphic)
-eBindingGraphicCamera = 0 // Global uniform containing camera matrices
+eBindingGraphicCamera = 0, // Global uniform containing camera matrices
+eBindingGraphicSceneDesc = 1
 END_BINDING();
 
 START_BINDING(BindingsRaytrace)

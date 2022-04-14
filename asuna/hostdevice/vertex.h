@@ -5,8 +5,8 @@
 
 struct Vertex
 {
-    vec3 position;
-    vec2 texCoord;
+    vec3 pos;
+    vec2 uv;
     vec3 normal;
     vec3 tangent;
 };

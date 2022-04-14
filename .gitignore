@@ -3,7 +3,5 @@ bin_*/
 .idea/
 cmake-build-*/
 build/
-test/
 asuna/third_party/downloaded_resources/
-backup/
-asuna/assets/@autogen/
+scenes/

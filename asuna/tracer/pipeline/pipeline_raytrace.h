@@ -2,7 +2,7 @@
 
 #include "pipeline.h"
 #include "pipeline_graphic.h"
-#include "../../assets/hostdevice/pushconstant.h"
+#include "../../hostdevice/pushconstant.h"
 
 #include "nvvk/raytraceKHR_vk.hpp"
 #include "nvvk/sbtwrapper_vk.hpp"

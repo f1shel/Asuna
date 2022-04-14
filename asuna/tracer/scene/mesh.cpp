@@ -32,7 +32,7 @@ void Mesh::init(const std::string& meshPath)
 	{
 		Vertex vertex = {};
 		const float* vp = &attrib.vertices[3 * index.vertex_index];
-		vertex.position = { *(vp + 0), *(vp + 1), *(vp + 2) };
+		vertex.pos = { *(vp + 0), *(vp + 1), *(vp + 2) };
 
 		if (!attrib.normals.empty() && index.normal_index >= 0)
 		{
@@ -43,7 +43,7 @@ void Mesh::init(const std::string& meshPath)
 		if (!attrib.texcoords.empty() && index.texcoord_index >= 0)
 		{
 			const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
-			vertex.texCoord = { *tp, 1.0f - *(tp + 1) };
+			vertex.uv = { *tp, 1.0f - *(tp + 1) };
 		}
 
 		m_vertices.push_back(vertex);

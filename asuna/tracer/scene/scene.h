@@ -4,7 +4,7 @@
 #include "sensor.h"
 #include "mesh.h"
 #include "instance.h"
-#include "../../assets/hostdevice/scene.h"
+#include "../../hostdevice/scene.h"
 
 #include "../../third_party/json/json.hpp"
 
@@ -43,6 +43,8 @@ public:
 private:
 	SceneDescAlloc* m_pSceneDescAlloc = nullptr;
 	void allocSceneDesc(ContextAware* pContext, const VkCommandBuffer& cmdBuf);
+public:
+	nvvk::Buffer getSceneDescBuffer();
 
 //Instance
 private:

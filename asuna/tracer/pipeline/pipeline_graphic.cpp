@@ -1,7 +1,7 @@
 #include "pipeline_graphic.h"
-#include "../../assets/hostdevice/vertex.h"
-#include "../../assets/hostdevice/camera.h"
-#include "../../assets/hostdevice/pushconstant.h"
+#include "../../hostdevice/vertex.h"
+#include "../../hostdevice/camera.h"
+#include "../../hostdevice/pushconstant.h"
 
 #include "nvvk/images_vk.hpp"
 #include "nvvk/renderpasses_vk.hpp"
@@ -9,18 +9,15 @@
 #include <nvvk/structs_vk.hpp>
 #include <nvvk/commands_vk.hpp>
 #include <nvh/timesampler.hpp>
+#include <nvh/fileoperations.hpp>
 
 #include <cstdint>
 #include <vector>
 
-// autogen shaders
-#include "../../assets/@autogen/graphic.idle.vert.h"
-#include "../../assets/@autogen/graphic.idle.frag.h"
-
 void PipelineGraphic::init(PipelineCorrelated* pPipCorr)
 {
     m_pContext = pPipCorr->m_pContext;
-    //m_pScene = pPipCorr->m_pScene;
+    m_pScene = pPipCorr->m_pScene;
     // Graphic
     // 创建光栅化管线
     nvh::Stopwatch sw_;
@@ -142,6 +139,9 @@ void PipelineGraphic::createGraphicDescriptorSetLayout()
     // Camera matrices
     bind.addBinding(BindingsGraphic::eBindingGraphicCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
+    // Mesh descriptions
+    bind.addBinding(BindingsGraphic::eBindingGraphicSceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
 
     m_dstLayout = bind.createLayout(m_device);
@@ -166,20 +166,21 @@ void PipelineGraphic::createGraphicPipeline()
     createInfo.pPushConstantRanges = &pushConstantRanges;
     vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_pipelineLayout);
 
-    // Shader source (Spir-V)
-    std::vector<uint32_t> vertexShader(std::begin(graphic_idle_vert), std::end(graphic_idle_vert));
-    std::vector<uint32_t> fragShader(std::begin(graphic_idle_frag), std::end(graphic_idle_frag));
-
     // Creating the Pipeline
     nvvk::GraphicsPipelineGeneratorCombined gpb(m_device, m_pipelineLayout, m_offscreenRenderPass);
     gpb.depthStencilState.depthTestEnable = true;
-    gpb.addShader(vertexShader, VK_SHADER_STAGE_VERTEX_BIT);
-    gpb.addShader(fragShader, VK_SHADER_STAGE_FRAGMENT_BIT);
+    gpb.addShader(
+        nvh::loadFile("shaders/graphic.idle.vert.spv", true, m_pContext->m_root),
+        VK_SHADER_STAGE_VERTEX_BIT);
+    gpb.addShader(
+        nvh::loadFile("shaders/graphic.idle.frag.spv", true, m_pContext->m_root),
+        VK_SHADER_STAGE_FRAGMENT_BIT);
     gpb.addBindingDescriptions({ {0, sizeof(Vertex)} });
     gpb.addAttributeDescriptions({
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, position))},
-        {1, 0, VK_FORMAT_R32G32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, texCoord))},
+        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, pos))},
+        {1, 0, VK_FORMAT_R32G32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, uv))},
         {2, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, normal))},
+        {3, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(Vertex, tangent))},
         });
     m_pipeline = gpb.createPipeline();
     NAME2_VK(m_pipeline, "Graphics");
@@ -206,8 +207,11 @@ void PipelineGraphic::updateGraphicDescriptorSet()
     std::vector<VkWriteDescriptorSet> writes;
 
     // Camera matrices and scene description
-    VkDescriptorBufferInfo dbiUnif{ m_bCamera.buffer, 0, VK_WHOLE_SIZE };
-    writes.emplace_back(bind.makeWrite(m_dstSet, BindingsGraphic::eBindingGraphicCamera, &dbiUnif));
+    VkDescriptorBufferInfo dbiCamera{ m_bCamera.buffer, 0, VK_WHOLE_SIZE };
+    writes.emplace_back(bind.makeWrite(m_dstSet, BindingsGraphic::eBindingGraphicCamera, &dbiCamera));
+
+    VkDescriptorBufferInfo dbiSceneDesc{ m_pScene->getSceneDescBuffer().buffer, 0, VK_WHOLE_SIZE};
+    writes.emplace_back(bind.makeWrite(m_dstSet, BindingsGraphic::eBindingGraphicSceneDesc, &dbiSceneDesc));
 
     // Writing the information
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);

@@ -32,7 +32,7 @@ public:
         createAppContext();
         // Search path for shaders and other media
         m_root.emplace_back(NVPSystem::exePath());
-        m_root.emplace_back(NVPSystem::exePath() + PROJECT_RELDIRECTORY);
+        m_root.emplace_back(NVPSystem::exePath() + "..");
     }
     void deinit() {
         m_root.clear();

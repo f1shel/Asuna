@@ -1,11 +1,10 @@
 #include "pipeline_post.h"
 
+#include "../../hostdevice/binding.h"
+
 #include <nvvk/debug_util_vk.hpp>
 #include <nvh/timesampler.hpp>
-
-#include "../../assets/hostdevice/binding.h"
-#include "../../assets/@autogen/post.idle.frag.h"
-#include "../../assets/@autogen/post.idle.vert.h"
+#include <nvh/fileoperations.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -61,12 +60,13 @@ void PipelinePost::createPostPipeline()
     vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_pipelineLayout);
 
     // Pipeline: completely generic, no vertices
-    std::vector<uint32_t> vertexShader(std::begin(post_idle_vert), std::end(post_idle_vert));
-    std::vector<uint32_t> fragShader(std::begin(post_idle_frag), std::end(post_idle_frag));
-
     nvvk::GraphicsPipelineGeneratorCombined pipelineGenerator(m_device, m_pipelineLayout, m_pContext->getRenderPass());
-    pipelineGenerator.addShader(vertexShader, VK_SHADER_STAGE_VERTEX_BIT);
-    pipelineGenerator.addShader(fragShader, VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipelineGenerator.addShader(
+        nvh::loadFile("shaders/post.idle.vert.spv", true, m_pContext->m_root),
+        VK_SHADER_STAGE_VERTEX_BIT);
+    pipelineGenerator.addShader(
+        nvh::loadFile("shaders/post.idle.frag.spv", true, m_pContext->m_root),
+        VK_SHADER_STAGE_FRAGMENT_BIT);
     pipelineGenerator.rasterizationState.cullMode = VK_CULL_MODE_NONE;
 
     m_pipeline = pipelineGenerator.createPipeline();

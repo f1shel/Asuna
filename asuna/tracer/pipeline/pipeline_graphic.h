@@ -1,8 +1,8 @@
 #pragma once
 
 #include "pipeline.h"
-#include "../../assets/hostdevice/pushconstant.h"
-#include "../../assets/hostdevice/camera.h"
+#include "../../hostdevice/pushconstant.h"
+#include "../../hostdevice/camera.h"
 
 class PipelineGraphic : public PipelineAware
 {

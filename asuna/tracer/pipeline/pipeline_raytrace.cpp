@@ -3,13 +3,7 @@
 #include <nvh/timesampler.hpp>
 #include "nvvk/shaders_vk.hpp"
 #include <nvvk/buffers_vk.hpp>
-
-#include "../../assets/@autogen/raytrace.uvtest.rgen.h"
-#include "../../assets/@autogen/raytrace.uvtest.rchit.h"
-#include "../../assets/@autogen/raytrace.uvtest.rmiss.h"
-#include "../../assets/@autogen/raytrace.intersectiontest.rgen.h"
-#include "../../assets/@autogen/raytrace.intersectiontest.rchit.h"
-#include "../../assets/@autogen/raytrace.intersectiontest.rmiss.h"
+#include <nvh/fileoperations.hpp>
 
 void PipelineRaytrace::init(PipelineCorrelated* pPipCorr)
 {
@@ -158,34 +152,30 @@ void PipelineRaytrace::createRtPipeline()
         eRaygen,
         eRayMiss,
         eClosestHit,
-        eShadowMiss,
         eShaderGroupCount
     };
-    std::array<VkPipelineShaderStageCreateInfo, 4> stages{};
+    std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
     VkPipelineShaderStageCreateInfo stage =
         nvvk::make<VkPipelineShaderStageCreateInfo>();
     stage.pName = "main";  // All the same entry point
     // Raygen
-    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rgen, sizeof(raytrace_uvtest_rgen));
-    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rgen, sizeof(raytrace_intersectiontest_rgen));
+    stage.module = nvvk::createShaderModule(
+        m_device,
+        nvh::loadFile("shaders/raytrace.intersectiontest.rgen.spv", true, m_pContext->m_root));
     stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     stages[eRaygen] = stage;
     NAME2_VK(stage.module, "Raygen");
     // Miss
-    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
-    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rmiss, sizeof(raytrace_intersectiontest_rmiss));
+    stage.module = nvvk::createShaderModule(
+        m_device,
+        nvh::loadFile("shaders/raytrace.intersectiontest.rmiss.spv", true, m_pContext->m_root));
     stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
     stages[eRayMiss] = stage;
     NAME2_VK(stage.module, "RayMiss");
-    // Miss
-    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rmiss, sizeof(raytrace_uvtest_rmiss));
-    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rmiss, sizeof(raytrace_intersectiontest_rmiss));
-    stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-    stages[eShadowMiss] = stage;
-    NAME2_VK(stage.module, "ShadowMiss");
     // Closet hit
-    //stage.module = nvvk::createShaderModule(m_device, raytrace_uvtest_rchit, sizeof(raytrace_uvtest_rchit));
-    stage.module = nvvk::createShaderModule(m_device, raytrace_intersectiontest_rchit, sizeof(raytrace_intersectiontest_rchit));
+    stage.module = nvvk::createShaderModule(
+        m_device,
+        nvh::loadFile("shaders/raytrace.intersectiontest.rchit.spv", true, m_pContext->m_root));
     stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
     stages[eClosestHit] = stage;
     NAME2_VK(stage.module, "Closethit");
@@ -194,12 +184,14 @@ void PipelineRaytrace::createRtPipeline()
         nvvk::make<VkRayTracingShaderGroupCreateInfoKHR>();
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
 
-    // Raygen
-    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
     group.anyHitShader = VK_SHADER_UNUSED_KHR;
     group.closestHitShader = VK_SHADER_UNUSED_KHR;
-    group.generalShader = eRaygen;
     group.intersectionShader = VK_SHADER_UNUSED_KHR;
+    group.generalShader = VK_SHADER_UNUSED_KHR;
+
+    // Raygen
+    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.generalShader = eRaygen;
     shaderGroups.push_back(group);
 
     // Miss

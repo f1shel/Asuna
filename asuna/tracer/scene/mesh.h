@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../context/context.h"
-#include "../../assets/hostdevice/vertex.h"
-#include "../../assets/hostdevice/scene.h"
+#include "../../hostdevice/vertex.h"
+#include "../../hostdevice/scene.h"
 
 #include <vector>
 #include <string>

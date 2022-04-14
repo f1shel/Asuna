@@ -174,3 +174,8 @@ void Scene::allocSceneDesc(ContextAware* pContext, const VkCommandBuffer& cmdBuf
 	m_pSceneDescAlloc = new SceneDescAlloc;
 	m_pSceneDescAlloc->init(pContext, m_meshAllocLUT, cmdBuf);
 }
+
+nvvk::Buffer Scene::getSceneDescBuffer()
+{
+	return m_pSceneDescAlloc->m_bSceneDesc;
+}

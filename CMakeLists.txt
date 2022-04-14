@@ -66,29 +66,29 @@ file(GLOB SRC_TRACER_PIPELINE
     ${PROJNAME}/tracer/pipeline/*.cpp)
 
 # Source files for this project
-file(GLOB SRC_ASSETS_HOSTDEVICE
-    ${PROJNAME}/assets/hostdevice/*.h
+file(GLOB SRC_HOSTDEVICE
+    ${PROJNAME}/hostdevice/*.h
 )
 
-file(GLOB SRC_ASSETS_SHADERS_RAYTRACE_COMMON
-    ${PROJNAME}/assets/shaders/raytrace/common/*.glsl
+file(GLOB SRC_SHADERS_RAYTRACE_COMMON
+    ${PROJNAME}/shaders/raytrace/common/*.glsl
 )
 
-file(GLOB SRC_ASSETS_SHADERS_RAYTRACE
-    ${PROJNAME}/assets/shaders/raytrace/*.rgen
-    ${PROJNAME}/assets/shaders/raytrace/*.rahit
-    ${PROJNAME}/assets/shaders/raytrace/*.rchit
-    ${PROJNAME}/assets/shaders/raytrace/*.rmiss
+file(GLOB SRC_SHADERS_RAYTRACE
+    ${PROJNAME}/shaders/raytrace/*.rgen
+    ${PROJNAME}/shaders/raytrace/*.rahit
+    ${PROJNAME}/shaders/raytrace/*.rchit
+    ${PROJNAME}/shaders/raytrace/*.rmiss
 )
 
-file(GLOB SRC_ASSETS_SHADERS_GRAPHIC
-    ${PROJNAME}/assets/shaders/graphic/*.frag
-    ${PROJNAME}/assets/shaders/graphic/*.vert
+file(GLOB SRC_SHADERS_GRAPHIC
+    ${PROJNAME}/shaders/graphic/*.frag
+    ${PROJNAME}/shaders/graphic/*.vert
 )
 
-file(GLOB SRC_ASSETS_SHADERS_POST
-    ${PROJNAME}/assets/shaders/post/*.frag
-    ${PROJNAME}/assets/shaders/post/*.vert
+file(GLOB SRC_SHADERS_POST
+    ${PROJNAME}/shaders/post/*.frag
+    ${PROJNAME}/shaders/post/*.vert
 )
 
 file(GLOB SRC_3RDPARTY_JSON
@@ -102,66 +102,49 @@ source_group("asuna\\tracer\\context" FILES ${SRC_TRACER_CONTEXT})
 source_group("asuna\\tracer\\scene" FILES ${SRC_TRACER_SCENE})
 source_group("asuna\\tracer\\resource" FILES ${SRC_TRACER_RESOURCE})
 source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
-source_group("asuna\\assets\\hostdevice" FILES ${SRC_ASSETS_HOSTDEVICE})
-source_group("asuna\\assets\\shaders\\raytrace" FILES ${SRC_ASSETS_SHADERS_RAYTRACE})
-source_group("asuna\\assets\\shaders\\raytrace\\common" FILES ${SRC_ASSETS_SHADERS_RAYTRACE_COMMON})
-source_group("asuna\\assets\\shaders\\graphic" FILES ${SRC_ASSETS_SHADERS_GRAPHIC})
-source_group("asuna\\assets\\shaders\\post" FILES ${SRC_ASSETS_SHADERS_POST})
+source_group("asuna\\hostdevice" FILES ${SRC_HOSTDEVICE})
+source_group("asuna\\shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
+source_group("asuna\\shaders\\raytrace\\common" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
+source_group("asuna\\shaders\\graphic" FILES ${SRC_SHADERS_GRAPHIC})
+source_group("asuna\\shaders\\post" FILES ${SRC_SHADERS_POST})
 
 # GLSL to SPIR-V custom build
 set(SAMPLES_BASESAMPLE_DEPENDENCIES OFF CACHE BOOL "Create dependies on GLSL files")
 compile_glsl(
     SOURCE_FILES
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.uvtest.rchit
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.uvtest.rgen
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.uvtest.rmiss
+        ${SRC_SHADERS_RAYTRACE}
     HEADER_FILES
-        ${SRC_ASSETS_HOSTDEVICE}
-        ${SRC_ASSETS_SHADERS_RAYTRACE_COMMON}
+        ${SRC_HOSTDEVICE}
+        ${SRC_SHADERS_RAYTRACE_COMMON}
     DST
-        "${PROJNAME}/assets/@autogen"
+        "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
         "vulkan1.3"
-    HEADER ON
+    HEADER OFF
     DEPENDENCY ON
 )
 compile_glsl(
     SOURCE_FILES
-        ${SRC_ASSETS_SHADERS_GRAPHIC}
+        ${SRC_SHADERS_GRAPHIC}
     HEADER_FILES
-        ${SRC_ASSETS_HOSTDEVICE}
+        ${SRC_HOSTDEVICE}
     DST
-        "${PROJNAME}/assets/@autogen"
+        "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
         "vulkan1.3"
-    HEADER ON
+    HEADER OFF
     DEPENDENCY ON
 )
 compile_glsl(
     SOURCE_FILES
-        ${SRC_ASSETS_SHADERS_POST}
+        ${SRC_SHADERS_POST}
     HEADER_FILES
-        ${SRC_ASSETS_HOSTDEVICE}
+        ${SRC_HOSTDEVICE}
     DST
-        "${PROJNAME}/assets/@autogen"
+        "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
         "vulkan1.3"
-    HEADER ON
-    DEPENDENCY ON
-)
-compile_glsl(
-    SOURCE_FILES
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.intersectiontest.rchit
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.intersectiontest.rgen
-        ${PROJ_ROOT_DIR}/${PROJNAME}/assets/shaders/raytrace/raytrace.intersectiontest.rmiss
-    HEADER_FILES
-        ${SRC_ASSETS_HOSTDEVICE}
-        ${SRC_ASSETS_SHADERS_RAYTRACE_COMMON}
-    DST
-        "${PROJNAME}/assets/@autogen"
-    VULKAN_TARGET
-        "vulkan1.3"
-    HEADER ON
+    HEADER OFF
     DEPENDENCY ON
 )
 
@@ -173,13 +156,13 @@ add_executable(${PROJNAME}
     ${SRC_TRACER_SCENE}
     ${SRC_TRACER_RESOURCE}
     ${SRC_TRACER_PIPELINE}
-    ${SRC_ASSETS_HOSTDEVICE})
+    ${SRC_HOSTDEVICE})
 
 target_sources(${PROJNAME} PUBLIC
-    ${SRC_ASSETS_SHADERS_GRAPHIC}
-    ${SRC_ASSETS_SHADERS_POST}
-    ${SRC_ASSETS_SHADERS_RAYTRACE_COMMON}
-    ${SRC_ASSETS_SHADERS_RAYTRACE})
+    ${SRC_SHADERS_GRAPHIC}
+    ${SRC_SHADERS_POST}
+    ${SRC_SHADERS_RAYTRACE_COMMON}
+    ${SRC_SHADERS_RAYTRACE})
 
 target_sources(${PROJNAME} PUBLIC ${COMMON_SOURCE_FILES})
 target_sources(${PROJNAME} PUBLIC ${PACKAGE_SOURCE_FILES})
@@ -195,3 +178,12 @@ endforeach(RELEASELIB)
 
 # copies binaries that need to be put next to the exe files (ZLib, etc.)
 _finalize_target(${PROJNAME})
+
+set(SCENE_SOURCE "${PROJ_ROOT_DIR}/scenes")
+set(SCENE_DESTINATION "${OUTPUT_PATH}/scenes")
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${SCENE_SOURCE} ${SCENE_DESTINATION} 
+    DEPENDS ${SCENE_SOURCE}
+    COMMENT "symbolic link resources folder from ${SCENE_SOURCE} => ${SCENE_DESTINATION}")
+# file(COPY ${PROJ_ROOT_DIR}/scenes DESTINATION ${OUTPUT_PATH})
