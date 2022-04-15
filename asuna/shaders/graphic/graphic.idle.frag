@@ -8,10 +8,9 @@
 
 layout(push_constant) uniform _PushConstantGraphic
 {
-    PushConstantGraphic pcGraphic;
+	PushConstantGraphic pcGraphic;
 };
 
 void main()
 {
-  
 }

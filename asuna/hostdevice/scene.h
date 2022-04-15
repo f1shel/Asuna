@@ -6,10 +6,10 @@
 // Information of a obj model when referenced in a shader
 struct MeshDesc
 {
-    // Address of the Vertex buffer
-    uint64_t vertexAddress;
-    // Address of the index buffer
-    uint64_t indexAddress;
+	// Address of the Vertex buffer
+	uint64_t vertexAddress;
+	// Address of the index buffer
+	uint64_t indexAddress;
 };
 
 // SceneDesc = MeshDesc[]

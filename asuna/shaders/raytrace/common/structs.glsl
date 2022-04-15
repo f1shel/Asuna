@@ -3,8 +3,8 @@
 
 struct RayPayload
 {
-    uint  depth;
-    vec3  radiance;
+	uint depth;
+	vec3 radiance;
 };
 
 #endif

@@ -5,12 +5,12 @@
 
 struct PushConstantGraphic
 {
-    uint placeholder;
+	uint placeholder;
 };
 
 struct PushConstantRaytrace
 {
-    uint placeholder;
+	uint placeholder;
 };
 
 #endif
