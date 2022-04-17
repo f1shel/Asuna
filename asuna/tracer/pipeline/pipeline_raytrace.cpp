@@ -44,7 +44,7 @@ void PipelineRaytrace::run(const VkCommandBuffer &cmdBuf)
 	vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(PushConstantRaytrace), &m_pcRaytrace);
 
 	const auto &regions = m_sbt.getRegions();
-	auto       &size    = m_pContext->getSize();
+	auto        size    = m_pContext->getSize();
 	vkCmdTraceRaysKHR(cmdBuf, &regions[0], &regions[1], &regions[2], &regions[3], size.width, size.height, 1);
 }
 
@@ -57,8 +57,7 @@ void PipelineRaytrace::initRayTracing()
 
 	// Requesting ray tracing properties
 	VkPhysicalDeviceProperties2 prop2 = nvvk::make<VkPhysicalDeviceProperties2>();
-	;
-	prop2.pNext = &m_rtProperties;
+	prop2.pNext                       = &m_rtProperties;
 	vkGetPhysicalDeviceProperties2(m_physicalDevice, &prop2);
 
 	m_rtBuilder.setup(m_device, &m_alloc, m_graphicsQueueIndex);

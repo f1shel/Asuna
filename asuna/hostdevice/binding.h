@@ -3,6 +3,7 @@
 
 #ifdef __cplusplus
 #	include "nvmath/nvmath.h"
+#	include <cstdint>
 using vec2 = nvmath::vec2f;
 using vec3 = nvmath::vec3f;
 using vec4 = nvmath::vec4f;
