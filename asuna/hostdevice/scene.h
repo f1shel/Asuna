@@ -4,7 +4,7 @@
 #include "binding.h"
 
 // Information of a obj model when referenced in a shader
-struct MeshDesc
+struct GPUMeshDesc
 {
 	// Address of the Vertex buffer
 	uint64_t vertexAddress;

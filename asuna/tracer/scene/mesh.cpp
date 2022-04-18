@@ -12,13 +12,14 @@ void Mesh::init(const std::string &meshPath)
 	reader.ParseFromFile(meshPath);
 	if (!reader.Valid())
 	{
-		LOGE("[x] Scene Error: load mesh from %s ----> %s\n",
-		     meshPath.c_str(), reader.Error().c_str());
+		LOGE("[x] Scene Error: load mesh from %s ----> %s\n", meshPath.c_str(),
+		     reader.Error().c_str());
 		exit(1);
 	}
 	if (reader.GetShapes().size() != 1)
 	{
-		LOGE("[x] Scene loader: load mesh from %s ----> asuna tracer supports only one shape per mesh\n",
+		LOGE("[x] Scene loader: load mesh from %s ----> asuna tracer supports only one shape "
+		     "per mesh\n",
 		     meshPath.c_str());
 		exit(1);
 	}
@@ -30,7 +31,7 @@ void Mesh::init(const std::string &meshPath)
 
 	for (const auto &index : shape.mesh.indices)
 	{
-		Vertex       vertex = {};
+		GPUVertex    vertex = {};
 		const float *vp     = &attrib.vertices[3 * index.vertex_index];
 		vertex.pos          = {*(vp + 0), *(vp + 1), *(vp + 2)};
 
@@ -48,6 +49,13 @@ void Mesh::init(const std::string &meshPath)
 
 		m_vertices.push_back(vertex);
 		m_indices.push_back(static_cast<int>(m_indices.size()));
+
+		m_posMin.x = std::min(m_posMin.x, vertex.pos.x);
+		m_posMin.y = std::min(m_posMin.y, vertex.pos.y);
+		m_posMin.z = std::min(m_posMin.z, vertex.pos.z);
+		m_posMax.x = std::max(m_posMax.x, vertex.pos.x);
+		m_posMax.y = std::max(m_posMax.y, vertex.pos.y);
+		m_posMax.z = std::max(m_posMax.z, vertex.pos.z);
 	}
 
 	// Compute normal when no normal were provided.
@@ -87,14 +95,20 @@ void MeshAlloc::init(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer 
 {
 	auto &m_alloc = pContext->m_alloc;
 
+	m_posMin = pMesh->getPosMin();
+	m_posMax = pMesh->getPosMax();
+
 	m_nIndices  = static_cast<uint32_t>(pMesh->m_indices.size());
 	m_nVertices = static_cast<uint32_t>(pMesh->m_vertices.size());
 
 	VkBufferUsageFlags flag            = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	VkBufferUsageFlags rayTracingFlags =        // used also for building acceleration structures
-	    flag | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	m_bVertices = m_alloc.createBuffer(cmdBuf, pMesh->m_vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | rayTracingFlags);
-	m_bIndices  = m_alloc.createBuffer(cmdBuf, pMesh->m_indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | rayTracingFlags);
+	    flag | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+	    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	m_bVertices = m_alloc.createBuffer(cmdBuf, pMesh->m_vertices,
+	                                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | rayTracingFlags);
+	m_bIndices  = m_alloc.createBuffer(cmdBuf, pMesh->m_indices,
+	                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT | rayTracingFlags);
 }
 
 void MeshAlloc::deinit(ContextAware *pContext)
@@ -105,19 +119,24 @@ void MeshAlloc::deinit(ContextAware *pContext)
 	m_alloc.destroy(m_bIndices);
 }
 
-void SceneDescAlloc::init(ContextAware *pContext, const std::map<uint32_t, MeshAlloc *> &meshAllocLUT, const VkCommandBuffer &cmdBuf)
+void SceneDescAlloc::init(ContextAware                          *pContext,
+                          const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
+                          const VkCommandBuffer                 &cmdBuf)
 {
 	auto m_device = pContext->getDevice();
 
 	for (auto &record : meshAllocLUT)
 	{
-		MeshAlloc *pMeshAlloc = record.second;
-		MeshDesc   desc;
-		desc.vertexAddress = nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bVertices.buffer);
-		desc.indexAddress  = nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bIndices.buffer);
+		MeshAlloc  *pMeshAlloc = record.second;
+		GPUMeshDesc desc;
+		desc.vertexAddress =
+		    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bVertices.buffer);
+		desc.indexAddress =
+		    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bIndices.buffer);
 		m_sceneDesc.emplace_back(desc);
 	}
-	m_bSceneDesc = pContext->m_alloc.createBuffer(cmdBuf, m_sceneDesc, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+	m_bSceneDesc =
+	    pContext->m_alloc.createBuffer(cmdBuf, m_sceneDesc, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 }
 
 void SceneDescAlloc::deinit(ContextAware *pContext)

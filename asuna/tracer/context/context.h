@@ -16,11 +16,16 @@
 #define ASUNA_DEFAULT_WINDOW_WIDTH 1
 #define ASUNA_DEFAULT_WINDOW_HEIGHT 1
 
+struct ContextInitState
+{
+	bool m_offline = false;
+};
+
 class ContextAware : public nvvk::AppBaseVk
 {
   public:
-	bool        m_offline = true;
-	GLFWwindow *m_glfw    = NULL;
+	ContextInitState m_cis;
+	GLFWwindow      *m_glfw = NULL;
 	// Allocator for buffer, images, acceleration structures
 	nvvk::ResourceAllocatorDedicated m_alloc;
 	// Debugger to name objects
@@ -32,7 +37,7 @@ class ContextAware : public nvvk::AppBaseVk
 	std::vector<std::string> m_root{};
 
   public:
-	void          init();
+	void          init(ContextInitState cis);
 	void          deinit();
 	VkExtent2D    getSize();
 	VkFramebuffer getFramebuffer(int onlineCurFrame = 0);

@@ -81,9 +81,9 @@ file(GLOB SRC_SHADERS_RAYTRACE
     ${PROJNAME}/shaders/raytrace/*.rmiss
 )
 
-file(GLOB SRC_SHADERS_GRAPHIC
-    ${PROJNAME}/shaders/graphic/*.frag
-    ${PROJNAME}/shaders/graphic/*.vert
+file(GLOB SRC_SHADERS_GRAPHICS
+    ${PROJNAME}/shaders/graphics/*.frag
+    ${PROJNAME}/shaders/graphics/*.vert
 )
 
 file(GLOB SRC_SHADERS_POST
@@ -105,7 +105,7 @@ source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
 source_group("asuna\\hostdevice" FILES ${SRC_HOSTDEVICE})
 source_group("asuna\\shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
 source_group("asuna\\shaders\\raytrace\\common" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
-source_group("asuna\\shaders\\graphic" FILES ${SRC_SHADERS_GRAPHIC})
+source_group("asuna\\shaders\\graphics" FILES ${SRC_SHADERS_GRAPHICS})
 source_group("asuna\\shaders\\post" FILES ${SRC_SHADERS_POST})
 
 # GLSL to SPIR-V custom build
@@ -125,7 +125,7 @@ compile_glsl(
 )
 compile_glsl(
     SOURCE_FILES
-        ${SRC_SHADERS_GRAPHIC}
+        ${SRC_SHADERS_GRAPHICS}
     HEADER_FILES
         ${SRC_HOSTDEVICE}
     DST
@@ -159,7 +159,7 @@ add_executable(${PROJNAME}
     ${SRC_HOSTDEVICE})
 
 target_sources(${PROJNAME} PUBLIC
-    ${SRC_SHADERS_GRAPHIC}
+    ${SRC_SHADERS_GRAPHICS}
     ${SRC_SHADERS_POST}
     ${SRC_SHADERS_RAYTRACE_COMMON}
     ${SRC_SHADERS_RAYTRACE})

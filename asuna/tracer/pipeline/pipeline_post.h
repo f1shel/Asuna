@@ -1,12 +1,12 @@
 #pragma once
 
 #include "pipeline.h"
-#include "pipeline_graphic.h"
+#include "pipeline_graphics.h"
 
 class PipelineCorrelatedPost : public PipelineCorrelated
 {
   public:
-	PipelineGraphic *m_pPipGraphic = nullptr;
+	PipelineGraphics *m_pPipGraphics = nullptr;
 };
 
 class PipelinePost : public PipelineAware
@@ -18,7 +18,7 @@ class PipelinePost : public PipelineAware
 
   private:
 	// Accompanied graphic pipeline
-	PipelineGraphic *m_pPipGraphic = nullptr;
+	PipelineGraphics *m_pPipGraphics = nullptr;
 
   private:
 	void createPostDescriptorSetLayout();

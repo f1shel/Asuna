@@ -1,6 +1,7 @@
 #include "scene.h"
 
 #include <nvh/fileoperations.hpp>
+#include <nvmath/nvmath.h>
 #include <nvvk/buffers_vk.hpp>
 #include <nvvk/commands_vk.hpp>
 
@@ -31,7 +32,8 @@ void Scene::create(std::string sceneFilePath)
 
 void Scene::deinit()
 {
-	assert((m_pContext != nullptr) && "[!] Scene Error: failed to find belonging context when deinit.");
+	assert((m_pContext != nullptr) &&
+	       "[!] Scene Error: failed to find belonging context when deinit.");
 	freeRawData();
 	freeAllocData();
 }
@@ -84,6 +86,39 @@ void Scene::parseSceneFile(std::string sceneFilePath)
 	}
 }
 
+void Scene::computeSceneDimensions()
+{
+	Bbox scnBbox;
+
+	for (const auto pInstance : m_instances)
+	{
+		auto pMeshAlloc = m_meshAllocLUT[pInstance->m_meshIndex];
+		Bbox bbox(pMeshAlloc->m_posMin, pMeshAlloc->m_posMax);
+		bbox.transform(pInstance->m_transform);
+		scnBbox.insert(bbox);
+	}
+
+	if (scnBbox.isEmpty() || !scnBbox.isVolume())
+	{
+		LOGE("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]");
+		scnBbox.insert({-1.0f, -1.0f, -1.0f});
+		scnBbox.insert({1.0f, 1.0f, 1.0f});
+	}
+
+	m_dimensions.min    = scnBbox.min();
+	m_dimensions.max    = scnBbox.max();
+	m_dimensions.size   = scnBbox.extents();
+	m_dimensions.center = scnBbox.center();
+	m_dimensions.radius = scnBbox.radius();
+}
+
+void Scene::fitCamera()
+{
+	auto m_size = m_pSensor->getSize();
+	CameraManip.fit(m_dimensions.min, m_dimensions.max, true, false,
+	                m_size.width / static_cast<float>(m_size.height));
+}
+
 void Scene::allocScene()
 {
 	// allocate resources on gpu
@@ -104,11 +139,19 @@ void Scene::allocScene()
 
 	cmdBufGet.submitAndWait(cmdBuf);
 	m_pContext->m_alloc.finalizeAndReleaseStaging();
+
+	// autofit
+	if (m_pSensor->getCamera() == nullptr || m_pSensor->needAutofit())
+	{
+		computeSceneDimensions();
+		fitCamera();
+	}
 }
 
 void Scene::freeRawData()
 {
 	// free sensor raw data
+	m_pSensor->deinit();
 	delete m_pSensor;
 	m_pSensor = nullptr;
 
@@ -146,13 +189,29 @@ void Scene::freeAllocData()
 
 void Scene::addSensor(const nlohmann::json &sensorJson)
 {
-	m_pSensor         = new Sensor;
-	m_pSensor->m_size = {sensorJson["width"], sensorJson["height"]};
+	m_pSensor       = new Sensor;
+	VkExtent2D size = {sensorJson["width"], sensorJson["height"]};
+	if (!(size.width >= 1 && size.height >= 1))
+	{
+		// TODO
+		exit(1);
+	}
+	m_pSensor->init(size, sensorJson["camera"]);
+}
+
+CameraInterface *Scene::getCamera()
+{
+	return m_pSensor->getCamera();
+}
+
+CameraType Scene::getCameraType()
+{
+	return m_pSensor->getCameraType();
 }
 
 VkExtent2D Scene::getSensorSize()
 {
-	return m_pSensor->m_size;
+	return m_pSensor->getSize();
 }
 
 void Scene::addMesh(const nlohmann::json &meshJson)
@@ -174,7 +233,8 @@ void Scene::addMesh(const nlohmann::json &meshJson)
 	m_meshLUT[meshName] = std::make_pair(pMesh, m_meshLUT.size());
 }
 
-void Scene::allocMesh(ContextAware *pContext, uint32_t meshId, const string &meshName, Mesh *pMesh, const VkCommandBuffer &cmdBuf)
+void Scene::allocMesh(ContextAware *pContext, uint32_t meshId, const string &meshName,
+                      Mesh *pMesh, const VkCommandBuffer &cmdBuf)
 {
 	auto &m_debug  = pContext->m_debug;
 	auto  m_device = pContext->getDevice();
@@ -183,7 +243,8 @@ void Scene::allocMesh(ContextAware *pContext, uint32_t meshId, const string &mes
 	pMeshAlloc->init(pContext, pMesh, cmdBuf);
 	m_meshAllocLUT[meshId] = pMeshAlloc;
 
-	m_debug.setObjectName(pMeshAlloc->m_bVertices.buffer, std::string(meshName + "_vertexBuffer"));
+	m_debug.setObjectName(pMeshAlloc->m_bVertices.buffer,
+	                      std::string(meshName + "_vertexBuffer"));
 	m_debug.setObjectName(pMeshAlloc->m_bIndices.buffer, std::string(meshName + "_indexBuffer"));
 }
 

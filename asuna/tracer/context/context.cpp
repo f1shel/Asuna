@@ -5,8 +5,9 @@
 #include <nvvk/images_vk.hpp>
 #include <nvvk/structs_vk.hpp>
 
-void ContextAware::init()
+void ContextAware::init(ContextInitState cis)
 {
+	m_cis = cis;
 	initializeVulkan();
 	createAppContext();
 	// Search path for shaders and other media
@@ -36,7 +37,7 @@ VkExtent2D ContextAware::getSize()
 
 VkFramebuffer ContextAware::getFramebuffer(int onlineCurFrame)
 {
-	if (!m_offline)
+	if (!m_cis.m_offline)
 		return AppBaseVk::getFramebuffers()[onlineCurFrame];
 	else
 		return m_offlineFramebuffer;
@@ -44,7 +45,7 @@ VkFramebuffer ContextAware::getFramebuffer(int onlineCurFrame)
 
 VkRenderPass ContextAware::getRenderPass()
 {
-	if (!m_offline)
+	if (!m_cis.m_offline)
 		return AppBaseVk::getRenderPass();
 	else
 		return m_offlineRenderPass;
@@ -52,11 +53,13 @@ VkRenderPass ContextAware::getRenderPass()
 
 void ContextAware::setViewport(const VkCommandBuffer &cmdBuf)
 {
-	if (!m_offline)
+	if (!m_cis.m_offline)
 		AppBaseVk::setViewport(cmdBuf);
 	else
 	{
-		VkViewport viewport{0.0f, 0.0f, static_cast<float>(m_size.width), static_cast<float>(m_size.height), 0.0f, 1.0f};
+		VkViewport viewport{
+		    0.0f, 0.0f, static_cast<float>(m_size.width), static_cast<float>(m_size.height),
+		    0.0f, 1.0f};
 		vkCmdSetViewport(cmdBuf, 0, 1, &viewport);
 
 		VkRect2D scissor{{0, 0}, {m_size.width, m_size.height}};
@@ -78,20 +81,24 @@ void ContextAware::createOfflineResources()
 
 	// Creating the color image
 	{
-		auto colorCreateInfo = nvvk::makeImage2DCreateInfo(
-		    m_size, colorFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT);
+		auto colorCreateInfo = nvvk::makeImage2DCreateInfo(m_size, colorFormat,
+		                                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+		                                                       VK_IMAGE_USAGE_SAMPLED_BIT |
+		                                                       VK_IMAGE_USAGE_STORAGE_BIT);
 
 		nvvk::Image image = m_alloc.createImage(colorCreateInfo);
 		NAME2_VK(image.image, "Offline Color");
 
-		VkImageViewCreateInfo ivInfo = nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
-		VkSamplerCreateInfo   sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+		VkImageViewCreateInfo ivInfo =
+		    nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
+		VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 		m_offlineColor                        = m_alloc.createTexture(image, ivInfo, sampler);
 		m_offlineColor.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	}
 
 	// Creating the depth buffer
-	auto depthCreateInfo = nvvk::makeImage2DCreateInfo(m_size, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+	auto depthCreateInfo = nvvk::makeImage2DCreateInfo(
+	    m_size, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 	{
 		nvvk::Image image = m_alloc.createImage(depthCreateInfo);
 		NAME2_VK(image.image, "Offline Depth");
@@ -109,20 +116,24 @@ void ContextAware::createOfflineResources()
 	{
 		nvvk::CommandPool genCmdBuf(m_device, m_graphicsQueueIndex);
 		auto              cmdBuf = genCmdBuf.createCommandBuffer();
-		nvvk::cmdBarrierImageLayout(cmdBuf, m_offlineColor.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		nvvk::cmdBarrierImageLayout(cmdBuf, m_offlineColor.image, VK_IMAGE_LAYOUT_UNDEFINED,
+		                            VK_IMAGE_LAYOUT_GENERAL);
 		nvvk::cmdBarrierImageLayout(cmdBuf, m_offlineDepth.image, VK_IMAGE_LAYOUT_UNDEFINED,
-		                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+		                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		genCmdBuf.submitAndWait(cmdBuf);
 	}
 
 	// Creating a renderpass for the offscreen
-	m_offlineRenderPass = nvvk::createRenderPass(m_device, {colorFormat}, depthFormat, 1, true, true,
-	                                             VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+	m_offlineRenderPass =
+	    nvvk::createRenderPass(m_device, {colorFormat}, depthFormat, 1, true, true,
+	                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
 	NAME2_VK(m_offlineRenderPass, "Offline RenderPass");
 
 	// Creating the frame buffer for offscreen
-	std::vector<VkImageView> attachments = {m_offlineColor.descriptor.imageView, m_offlineDepth.descriptor.imageView};
+	std::vector<VkImageView> attachments = {m_offlineColor.descriptor.imageView,
+	                                        m_offlineDepth.descriptor.imageView};
 
 	VkFramebufferCreateInfo info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
 	info.renderPass      = m_offlineRenderPass;
@@ -163,7 +174,7 @@ void ContextAware::createGlfwWindow()
 void ContextAware::initializeVulkan()
 {
 	nvvk::ContextCreateInfo contextInfo;
-	if (!m_offline)
+	if (!m_cis.m_offline)
 	{
 		createGlfwWindow();
 		// Set up Vulkan extensions required by glfw(surface, win32, linux, ..)
@@ -181,43 +192,50 @@ void ContextAware::initializeVulkan()
 	// Allow pointers to buffer memory in shaders
 	contextInfo.addDeviceExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 	// Activate the ray tracing extension
-	// Required by KHR_acceleration_structure; allows work to be offloaded onto background threads and parallelized
+	// Required by KHR_acceleration_structure; allows work to be offloaded onto background
+	// threads and parallelized
 	contextInfo.addDeviceExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 	// KHR_acceleration_structure
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures =
 	    nvvk::make<VkPhysicalDeviceAccelerationStructureFeaturesKHR>();
-	contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, false, &asFeatures);
+	contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, false,
+	                               &asFeatures);
 	// KHR_raytracing_pipeline
 	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures =
 	    nvvk::make<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>();
-	contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, false, &rtPipelineFeatures);
+	contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, false,
+	                               &rtPipelineFeatures);
 	// Add the required device extensions for Debug Printf. If this is confusing,
 	contextInfo.addDeviceExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-	VkValidationFeaturesEXT      validationInfo            = nvvk::make<VkValidationFeaturesEXT>();
-	VkValidationFeatureEnableEXT validationFeatureToEnable = VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT;
-	validationInfo.disabledValidationFeatureCount          = 0;
-	validationInfo.pDisabledValidationFeatures             = nullptr;
-	validationInfo.enabledValidationFeatureCount           = 1;
-	validationInfo.pEnabledValidationFeatures              = &validationFeatureToEnable;
-	contextInfo.instanceCreateInfoExt                      = &validationInfo;
+	VkValidationFeaturesEXT      validationInfo = nvvk::make<VkValidationFeaturesEXT>();
+	VkValidationFeatureEnableEXT validationFeatureToEnable =
+	    VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT;
+	validationInfo.disabledValidationFeatureCount = 0;
+	validationInfo.pDisabledValidationFeatures    = nullptr;
+	validationInfo.enabledValidationFeatureCount  = 1;
+	validationInfo.pEnabledValidationFeatures     = &validationFeatureToEnable;
+	contextInfo.instanceCreateInfoExt             = &validationInfo;
 #ifdef _WIN32
 	_putenv_s("DEBUG_PRINTF_TO_STDOUT", "1");
 #else         // If not _WIN32
 	putenv("DEBUG_PRINTF_TO_STDOUT=1");
 #endif        // _WIN32
-    // Create the Vulkan instance and then first compatible device based on info
+	          // Create the Vulkan instance and then first compatible device based on info
 	m_vkcontext.init(contextInfo);
 	// Device must support acceleration structures and ray tracing pipelines:
-	if (asFeatures.accelerationStructure != VK_TRUE || rtPipelineFeatures.rayTracingPipeline != VK_TRUE)
+	if (asFeatures.accelerationStructure != VK_TRUE ||
+	    rtPipelineFeatures.rayTracingPipeline != VK_TRUE)
 	{
-		std::cerr << "[!] Vulkan: device does not support acceleration structures and ray tracing pipelines" << std::endl;
+		std::cerr << "[!] Vulkan: device does not support acceleration structures and ray "
+		             "tracing pipelines"
+		          << std::endl;
 		exit(1);
 	}
 }
 
 void ContextAware::createAppContext()
 {
-	if (!m_offline)
+	if (!m_cis.m_offline)
 	{
 		// Creation of the application
 		nvvk::AppBaseVkCreateInfo info;
@@ -235,8 +253,8 @@ void ContextAware::createAppContext()
 	}
 	else
 	{
-		AppBaseVk::setup(m_vkcontext.m_instance, m_vkcontext.m_device, m_vkcontext.m_physicalDevice,
-		                 m_vkcontext.m_queueGCT.familyIndex);
+		AppBaseVk::setup(m_vkcontext.m_instance, m_vkcontext.m_device,
+		                 m_vkcontext.m_physicalDevice, m_vkcontext.m_queueGCT.familyIndex);
 	}
 	m_alloc.init(m_instance, m_device, m_physicalDevice);
 	m_debug.setup(m_device);

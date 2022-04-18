@@ -1,7 +1,5 @@
 #include "tracer.h"
 
-#include <iostream>
-
 #include <backends/imgui_impl_glfw.h>
 #include <nvvk/context_vk.hpp>
 #include <nvvk/images_vk.hpp>
@@ -9,18 +7,25 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#include <filesystem>
+#include <iostream>
+
+using std::filesystem::path;
+
 // **************************************************************************
 // functions exposed to main.cpp
 // **************************************************************************
-void Tracer::init()
+void Tracer::init(TracerInitState tis)
 {
-	m_context.init();
+	m_tis = tis;
+
+	m_context.init({m_tis.m_offline});
 
 	m_scene.init(&m_context);
-	m_scene.create("scenes/dragon/scene.json");
+	m_scene.create(m_tis.m_scenefile);
 
 	m_context.m_size = m_scene.getSensorSize();
-	if (!m_context.m_offline)
+	if (!m_tis.m_offline)
 		m_context.resizeGlfwWindow();
 	else
 		m_context.createOfflineResources();
@@ -28,10 +33,11 @@ void Tracer::init()
 	PipelineCorrelated *pPipCorrGraphic = new PipelineCorrelatedRaytrace;
 	pPipCorrGraphic->m_pContext         = &m_context;
 	pPipCorrGraphic->m_pScene           = &m_scene;
-	m_pipelineGraphic.init(pPipCorrGraphic);
+	m_pipelineGraphics.init(pPipCorrGraphic);
 
-	PipelineCorrelatedRaytrace *pPipCorrRaytrace = (PipelineCorrelatedRaytrace *) pPipCorrGraphic;
-	pPipCorrRaytrace->m_pPipGraphic              = &m_pipelineGraphic;
+	PipelineCorrelatedRaytrace *pPipCorrRaytrace =
+	    (PipelineCorrelatedRaytrace *) pPipCorrGraphic;
+	pPipCorrRaytrace->m_pPipGraphics = &m_pipelineGraphics;
 	m_pipelineRaytrace.init(pPipCorrRaytrace);
 
 	PipelineCorrelatedPost *pPipCorrPost = (PipelineCorrelatedPost *) pPipCorrRaytrace;
@@ -42,7 +48,7 @@ void Tracer::init()
 
 void Tracer::run()
 {
-	if (m_context.m_offline)
+	if (m_tis.m_offline)
 		runOffline();
 	else
 		runOnline();
@@ -50,7 +56,7 @@ void Tracer::run()
 
 void Tracer::deinit()
 {
-	m_pipelineGraphic.deinit();
+	m_pipelineGraphics.deinit();
 	m_pipelineRaytrace.deinit();
 	m_pipelinePost.deinit();
 	m_scene.deinit();
@@ -82,21 +88,24 @@ void Tracer::runOnline()
 		{
 			vkBeginCommandBuffer(cmdBuf, &beginInfo);
 			{
-				m_pipelineGraphic.run(cmdBuf);
+				m_pipelineGraphics.run(cmdBuf);
 			}
 			{
 				m_pipelineRaytrace.run(cmdBuf);
 			}
 			{
-				VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+				VkRenderPassBeginInfo postRenderPassBeginInfo{
+				    VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
 				postRenderPassBeginInfo.clearValueCount = 2;
 				postRenderPassBeginInfo.pClearValues    = clearValues.data();
 				postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
 				postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer(curFrame);
 				postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
 
-				// Rendering to the swapchain framebuffer the rendered image and apply a tonemapper
-				vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+				// Rendering to the swapchain framebuffer the rendered image and apply a
+				// tonemapper
+				vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
+				                     VK_SUBPASS_CONTENTS_INLINE);
 
 				m_pipelinePost.run(cmdBuf);
 
@@ -130,13 +139,14 @@ void Tracer::runOffline()
 	{
 		const VkCommandBuffer &cmdBuf = genCmdBuf.createCommandBuffer();
 		{
-			m_pipelineGraphic.run(cmdBuf);
+			m_pipelineGraphics.run(cmdBuf);
 		}
 		{
 			m_pipelineRaytrace.run(cmdBuf);
 		}
 		{
-			VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+			VkRenderPassBeginInfo postRenderPassBeginInfo{
+			    VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
 			postRenderPassBeginInfo.clearValueCount = 2;
 			postRenderPassBeginInfo.pClearValues    = clearValues.data();
 			postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
@@ -153,7 +163,7 @@ void Tracer::runOffline()
 		genCmdBuf.submitAndWait(cmdBuf);
 	}
 	vkDeviceWaitIdle(m_context.getDevice());
-	saveImage();
+	saveImage(m_tis.m_outputname);
 }
 
 void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut)
@@ -162,7 +172,8 @@ void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBuff
 	VkCommandBuffer   cmdBuf = genCmdBuf.createCommandBuffer();
 
 	// Make the image layout eTransferSrcOptimal to copy to buffer
-	nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_GENERAL,
+	                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	// Copy the image to the buffer
 	VkBufferImageCopy copyRegion;
@@ -172,28 +183,37 @@ void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBuff
 	copyRegion.bufferOffset      = 0;
 	copyRegion.bufferImageHeight = m_context.getSize().height;
 	copyRegion.bufferRowLength   = m_context.getSize().width;
-	vkCmdCopyImageToBuffer(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pixelBufferOut, 1, &copyRegion);
+	vkCmdCopyImageToBuffer(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	                       pixelBufferOut, 1, &copyRegion);
 
 	// Put back the image as it was
-	nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	                            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
 	genCmdBuf.submitAndWait(cmdBuf);
 }
 
-void Tracer::saveImage()
+void Tracer::saveImage(std::string outputpath)
 {
+	bool isRelativePath = path(outputpath).is_relative();
+	if (isRelativePath)
+		outputpath = NVPSystem::exePath() + outputpath;
+
 	auto &m_alloc = m_context.m_alloc;
 	auto  m_size  = m_context.getSize();
 
 	// Create a temporary buffer to hold the pixels of the image
-	VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT};
-	VkDeviceSize       bufferSize  = 4 * sizeof(float) * m_size.width * m_size.height;
-	nvvk::Buffer       pixelBuffer = m_context.m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+	VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+	                         VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+	VkDeviceSize       bufferSize = 4 * sizeof(float) * m_size.width * m_size.height;
+	nvvk::Buffer       pixelBuffer =
+	    m_context.m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 	imageToBuffer(m_context.getOfflineFramebufferTexture(), pixelBuffer.buffer);
 
 	// Write the buffer to disk
 	void *data = m_alloc.map(pixelBuffer);
-	stbi_write_hdr(std::string("hello.hdr").c_str(), m_size.width, m_size.height, 4, reinterpret_cast<float *>(data));
+	stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4,
+	               reinterpret_cast<float *>(data));
 	m_alloc.unmap(pixelBuffer);
 
 	// Destroy temporary buffer

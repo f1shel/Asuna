@@ -12,8 +12,9 @@ using uint = unsigned int;
 #endif
 
 #ifdef __cplusplus        // Descriptor binding helper for C++ and GLSL
-#	define START_BINDING(a) enum a \
-	{
+#	define START_BINDING(a) \
+		enum a               \
+		{
 #	define END_BINDING() }
 #else
 #	define START_BINDING(a) const uint
@@ -21,24 +22,25 @@ using uint = unsigned int;
 #endif
 
 #ifdef __cplusplus        // glsl reserve enum keyword
-#	define START_ENUM(a) enum a \
-	{
+#	define START_ENUM(a) \
+		enum a            \
+		{
 #	define END_ENUM() }
 #else
 #	define START_ENUM(a) const uint
 #	define END_ENUM()
 #endif
 
-START_BINDING(BindingsGraphic)
-eBindingGraphicCamera        = 0,        // Global uniform containing camera matrices
-    eBindingGraphicSceneDesc = 1 END_BINDING();
+START_BINDING(GPUBindingGraphics)
+eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
+    eGPUBindingGraphicsSceneDesc = 1 END_BINDING();
 
-START_BINDING(BindingsRaytrace)
-eBindingRaytraceTlas      = 0,        // Top level acceleration structure,
-    eBindingRaytraceImage = 1         // Ray tracer image
+START_BINDING(GPUBindingRaytrace)
+eGPUBindingRaytraceTlas      = 0,        // Top level acceleration structure,
+    eGPUBindingRaytraceImage = 1         // Ray tracer image
     END_BINDING();
 
-START_BINDING(BindingsPost)
-eBindingPostImage = 0 END_BINDING();
+START_BINDING(GPUBindingPost)
+eGPUBindingPostImage = 0 END_BINDING();
 
 #endif

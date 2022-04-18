@@ -20,7 +20,8 @@ class PipelineAware
 	virtual void run(const VkCommandBuffer &cmdBuf) = 0;
 	virtual void deinit()
 	{
-		assert((m_pContext != nullptr) && "[!] Pipeline Error: failed to find belonging context when deinit.");
+		assert((m_pContext != nullptr) &&
+		       "[!] Pipeline Error: failed to find belonging context when deinit.");
 
 		auto &m_alloc  = m_pContext->m_alloc;
 		auto  m_device = m_pContext->getDevice();

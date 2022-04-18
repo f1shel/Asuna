@@ -4,7 +4,7 @@
 #include "../../hostdevice/pushconstant.h"
 #include "pipeline.h"
 
-class PipelineGraphic : public PipelineAware
+class PipelineGraphics : public PipelineAware
 {
   public:
 	virtual void init(PipelineCorrelated *pPipCorr);
@@ -26,17 +26,17 @@ class PipelineGraphic : public PipelineAware
 	// Device-Host of the camera matrices
 	nvvk::Buffer m_bCamera;
 	// Push constant
-	PushConstantGraphic m_pcGraphic{0};
+	GPUPushConstantGraphics m_pcGraphics{0};
 
   private:
 	// Creating an offscreen frame buffer and the associated render pass
 	void createOffscreenResources();
 	// Describing the layout pushed when rendering
-	void createGraphicDescriptorSetLayout();
+	void createGraphicsDescriptorSetLayout();
 	// Create graphic pipeline with vertex and fragment shader
-	void createGraphicPipeline();
+	void createGraphicsPipeline();
 	// Creating the uniform buffer holding the camera matrices
 	void createCameraBuffer();
 	// Setting up the buffers in the descriptor set
-	void updateGraphicDescriptorSet();
+	void updateGraphicsDescriptorSet();
 };

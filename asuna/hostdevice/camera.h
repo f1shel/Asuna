@@ -4,11 +4,11 @@
 #include "binding.h"
 
 // Uniform buffer set at each frame
-struct Camera
+struct GPUCamera
 {
-	mat4 viewProj;           // Camera view * projection
 	mat4 viewInverse;        // Camera inverse view matrix
 	mat4 projInverse;        // Camera inverse projection matrix
+	vec4 intrinsic;          // [fx, fy, cx, cy]
 };
 
 #endif

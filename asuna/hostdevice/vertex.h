@@ -3,7 +3,7 @@
 
 #include "binding.h"
 
-struct Vertex
+struct GPUVertex
 {
 	vec3 pos;
 	vec2 uv;

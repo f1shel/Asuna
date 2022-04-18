@@ -18,17 +18,17 @@ layout(location = 1) rayPayloadEXT bool isShadowed;
 // gpu buffers
 layout(buffer_reference, scalar) buffer Vertices
 {
-	Vertex v[];
+	GPUVertex v[];
 };        // Vertices of an object
 layout(buffer_reference, scalar) buffer Indices
 {
 	ivec3 i[];
 };        // Triangle indices
 // descriptor sets
-layout(set = 0, binding = eBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
-layout(set = 1, binding = eBindingGraphicSceneDesc, scalar) buffer _SceneDesc
+layout(set = 0, binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
+layout(set = 1, binding = eGPUBindingGraphicsSceneDesc, scalar) buffer _SceneDesc
 {
-	MeshDesc m[];
+	GPUMeshDesc m[];
 }
 sceneDesc;
 // This will store two of the barycentric coordinates of the intersection
@@ -37,21 +37,21 @@ hitAttributeEXT vec2 hit;
 void main()
 {
 	// Object data
-	MeshDesc meshDesc = sceneDesc.m[gl_InstanceCustomIndexEXT];
-	Indices  indices  = Indices(meshDesc.indexAddress);
-	Vertices vertices = Vertices(meshDesc.vertexAddress);
+	GPUMeshDesc meshDesc = sceneDesc.m[gl_InstanceCustomIndexEXT];
+	Indices     indices  = Indices(meshDesc.indexAddress);
+	Vertices    vertices = Vertices(meshDesc.vertexAddress);
 	// Indices of the triangle
 	ivec3 id = indices.i[gl_PrimitiveID];
 	// Vertex of the triangle
-	const Vertex v0 = vertices.v[id.x];
-	const Vertex v1 = vertices.v[id.y];
-	const Vertex v2 = vertices.v[id.z];
+	const GPUVertex v0 = vertices.v[id.x];
+	const GPUVertex v1 = vertices.v[id.y];
+	const GPUVertex v2 = vertices.v[id.z];
 	// Barycentrics coordinate of the hit position
 	const vec3 bary = vec3(1.0 - hit.x - hit.y, hit.x, hit.y);
 
-	const vec2 uv        = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
-	const vec3 pos       = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
-	const vec3 normal    = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
+	const vec2 uv     = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
+	const vec3 pos    = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
+	const vec3 normal = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
 	const vec3 worldPos  = gl_ObjectToWorldEXT * vec4(pos, 1.0);
 	const vec3 geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
 

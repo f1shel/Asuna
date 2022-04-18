@@ -3,12 +3,12 @@
 
 #include "binding.h"
 
-struct PushConstantGraphic
+struct GPUPushConstantGraphics
 {
 	uint placeholder;
 };
 
-struct PushConstantRaytrace
+struct GPUPushConstantRaytrace
 {
 	uint placeholder;
 };

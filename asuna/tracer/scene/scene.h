@@ -29,7 +29,9 @@ class Scene
 	void    addSensor(const nlohmann::json &sensorJson);
 
   public:
-	VkExtent2D getSensorSize();
+	VkExtent2D       getSensorSize();
+	CameraInterface *getCamera();
+	CameraType       getCameraType();
 
 	// Mesh
   private:
@@ -37,7 +39,8 @@ class Scene
 	std::map<std::string, std::pair<Mesh *, uint32_t>> m_meshLUT{};
 	std::map<uint32_t, MeshAlloc *>                    m_meshAllocLUT{};
 	void                                               addMesh(const nlohmann::json &meshJson);
-	void                                               allocMesh(ContextAware *pContext, uint32_t meshId, const std::string &meshName, Mesh *pMesh, const VkCommandBuffer &cmdBuf);
+	void allocMesh(ContextAware *pContext, uint32_t meshId, const std::string &meshName,
+	               Mesh *pMesh, const VkCommandBuffer &cmdBuf);
 
   public:
 	uint32_t   getMeshesNum();
@@ -63,7 +66,19 @@ class Scene
 
   private:
 	void parseSceneFile(std::string sceneFilePath);
+	void computeSceneDimensions();
+	void fitCamera();
 	void allocScene();
 	void freeRawData();
 	void freeAllocData();
+
+  private:
+	struct Dimensions
+	{
+		nvmath::vec3f min = nvmath::vec3f(std::numeric_limits<float>::max());
+		nvmath::vec3f max = nvmath::vec3f(std::numeric_limits<float>::min());
+		nvmath::vec3f size{0.f};
+		nvmath::vec3f center{0.f};
+		float         radius{0};
+	} m_dimensions;
 };

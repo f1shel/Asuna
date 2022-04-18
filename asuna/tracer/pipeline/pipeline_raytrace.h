@@ -2,7 +2,7 @@
 
 #include "../../hostdevice/pushconstant.h"
 #include "pipeline.h"
-#include "pipeline_graphic.h"
+#include "pipeline_graphics.h"
 
 #include "nvvk/raytraceKHR_vk.hpp"
 #include "nvvk/sbtwrapper_vk.hpp"
@@ -10,7 +10,7 @@
 class PipelineCorrelatedRaytrace : public PipelineCorrelated
 {
   public:
-	PipelineGraphic *m_pPipGraphic = nullptr;
+	PipelineGraphics *m_pPipGraphics = nullptr;
 };
 
 class PipelineRaytrace : public PipelineAware
@@ -35,7 +35,7 @@ class PipelineRaytrace : public PipelineAware
 
   private:
 	// Accompanied graphic pipeline
-	PipelineGraphic *m_pPipGraphic = nullptr;
+	PipelineGraphics *m_pPipGraphics = nullptr;
 	// Pipeline properties
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties = {
 	    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
@@ -48,5 +48,5 @@ class PipelineRaytrace : public PipelineAware
 	// Bottom level acceleration structures
 	std::vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};
 	// Push constant
-	PushConstantRaytrace m_pcRaytrace{0};
+	GPUPushConstantRaytrace m_pcRaytrace{0};
 };
