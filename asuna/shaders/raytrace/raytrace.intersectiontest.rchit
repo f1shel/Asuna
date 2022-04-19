@@ -55,5 +55,8 @@ void main()
 	const vec3 worldPos  = gl_ObjectToWorldEXT * vec4(pos, 1.0);
 	const vec3 geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
 
-	payload.radiance = geoNormal;
+	payload.radiance  = geoNormal;
+	payload.uv        = uv;
+	payload.geoNormal = geoNormal;
+	payload.depth     = gl_HitTEXT;
 }

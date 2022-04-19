@@ -35,9 +35,13 @@ START_BINDING(GPUBindingGraphics)
 eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
     eGPUBindingGraphicsSceneDesc = 1 END_BINDING();
 
+#define eGPUBindingRaytraceChannelN 4
 START_BINDING(GPUBindingRaytrace)
-eGPUBindingRaytraceTlas      = 0,        // Top level acceleration structure,
-    eGPUBindingRaytraceImage = 1         // Ray tracer image
+eGPUBindingRaytraceChannel0     = 0,        // Ray tracer channel0
+    eGPUBindingRaytraceChannel1 = 1,        // Ray tracer channel1
+    eGPUBindingRaytraceChannel2 = 2,        // Ray tracer channel2
+    eGPUBindingRaytraceChannel3 = 3,        // Ray tracer channel3
+    eGPUBindingRaytraceTlas     = 4         // Top level acceleration structure,
     END_BINDING();
 
 START_BINDING(GPUBindingPost)

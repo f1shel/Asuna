@@ -8,5 +8,8 @@ layout(location = 0) rayPayloadInEXT RayPayload payload;
 
 void main()
 {
-	payload.radiance = vec3(0.0, 0.0, 0.0);
+	payload.radiance  = vec3(0.0);
+	payload.uv        = vec2(0.0);
+	payload.geoNormal = vec3(0.0);
+	payload.depth     = 0.0;
 }

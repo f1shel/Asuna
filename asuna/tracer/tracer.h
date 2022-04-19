@@ -35,5 +35,6 @@ class Tracer
 	void runOnline();
 	void runOffline();
 	void imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut);
-	void saveImage(std::string outputpath);
+	void saveImageTest();
+	void saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId = -1);
 };

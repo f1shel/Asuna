@@ -134,7 +134,7 @@ void Tracer::runOffline()
 	nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
 
 	// Main loop
-	int spp = 100;
+	int spp = 1;
 	while (spp-- > 0)
 	{
 		const VkCommandBuffer &cmdBuf = genCmdBuf.createCommandBuffer();
@@ -163,7 +163,7 @@ void Tracer::runOffline()
 		genCmdBuf.submitAndWait(cmdBuf);
 	}
 	vkDeviceWaitIdle(m_context.getDevice());
-	saveImage(m_tis.m_outputname);
+	saveImageTest();
 }
 
 void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut)
@@ -192,12 +192,8 @@ void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBuff
 	genCmdBuf.submitAndWait(cmdBuf);
 }
 
-void Tracer::saveImage(std::string outputpath)
+void Tracer::saveImageTest()
 {
-	bool isRelativePath = path(outputpath).is_relative();
-	if (isRelativePath)
-		outputpath = NVPSystem::exePath() + outputpath;
-
 	auto &m_alloc = m_context.m_alloc;
 	auto  m_size  = m_context.getSize();
 
@@ -208,14 +204,33 @@ void Tracer::saveImage(std::string outputpath)
 	nvvk::Buffer       pixelBuffer =
 	    m_context.m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-	imageToBuffer(m_context.getOfflineFramebufferTexture(), pixelBuffer.buffer);
+	saveImage(pixelBuffer, m_tis.m_outputname);
+	saveImage(pixelBuffer, "channel0.hdr", 0);
+	saveImage(pixelBuffer, "channel1.hdr", 1);
+	saveImage(pixelBuffer, "channel2.hdr", 2);
+	saveImage(pixelBuffer, "channel3.hdr", 3);
+
+	// Destroy temporary buffer
+	m_alloc.destroy(pixelBuffer);
+}
+
+void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId)
+{
+	bool isRelativePath = path(outputpath).is_relative();
+	if (isRelativePath)
+		outputpath = NVPSystem::exePath() + outputpath;
+
+	auto &m_alloc = m_context.m_alloc;
+	auto  m_size  = m_context.getSize();
+
+	if (channelId == -1)
+		imageToBuffer(m_context.getOfflineFramebufferTexture(), pixelBuffer.buffer);
+	else
+		imageToBuffer(m_pipelineGraphics.m_tChannels[channelId], pixelBuffer.buffer);
 
 	// Write the buffer to disk
 	void *data = m_alloc.map(pixelBuffer);
 	stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4,
 	               reinterpret_cast<float *>(data));
 	m_alloc.unmap(pixelBuffer);
-
-	// Destroy temporary buffer
-	m_alloc.destroy(pixelBuffer);
 }

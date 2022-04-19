@@ -100,6 +100,6 @@ void PipelinePost::updatePostDescriptorSet()
 	wds.dstBinding      = GPUBindingPost::eGPUBindingPostImage;
 	wds.descriptorCount = 1;
 	wds.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	wds.pImageInfo      = &m_pPipGraphics->m_tColor.descriptor;
+	wds.pImageInfo      = &m_pPipGraphics->m_tChannels[0].descriptor;
 	vkUpdateDescriptorSets(m_device, 1, &wds, 0, nullptr);
 }

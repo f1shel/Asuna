@@ -89,7 +89,8 @@ void PipelineGraphics::deinit()
 	vkFreeCommandBuffers(m_device, m_cmdPool, 1, &m_recordedCmdBuffer);
 	m_recordedCmdBuffer = VK_NULL_HANDLE;
 
-	m_alloc.destroy(m_tColor);
+	for (auto &m_tColor : m_tChannels)
+		m_alloc.destroy(m_tColor);
 	m_alloc.destroy(m_tDepth);
 	m_alloc.destroy(m_bCamera);
 	vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
@@ -111,7 +112,9 @@ void PipelineGraphics::createOffscreenResources()
 	auto  m_size               = m_pContext->getSize();
 	auto  m_graphicsQueueIndex = m_pContext->getQueueFamily();
 
-	m_alloc.destroy(m_tColor);
+	for (auto &m_tColor : m_tChannels)
+		m_alloc.destroy(m_tColor);
+	m_tChannels.clear();
 	m_alloc.destroy(m_tDepth);
 	vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
 	vkDestroyFramebuffer(m_device, m_offscreenFramebuffer, nullptr);
@@ -123,19 +126,20 @@ void PipelineGraphics::createOffscreenResources()
 
 	// Creating the color image
 	{
-		auto colorCreateInfo = nvvk::makeImage2DCreateInfo(m_size, colorFormat,
-		                                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-		                                                       VK_IMAGE_USAGE_SAMPLED_BIT |
-		                                                       VK_IMAGE_USAGE_STORAGE_BIT);
-
-		nvvk::Image image = m_alloc.createImage(colorCreateInfo);
-		NAME2_VK(image.image, "Offscreen Color");
-
-		VkImageViewCreateInfo ivInfo =
-		    nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
-		VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-		m_tColor                        = m_alloc.createTexture(image, ivInfo, sampler);
-		m_tColor.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
+		{
+			VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+			auto                colorCreateInfo = nvvk::makeImage2DCreateInfo(
+			                   m_size, colorFormat,
+			                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+			                       VK_IMAGE_USAGE_STORAGE_BIT);
+			nvvk::Image           image = m_alloc.createImage(colorCreateInfo);
+			VkImageViewCreateInfo ivInfo =
+			    nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
+			auto texture = m_alloc.createTexture(image, ivInfo, sampler);
+			texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			m_tChannels.emplace_back(texture);
+		}
 	}
 
 	// Creating the depth buffer
@@ -158,8 +162,11 @@ void PipelineGraphics::createOffscreenResources()
 	{
 		nvvk::CommandPool genCmdBuf(m_device, m_graphicsQueueIndex);
 		auto              cmdBuf = genCmdBuf.createCommandBuffer();
-		nvvk::cmdBarrierImageLayout(cmdBuf, m_tColor.image, VK_IMAGE_LAYOUT_UNDEFINED,
-		                            VK_IMAGE_LAYOUT_GENERAL);
+		for (auto &m_tColor : m_tChannels)
+		{
+			nvvk::cmdBarrierImageLayout(cmdBuf, m_tColor.image, VK_IMAGE_LAYOUT_UNDEFINED,
+			                            VK_IMAGE_LAYOUT_GENERAL);
+		}
 		nvvk::cmdBarrierImageLayout(cmdBuf, m_tDepth.image, VK_IMAGE_LAYOUT_UNDEFINED,
 		                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		                            VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -174,7 +181,7 @@ void PipelineGraphics::createOffscreenResources()
 	NAME2_VK(m_offscreenRenderPass, "Offscreen RenderPass");
 
 	// Creating the frame buffer for offscreen
-	std::vector<VkImageView> attachments = {m_tColor.descriptor.imageView,
+	std::vector<VkImageView> attachments = {m_tChannels[0].descriptor.imageView,
 	                                        m_tDepth.descriptor.imageView};
 
 	VkFramebufferCreateInfo info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};

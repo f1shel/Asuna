@@ -158,8 +158,10 @@ void PipelineRaytrace::createRtDescriptorSetLayout()
 	// Create Binding Set
 	bind.addBinding(GPUBindingRaytrace::eGPUBindingRaytraceTlas,
 	                VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL);
-	bind.addBinding(GPUBindingRaytrace::eGPUBindingRaytraceImage,
-	                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL);
+	for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
+	{
+		bind.addBinding(channelId, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL);
+	}
 	m_dstPool   = bind.createPool(m_device);
 	m_dstLayout = bind.createLayout(m_device);
 	m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
@@ -272,22 +274,31 @@ void PipelineRaytrace::createRtPipeline()
 void PipelineRaytrace::updateRtDescriptorSet()
 {
 	auto m_device = m_pContext->getDevice();
+
+	std::vector<VkWriteDescriptorSet> writes;
 	// This descriptor set, holds the top level acceleration structure and the output image
 	nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
+
 	// Write to descriptors
 	VkAccelerationStructureKHR                   tlas = m_rtBuilder.getAccelerationStructure();
 	VkWriteDescriptorSetAccelerationStructureKHR descASInfo{
 	    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	descASInfo.accelerationStructureCount = 1;
 	descASInfo.pAccelerationStructures    = &tlas;
-	VkDescriptorImageInfo imageInfo{
-	    {}, m_pPipGraphics->m_tColor.descriptor.imageView, VK_IMAGE_LAYOUT_GENERAL};
-
-	std::vector<VkWriteDescriptorSet> writes;
 	writes.emplace_back(
 	    bind.makeWrite(m_dstSet, GPUBindingRaytrace::eGPUBindingRaytraceTlas, &descASInfo));
-	writes.emplace_back(
-	    bind.makeWrite(m_dstSet, GPUBindingRaytrace::eGPUBindingRaytraceImage, &imageInfo));
+
+	std::vector<VkDescriptorImageInfo> imageInfos{};
+	imageInfos.reserve(eGPUBindingRaytraceChannelN);
+	for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
+	{
+		VkDescriptorImageInfo imageInfo{
+		    {},
+		    m_pPipGraphics->m_tChannels[channelId].descriptor.imageView,
+		    VK_IMAGE_LAYOUT_GENERAL};
+		imageInfos.push_back(imageInfo);
+		writes.push_back(bind.makeWrite(m_dstSet, channelId, &imageInfos[channelId]));
+	}
 	vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
 	                       nullptr);
 }

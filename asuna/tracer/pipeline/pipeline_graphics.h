@@ -4,6 +4,8 @@
 #include "../../hostdevice/pushconstant.h"
 #include "pipeline.h"
 
+#include <vector>
+
 class PipelineGraphics : public PipelineAware
 {
   public:
@@ -13,9 +15,10 @@ class PipelineGraphics : public PipelineAware
 
   public:
 	// Canvas we draw things on
-	nvvk::Texture m_tColor;
+	std::vector<nvvk::Texture> m_tChannels{};
 	// Depth buffer
 	nvvk::Texture m_tDepth;
+	// Multiple output channels
 
   private:
 	VkRenderPass  m_offscreenRenderPass{VK_NULL_HANDLE};
