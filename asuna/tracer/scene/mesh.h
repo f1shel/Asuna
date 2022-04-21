@@ -3,6 +3,7 @@
 #include "../../hostdevice/scene.h"
 #include "../../hostdevice/vertex.h"
 #include "../context/context.h"
+#include "alloc.h"
 #include "utils.h"
 
 #include <map>
@@ -12,8 +13,8 @@
 class Mesh
 {
   public:
-	void init(const std::string &meshPath);
-	void deinit()
+	Mesh(const std::string &meshPath, bool recomputeNormal = false);
+	~Mesh()
 	{
 		m_vertices.clear();
 		m_indices.clear();
@@ -38,11 +39,10 @@ class Mesh
 	}
 };
 
-class MeshAlloc
+class MeshAlloc : public GPUAlloc
 {
   public:
-	void init(ContextAware *pContext, Mesh *pMesh);
-	void init(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf);
+	MeshAlloc(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf);
 	void deinit(ContextAware *pContext);
 
   public:
@@ -54,11 +54,11 @@ class MeshAlloc
 	nvmath::vec3f m_posMax{0, 0, 0};
 };
 
-class SceneDescAlloc
+class SceneDescAlloc : public GPUAlloc
 {
   public:
-	void init(ContextAware *pContext, const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
-	          const VkCommandBuffer &cmdBuf);
+	SceneDescAlloc(ContextAware *pContext, const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
+	               const VkCommandBuffer &cmdBuf);
 	void deinit(ContextAware *pContext);
 
   public:

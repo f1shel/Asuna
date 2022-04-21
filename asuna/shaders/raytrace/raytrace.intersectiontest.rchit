@@ -25,14 +25,23 @@ layout(buffer_reference, scalar) buffer Indices
 	ivec3 i[];
 };        // Triangle indices
 // descriptor sets
-layout(set = 0, binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
-layout(set = 1, binding = eGPUBindingGraphicsSceneDesc, scalar) buffer _SceneDesc
+layout(set     = eGPUSetRaytraceRaytrace,
+       binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
+layout(set     = eGPUSetRaytraceGraphics,
+       binding = eGPUBindingGraphicsTextures) uniform sampler2D textureSamplers[];
+layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsSceneDesc,
+       scalar) buffer _SceneDesc
 {
 	GPUMeshDesc m[];
 }
 sceneDesc;
 // This will store two of the barycentric coordinates of the intersection
 hitAttributeEXT vec2 hit;
+
+vec4 textureEval(in int texId, in vec2 uv)
+{
+	return texture(textureSamplers[nonuniformEXT(texId)], uv).rgba;
+}
 
 void main()
 {
@@ -55,7 +64,7 @@ void main()
 	const vec3 worldPos  = gl_ObjectToWorldEXT * vec4(pos, 1.0);
 	const vec3 geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
 
-	payload.radiance  = geoNormal;
+	payload.radiance  = textureEval(4, uv).rgb;
 	payload.uv        = uv;
 	payload.geoNormal = geoNormal;
 	payload.depth     = gl_HitTEXT;

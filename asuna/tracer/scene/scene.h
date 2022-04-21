@@ -3,10 +3,10 @@
 #include "../../hostdevice/scene.h"
 #include "../context/context.h"
 #include "instance.h"
+#include "integrator.h"
 #include "mesh.h"
-#include "sensor.h"
-
-#include "../../third_party/json/json.hpp"
+#include "texture.h"
+#include "json/json.hpp"
 
 #include <map>
 #include <string>
@@ -23,15 +23,37 @@ class Scene
 	ContextAware *m_pContext = nullptr;
 	std::string   m_sceneFileDir;
 
-	// Sensor
+	// Integrator
   private:
-	Sensor *m_pSensor = nullptr;
-	void    addSensor(const nlohmann::json &sensorJson);
+	Integrator *m_pIntegrator = nullptr;
+	void        addIntegrator(const nlohmann::json &integratorJson);
 
   public:
-	VkExtent2D       getSensorSize();
+	VkExtent2D getSensorSize();
+
+	// Camera
+  private:
+	CameraInterface *m_pCamera = nullptr;
+	void             addCamera(const nlohmann::json &cameraJson);
+	void             addCameraPerspective(const nlohmann::json &cameraJson);
+	void             addCameraPinhole(const nlohmann::json &cameraJson);
+
+  public:
 	CameraInterface *getCamera();
 	CameraType       getCameraType();
+
+	// Texture
+  private:
+	std::map<std::string, std::pair<Texture *, uint32_t>> m_textureLUT{};
+	std::map<uint32_t, TextureAlloc *>                    m_textureAllocLUT{};
+	void addTexture(const nlohmann::json &textureJson);
+	void allocTexture(ContextAware *pContext, uint32_t textureId, const std::string &textureName,
+	                  Texture *pTexture, const VkCommandBuffer &cmdBuf);
+
+  public:
+	uint32_t      getTexturesNum();
+	uint32_t      getTextureId(const std::string &textureName);
+	TextureAlloc *getTextureAlloc(uint32_t textureId);
 
 	// Mesh
   private:
@@ -63,6 +85,10 @@ class Scene
   public:
 	uint32_t                       getInstancesNum();
 	const std::vector<Instance *> &getInstances();
+
+	// Shot
+  private:
+	std::vector<int *> m_shots{};
 
   private:
 	void parseSceneFile(std::string sceneFilePath);

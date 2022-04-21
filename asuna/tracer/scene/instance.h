@@ -7,7 +7,7 @@
 class Instance
 {
   public:
-	void init(const nvmath::mat4f &tm, uint32_t meshId)
+	Instance(const nvmath::mat4f &tm, uint32_t meshId)
 	{
 		m_transform = tm;
 		m_meshIndex = meshId;

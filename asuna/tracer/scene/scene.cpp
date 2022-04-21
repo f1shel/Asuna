@@ -13,6 +13,21 @@ using std::ifstream;
 using std::string;
 using std::filesystem::path;
 
+static json defaultSceneOptions = json::parse(R"(
+{
+	"integrator": {
+		"spp": 1,
+		"max_recursion": 2
+	},
+	"camera": {
+		"fov": 45.0
+	},
+	"textures": {
+		"gamma": 1.0
+	}
+}
+)");
+
 void Scene::init(ContextAware *pContext)
 {
 	m_pContext = pContext;
@@ -42,12 +57,45 @@ void Scene::addInstance(const nlohmann::json &instanceJson)
 {
 	const string &meshName  = instanceJson["mesh"];
 	nvmath::mat4f transform = nvmath::mat4f_id;
-	if (instanceJson.count("transform"))
+	if (instanceJson.contains("transform"))
 	{
-		// TODO
+		for (const auto &singleton : instanceJson["transform"])
+		{
+			nvmath::mat4f t = nvmath::mat4f_id;
+			if (!singleton.contains("type"))
+			{
+				// TODO
+				exit(1);
+			}
+			if (singleton["type"] == "translate")
+			{
+				t.set_translation(Json2Vec3(singleton["value"]));
+			}
+			else if (singleton["type"] == "scale")
+			{
+				t.set_scale(Json2Vec3(singleton["scale"]));
+			}
+			else if (singleton["type"] == "rotx")
+			{
+				t = nvmath::rotation_mat4_x(float(singleton["value"]));
+			}
+			else if (singleton["type"] == "roty")
+			{
+				t = nvmath::rotation_mat4_y(float(singleton["value"]));
+			}
+			else if (singleton["type"] == "rotz")
+			{
+				t = nvmath::rotation_mat4_z(float(singleton["value"]));
+			}
+			else
+			{
+				// TODO
+				exit(1);
+			}
+			transform = t * transform;
+		}
 	}
-	Instance *pInst = new Instance;
-	pInst->init(transform, getMeshId(meshName));
+	Instance *pInst = new Instance(transform, getMeshId(meshName));
 	m_instances.emplace_back(pInst);
 }
 
@@ -67,13 +115,22 @@ void Scene::parseSceneFile(std::string sceneFilePath)
 	json     sceneFileJson;
 	sceneFileStream >> sceneFileJson;
 
-	auto &sensorJson    = sceneFileJson["sensor"];
-	auto &meshesJson    = sceneFileJson["meshes"];
-	auto &instancesJson = sceneFileJson["instances"];
+	auto &integratorJson = sceneFileJson["integrator"];
+	auto &cameraJson     = sceneFileJson["camera"];
+	auto &texturesJson   = sceneFileJson["textures"];
+	auto &meshesJson     = sceneFileJson["meshes"];
+	auto &instancesJson  = sceneFileJson["instances"];
 
 	// parse scene file to generate raw data
-	// sensor
-	addSensor(sensorJson);
+	// integrator
+	addIntegrator(integratorJson);
+	// camera
+	addCamera(cameraJson);
+	// textures
+	for (auto &textureJson : texturesJson)
+	{
+		addTexture(textureJson);
+	}
 	// meshes
 	for (auto &meshJson : meshesJson)
 	{
@@ -100,7 +157,7 @@ void Scene::computeSceneDimensions()
 
 	if (scnBbox.isEmpty() || !scnBbox.isVolume())
 	{
-		LOGE("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]");
+		LOGE("[!] Scene Warning: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]");
 		scnBbox.insert({-1.0f, -1.0f, -1.0f});
 		scnBbox.insert({1.0f, 1.0f, 1.0f});
 	}
@@ -114,7 +171,7 @@ void Scene::computeSceneDimensions()
 
 void Scene::fitCamera()
 {
-	auto m_size = m_pSensor->getSize();
+	auto m_size = m_pIntegrator->getSize();
 	CameraManip.fit(m_dimensions.min, m_dimensions.max, true, false,
 	                m_size.width / static_cast<float>(m_size.height));
 }
@@ -124,6 +181,15 @@ void Scene::allocScene()
 	// allocate resources on gpu
 	nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), m_pContext->getQueueFamily());
 	VkCommandBuffer   cmdBuf = cmdBufGet.createCommandBuffer();
+
+	for (auto &record : m_textureLUT)
+	{
+		const auto &textureName = record.first;
+		const auto &valuePair   = record.second;
+		auto        pTexture    = valuePair.first;
+		auto        textureId   = valuePair.second;
+		allocTexture(m_pContext, textureId, textureName, pTexture, cmdBuf);
+	}
 
 	for (auto &record : m_meshLUT)
 	{
@@ -141,7 +207,7 @@ void Scene::allocScene()
 	m_pContext->m_alloc.finalizeAndReleaseStaging();
 
 	// autofit
-	if (m_pSensor->getCamera() == nullptr || m_pSensor->needAutofit())
+	if (m_shots.empty())
 	{
 		computeSceneDimensions();
 		fitCamera();
@@ -151,16 +217,18 @@ void Scene::allocScene()
 void Scene::freeRawData()
 {
 	// free sensor raw data
-	m_pSensor->deinit();
-	delete m_pSensor;
-	m_pSensor = nullptr;
+	delete m_pIntegrator;
+	m_pIntegrator = nullptr;
+
+	delete m_pCamera;
+	m_pCamera = nullptr;
 
 	// free meshes raw data
 	for (auto &record : m_meshLUT)
 	{
 		const auto &valuePair = record.second;
 		auto        pMesh     = valuePair.first;
-		pMesh->deinit();
+		delete pMesh;
 	}
 
 	// free instance raw data
@@ -174,6 +242,13 @@ void Scene::freeRawData()
 
 void Scene::freeAllocData()
 {
+	// free textures alloc data
+	for (auto &record : m_textureAllocLUT)
+	{
+		auto pTextureAlloc = record.second;
+		pTextureAlloc->deinit(m_pContext);
+	}
+
 	// free meshes alloc data
 	for (auto &record : m_meshAllocLUT)
 	{
@@ -187,31 +262,135 @@ void Scene::freeAllocData()
 	m_pSceneDescAlloc = nullptr;
 }
 
-void Scene::addSensor(const nlohmann::json &sensorJson)
+void Scene::addIntegrator(const nlohmann::json &integratorJson)
 {
-	m_pSensor       = new Sensor;
-	VkExtent2D size = {sensorJson["width"], sensorJson["height"]};
+	VkExtent2D size = {integratorJson["width"], integratorJson["height"]};
 	if (!(size.width >= 1 && size.height >= 1))
 	{
 		// TODO
 		exit(1);
 	}
-	m_pSensor->init(size, sensorJson["camera"]);
+	int spp      = defaultSceneOptions["integrator"]["spp"];
+	int maxRecur = defaultSceneOptions["integrator"]["max_recursion"];
+	if (integratorJson.contains("spp"))
+		spp = integratorJson["spp"];
+	if (integratorJson.contains("max_recursion"))
+		maxRecur = integratorJson["max_recursion"];
+	m_pIntegrator = new Integrator(size, spp, maxRecur);
+}
+
+void Scene::addCamera(const nlohmann::json &cameraJson)
+{
+	if (cameraJson.contains("type"))
+	{
+		if (cameraJson["type"] == "perspective")
+			addCameraPerspective(cameraJson);
+		else if (cameraJson["type"] == "pinhole")
+			addCameraPinhole(cameraJson);
+		else
+		{
+			// TODO
+			exit(1);
+		}
+	}
+	else
+	{
+		// TODO
+		exit(1);
+	}
+}
+
+void Scene::addCameraPerspective(const nlohmann::json &cameraJson)
+{
+	float fov = defaultSceneOptions["camera"]["fov"];
+	if (cameraJson.contains("fov"))
+		fov = cameraJson["fov"];
+	m_pCamera = new CameraGraphicsPerspective(fov);
+}
+
+void Scene::addCameraPinhole(const nlohmann::json &cameraJson)
+{
+	nvmath::vec4f fxfycxcy = 0.0f;
+	if (cameraJson.contains("intrinsic"))
+	{
+		auto intrinsic = Json2Mat3(cameraJson["intrinsic"]);
+		fxfycxcy       = getFxFyCxCy(intrinsic);
+	}
+	else if (cameraJson.contains("fx") && cameraJson.contains("fy") &&
+	         cameraJson.contains("cx") && cameraJson.contains("cy"))
+	{
+		fxfycxcy = {cameraJson.contains("fx"), cameraJson.contains("fy"),
+		            cameraJson.contains("cx"), cameraJson.contains("cy")};
+	}
+	else
+	{
+		// LOGE("TODO");
+		exit(1);
+	}
+	m_pCamera = new CameraVisionPinhole(fxfycxcy.x, fxfycxcy.y, fxfycxcy.z, fxfycxcy.w);
 }
 
 CameraInterface *Scene::getCamera()
 {
-	return m_pSensor->getCamera();
+	return m_pCamera;
 }
 
 CameraType Scene::getCameraType()
 {
-	return m_pSensor->getCameraType();
+	return m_pCamera->getType();
+}
+
+void Scene::addTexture(const nlohmann::json &textureJson)
+{
+	std::string textureName = textureJson["name"];
+	if (m_meshLUT.count(textureName))
+	{
+		// TODO: LOGE
+		exit(1);
+	}
+	auto texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
+	if (texturePath.empty())
+	{
+		// TODO: LOGE
+		exit(1);
+	}
+	float gamma = defaultSceneOptions["textures"]["gamma"];
+	if (textureJson.contains("gamma"))
+		gamma = textureJson["gamma"];
+
+	Texture *pTexture         = new Texture(texturePath, gamma);
+	m_textureLUT[textureName] = std::make_pair(pTexture, m_textureLUT.size());
+}
+
+void Scene::allocTexture(ContextAware *pContext, uint32_t textureId,
+                         const std::string &textureName, Texture *pTexture,
+                         const VkCommandBuffer &cmdBuf)
+{
+	auto &m_debug  = pContext->m_debug;
+	auto  m_device = pContext->getDevice();
+
+	TextureAlloc *pTextureAlloc  = new TextureAlloc(pContext, pTexture, cmdBuf);
+	m_textureAllocLUT[textureId] = pTextureAlloc;
+}
+
+uint32_t Scene::getTexturesNum()
+{
+	return m_textureLUT.size();
+}
+
+uint32_t Scene::getTextureId(const std::string &textureName)
+{
+	return m_textureLUT[textureName].second;
+}
+
+TextureAlloc *Scene::getTextureAlloc(uint32_t textureId)
+{
+	return m_textureAllocLUT[textureId];
 }
 
 VkExtent2D Scene::getSensorSize()
 {
-	return m_pSensor->getSize();
+	return m_pIntegrator->getSize();
 }
 
 void Scene::addMesh(const nlohmann::json &meshJson)
@@ -228,8 +407,11 @@ void Scene::addMesh(const nlohmann::json &meshJson)
 		// TODO: LOGE
 		exit(1);
 	}
-	Mesh *pMesh = new Mesh;
-	pMesh->init(meshPath);
+	bool recomputeNormal = false;
+	if (meshJson.contains("recompute_normal"))
+		recomputeNormal = meshJson["recompute_normal"];
+
+	Mesh *pMesh         = new Mesh(meshPath, recomputeNormal);
 	m_meshLUT[meshName] = std::make_pair(pMesh, m_meshLUT.size());
 }
 
@@ -239,8 +421,7 @@ void Scene::allocMesh(ContextAware *pContext, uint32_t meshId, const string &mes
 	auto &m_debug  = pContext->m_debug;
 	auto  m_device = pContext->getDevice();
 
-	MeshAlloc *pMeshAlloc = new MeshAlloc;
-	pMeshAlloc->init(pContext, pMesh, cmdBuf);
+	MeshAlloc *pMeshAlloc  = new MeshAlloc(pContext, pMesh, cmdBuf);
 	m_meshAllocLUT[meshId] = pMeshAlloc;
 
 	m_debug.setObjectName(pMeshAlloc->m_bVertices.buffer,
@@ -266,8 +447,7 @@ MeshAlloc *Scene::getMeshAlloc(uint32_t meshId)
 void Scene::allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf)
 {
 	// Keeping the obj host model and device description
-	m_pSceneDescAlloc = new SceneDescAlloc;
-	m_pSceneDescAlloc->init(pContext, m_meshAllocLUT, cmdBuf);
+	m_pSceneDescAlloc = new SceneDescAlloc(pContext, m_meshAllocLUT, cmdBuf);
 }
 
 nvvk::Buffer Scene::getSceneDescBuffer()

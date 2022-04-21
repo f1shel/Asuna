@@ -92,7 +92,7 @@ file(GLOB SRC_SHADERS_POST
 )
 
 file(GLOB SRC_3RDPARTY_JSON
-    ${PROJNAME}/third_party/json/json.hpp
+    ${PROJNAME}/third_party/json/json/json.hpp
 )
 
 source_group("asuna" FILES ${ENTRY})
@@ -163,6 +163,11 @@ target_sources(${PROJNAME} PUBLIC
     ${SRC_SHADERS_POST}
     ${SRC_SHADERS_RAYTRACE_COMMON}
     ${SRC_SHADERS_RAYTRACE})
+
+target_include_directories(${PROJNAME} PUBLIC
+    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/json
+)
+
 
 target_sources(${PROJNAME} PUBLIC ${COMMON_SOURCE_FILES})
 target_sources(${PROJNAME} PUBLIC ${PACKAGE_SOURCE_FILES})

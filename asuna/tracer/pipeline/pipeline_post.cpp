@@ -9,11 +9,12 @@
 #include <cstdint>
 #include <vector>
 
-void PipelinePost::init(PipelineCorrelated *pPipCorr)
+void PipelinePost::init(PipelineInitState pis)
 {
-	m_pContext     = pPipCorr->m_pContext;
-	m_pScene       = pPipCorr->m_pScene;
-	m_pPipGraphics = ((PipelineCorrelatedPost *) pPipCorr)->m_pPipGraphics;
+	m_pContext     = pis.m_pContext;
+	m_pScene       = pis.m_pScene;
+	// pis.m_pCorrPips[0] should points to a graphics pipeline
+	m_pPipGraphics = dynamic_cast<PipelineGraphics*>(pis.m_pCorrPips[0]);
 	// Ray tracing
 	nvh::Stopwatch sw_;
 	createPostDescriptorSetLayout();

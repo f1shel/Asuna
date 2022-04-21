@@ -1,6 +1,6 @@
 #pragma once
 
-#include <../../third_party/json/json.hpp>
+#include <json/json.hpp>
 #include <nvmath/nvmath.h>
 #include <vector>
 

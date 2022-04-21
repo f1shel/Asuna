@@ -14,12 +14,12 @@
 #include <cstdint>
 #include <vector>
 
-void PipelineGraphics::init(PipelineCorrelated *pPipCorr)
+void PipelineGraphics::init(PipelineInitState pis)
 {
-	m_pContext = pPipCorr->m_pContext;
-	m_pScene   = pPipCorr->m_pScene;
-	// Graphic
-	// 创建光栅化管线
+	m_pContext = pis.m_pContext;
+	m_pScene   = pis.m_pScene;
+	// pis.m_pCorrPips not used
+	// Graphics pipeine
 	nvh::Stopwatch sw_;
 	createOffscreenResources();
 	createGraphicsDescriptorSetLayout();
@@ -31,6 +31,7 @@ void PipelineGraphics::init(PipelineCorrelated *pPipCorr)
 
 void PipelineGraphics::run(const VkCommandBuffer &cmdBuf)
 {
+	// Upload updated camera information to GPU
 	// Prepare new UBO contents on host.
 	auto        m_size      = m_pContext->getSize();
 	const float aspectRatio = m_size.width / static_cast<float>(m_size.height);
@@ -126,7 +127,7 @@ void PipelineGraphics::createOffscreenResources()
 
 	// Creating the color image
 	{
-		for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
+		for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelCount; channelId++)
 		{
 			VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 			auto                colorCreateInfo = nvvk::makeImage2DCreateInfo(
@@ -136,7 +137,7 @@ void PipelineGraphics::createOffscreenResources()
 			nvvk::Image           image = m_alloc.createImage(colorCreateInfo);
 			VkImageViewCreateInfo ivInfo =
 			    nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
-			auto texture = m_alloc.createTexture(image, ivInfo, sampler);
+			auto texture                   = m_alloc.createTexture(image, ivInfo, sampler);
 			texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 			m_tChannels.emplace_back(texture);
 		}
@@ -195,7 +196,6 @@ void PipelineGraphics::createOffscreenResources()
 	NAME2_VK(m_offscreenFramebuffer, "Offscreen FrameBuffer");
 }
 
-// TODO: nbtxt
 void PipelineGraphics::createGraphicsDescriptorSetLayout()
 {
 	auto m_device = m_pContext->getDevice();
@@ -203,14 +203,16 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout()
 	nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
 
 	// Camera matrices
-	bind.addBinding(GPUBindingGraphics::eGPUBindingGraphicsCamera,
-	                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+	bind.addBinding(eGPUBindingGraphicsCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
 	                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
 	// Mesh descriptions
-	bind.addBinding(GPUBindingGraphics::eGPUBindingGraphicsSceneDesc,
-	                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+	bind.addBinding(eGPUBindingGraphicsSceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
 	                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
 	                    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+	// Textures
+	bind.addBinding(eGPUBindingGraphicsTextures, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+	                m_pScene->getTexturesNum(),
+	                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
 	m_dstLayout = bind.createLayout(m_device);
 	m_dstPool   = bind.createPool(m_device, 1);
@@ -274,12 +276,19 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
 
 	// Camera matrices and scene description
 	VkDescriptorBufferInfo dbiCamera{m_bCamera.buffer, 0, VK_WHOLE_SIZE};
-	writes.emplace_back(
-	    bind.makeWrite(m_dstSet, GPUBindingGraphics::eGPUBindingGraphicsCamera, &dbiCamera));
+	writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsCamera, &dbiCamera));
 
 	VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescBuffer().buffer, 0, VK_WHOLE_SIZE};
-	writes.emplace_back(bind.makeWrite(
-	    m_dstSet, GPUBindingGraphics::eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
+	writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
+
+	// All texture samplers
+	std::vector<VkDescriptorImageInfo> diit{};
+	diit.reserve(m_pScene->getTexturesNum());
+	for (uint textureId = 0; textureId < m_pScene->getTexturesNum(); textureId++)
+	{
+		diit.emplace_back((m_pScene->getTextureAlloc(textureId)->getTexture()).descriptor);
+	}
+	writes.emplace_back(bind.makeWriteArray(m_dstSet, eGPUBindingGraphicsTextures, diit.data()));
 
 	// Writing the information
 	vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,

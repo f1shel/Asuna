@@ -31,17 +31,23 @@ using uint = unsigned int;
 #	define END_ENUM()
 #endif
 
+START_ENUM(GPUSetGraphics)
+eGPUSetGraphicsGraphics = 0, eGPUSetGraphicsCount = 1 END_ENUM();
+START_ENUM(GPUSetRaytrace)
+eGPUSetRaytraceGraphics = 0, eGPUSetRaytraceRaytrace = 1, eGPUSetRaytraceCount = 2 END_ENUM();
+START_ENUM(GPUSetPost)
+eGPUSetPostPost = 0, eGPUSetPostCount = 1 END_ENUM();
+
 START_BINDING(GPUBindingGraphics)
 eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
-    eGPUBindingGraphicsSceneDesc = 1 END_BINDING();
+    eGPUBindingGraphicsSceneDesc = 1,        // Access to the scene descriptions
+    eGPUBindingGraphicsTextures  = 2         // Access to textures
+    END_BINDING();
 
-#define eGPUBindingRaytraceChannelN 4
+#define eGPUBindingRaytraceChannelCount 4
 START_BINDING(GPUBindingRaytrace)
-eGPUBindingRaytraceChannel0     = 0,        // Ray tracer channel0
-    eGPUBindingRaytraceChannel1 = 1,        // Ray tracer channel1
-    eGPUBindingRaytraceChannel2 = 2,        // Ray tracer channel2
-    eGPUBindingRaytraceChannel3 = 3,        // Ray tracer channel3
-    eGPUBindingRaytraceTlas     = 4         // Top level acceleration structure,
+eGPUBindingRaytraceChannels = 0,        // Ray tracer channels
+    eGPUBindingRaytraceTlas = 1         // Top level acceleration structure,
     END_BINDING();
 
 START_BINDING(GPUBindingPost)

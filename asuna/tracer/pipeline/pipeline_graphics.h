@@ -9,7 +9,7 @@
 class PipelineGraphics : public PipelineAware
 {
   public:
-	virtual void init(PipelineCorrelated *pPipCorr);
+	virtual void init(PipelineInitState pis);
 	virtual void run(const VkCommandBuffer &cmdBuf);
 	virtual void deinit();
 

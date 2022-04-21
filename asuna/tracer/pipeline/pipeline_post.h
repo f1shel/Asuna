@@ -3,16 +3,11 @@
 #include "pipeline.h"
 #include "pipeline_graphics.h"
 
-class PipelineCorrelatedPost : public PipelineCorrelated
-{
-  public:
-	PipelineGraphics *m_pPipGraphics = nullptr;
-};
-
 class PipelinePost : public PipelineAware
 {
   public:
-	virtual void init(PipelineCorrelated *pPipCorr);
+	// pis.
+	virtual void init(PipelineInitState pis);
 	virtual void run(const VkCommandBuffer &cmdBuf);
 	virtual void deinit();
 

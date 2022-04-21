@@ -20,14 +20,14 @@ void ContextAware::deinit()
 	m_root.clear();
 	m_alloc.deinit();
 	AppBaseVk::destroy();
-	glfwDestroyWindow(m_glfw);
-	m_glfw = NULL;
+	glfwDestroyWindow(m_window);
+	m_window = NULL;
 	glfwTerminate();
 }
 
 void ContextAware::resizeGlfwWindow()
 {
-	glfwSetWindowSize(m_glfw, m_size.width, m_size.height);
+	glfwSetWindowSize(m_window, m_size.width, m_size.height);
 }
 
 VkExtent2D ContextAware::getSize()
@@ -146,6 +146,11 @@ void ContextAware::createOfflineResources()
 	NAME2_VK(m_offlineFramebuffer, "Offline Framebuffer");
 }
 
+bool ContextAware::shouldGlfwCloseWindow()
+{
+	return glfwWindowShouldClose(m_window);
+}
+
 nvvk::Texture ContextAware::getOfflineFramebufferTexture()
 {
 	return m_offlineColor;
@@ -161,7 +166,7 @@ void ContextAware::createGlfwWindow()
 	}
 	// Create a window without OpenGL context
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	m_glfw = glfwCreateWindow(m_size.width, m_size.height, PROJECT_NAME, nullptr, nullptr);
+	m_window = glfwCreateWindow(m_size.width, m_size.height, PROJECT_NAME, nullptr, nullptr);
 	// Check glfw support for Vulkan
 	if (!glfwVulkanSupported())
 	{
@@ -244,11 +249,11 @@ void ContextAware::createAppContext()
 		info.physicalDevice = m_vkcontext.m_physicalDevice;
 		info.queueIndices.push_back(m_vkcontext.m_queueGCT.familyIndex);
 		// Window need to be opened to get the surface on which we will draw
-		const VkSurfaceKHR surface = getVkSurface(m_vkcontext.m_instance, m_glfw);
+		const VkSurfaceKHR surface = getVkSurface(m_vkcontext.m_instance, m_window);
 		m_vkcontext.setGCTQueueWithPresent(surface);
 		info.size    = m_size;
 		info.surface = surface;
-		info.window  = m_glfw;
+		info.window  = m_window;
 		AppBaseVk::create(info);
 	}
 	else

@@ -5,13 +5,13 @@
 #include <nvh/timesampler.hpp>
 #include <nvvk/buffers_vk.hpp>
 
-void PipelineRaytrace::init(PipelineCorrelated *pPipCorr)
+void PipelineRaytrace::init(PipelineInitState pis)
 {
-	m_pContext     = pPipCorr->m_pContext;
-	m_pScene       = pPipCorr->m_pScene;
-	m_pPipGraphics = ((PipelineCorrelatedRaytrace *) pPipCorr)->m_pPipGraphics;
+	m_pContext = pis.m_pContext;
+	m_pScene   = pis.m_pScene;
+	// pis.m_pCorrPips[0] should points to a graphics pipeline
+	m_pPipGraphics = dynamic_cast<PipelineGraphics *>(pis.m_pCorrPips[0]);
 	// Ray tracing
-	// 创建光线追踪管线
 	nvh::Stopwatch sw_;
 	initRayTracing();
 	createBottomLevelAS();
@@ -37,7 +37,25 @@ void PipelineRaytrace::deinit()
 
 void PipelineRaytrace::run(const VkCommandBuffer &cmdBuf)
 {
-	std::vector<VkDescriptorSet> descSets{m_dstSet, m_pPipGraphics->m_dstSet};
+	// If the camera matrix has changed, resets the frame; otherwise, increments frame.
+	static nvmath::mat4f refCamMatrix{0};
+	static float         refFov{CameraManip.getFov()};
+
+	const auto &m   = CameraManip.getMatrix();
+	const auto  fov = CameraManip.getFov();
+
+	if (memcmp(&refCamMatrix.a00, &m.a00, sizeof(nvmath::mat4f)) != 0 || refFov != fov)
+	{
+		m_pcRaytrace.curFrame = -1;
+		refCamMatrix          = m;
+		refFov                = fov;
+	}
+	m_pcRaytrace.curFrame++;
+
+	// Do ray tracing
+	std::array<VkDescriptorSet, eGPUSetRaytraceCount> descSets{};
+	descSets[eGPUSetRaytraceRaytrace] = m_dstSet;
+	descSets[eGPUSetRaytraceGraphics] = m_pPipGraphics->m_dstSet;
 	vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipeline);
 	vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipelineLayout, 0,
 	                        (uint32_t) descSets.size(), descSets.data(), 0, nullptr);
@@ -156,12 +174,10 @@ void PipelineRaytrace::createRtDescriptorSetLayout()
 	nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
 
 	// Create Binding Set
-	bind.addBinding(GPUBindingRaytrace::eGPUBindingRaytraceTlas,
-	                VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL);
-	for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
-	{
-		bind.addBinding(channelId, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL);
-	}
+	bind.addBinding(eGPUBindingRaytraceTlas, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1,
+	                VK_SHADER_STAGE_ALL);
+	bind.addBinding(eGPUBindingRaytraceChannels, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+	                eGPUBindingRaytraceChannelCount, VK_SHADER_STAGE_ALL);
 	m_dstPool   = bind.createPool(m_device);
 	m_dstLayout = bind.createLayout(m_device);
 	m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
@@ -185,9 +201,9 @@ void PipelineRaytrace::createRtPipeline()
 	stage.pName                           = "main";        // All the same entry point
 	// Raygen
 	std::string modulePath = "";
-	if (m_pScene->getCameraType() == eCameraTypePerspective)
+	if (m_pScene->getCameraType() == CameraType::eCameraTypePerspective)
 		modulePath = "shaders/raytrace.perspective.rgen.spv";
-	else if (m_pScene->getCameraType() == eCameraTypePinhole)
+	else if (m_pScene->getCameraType() == CameraType::eCameraTypePinhole)
 		modulePath = "shaders/raytrace.pinhole.rgen.spv";
 	stage.module =
 	    nvvk::createShaderModule(m_device, nvh::loadFile(modulePath, true, m_pContext->m_root));
@@ -244,10 +260,12 @@ void PipelineRaytrace::createRtPipeline()
 
 	// Descriptor sets: one specific to ray tracing, and one shared with the rasterization
 	// pipeline
-	std::vector<VkDescriptorSetLayout> rtDescSetLayouts = {m_dstLayout,
-	                                                       m_pPipGraphics->m_dstLayout};
-	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(rtDescSetLayouts.size());
-	pipelineLayoutCreateInfo.pSetLayouts    = rtDescSetLayouts.data();
+	std::array<VkDescriptorSetLayout, eGPUSetRaytraceCount> rtDescSetLayouts{};
+
+	rtDescSetLayouts[eGPUSetRaytraceRaytrace] = m_dstLayout;
+	rtDescSetLayouts[eGPUSetRaytraceGraphics] = m_pPipGraphics->m_dstLayout;
+	pipelineLayoutCreateInfo.setLayoutCount   = static_cast<uint32_t>(rtDescSetLayouts.size());
+	pipelineLayoutCreateInfo.pSetLayouts      = rtDescSetLayouts.data();
 	vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout);
 
 	// Assemble the shader stages and recursion depth info into the ray tracing pipeline
@@ -288,17 +306,17 @@ void PipelineRaytrace::updateRtDescriptorSet()
 	writes.emplace_back(
 	    bind.makeWrite(m_dstSet, GPUBindingRaytrace::eGPUBindingRaytraceTlas, &descASInfo));
 
-	std::vector<VkDescriptorImageInfo> imageInfos{};
-	imageInfos.reserve(eGPUBindingRaytraceChannelN);
-	for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelN; channelId++)
+	std::array<VkDescriptorImageInfo, eGPUBindingRaytraceChannelCount> imageInfos{};
+	for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelCount; channelId++)
 	{
 		VkDescriptorImageInfo imageInfo{
 		    {},
 		    m_pPipGraphics->m_tChannels[channelId].descriptor.imageView,
 		    VK_IMAGE_LAYOUT_GENERAL};
-		imageInfos.push_back(imageInfo);
-		writes.push_back(bind.makeWrite(m_dstSet, channelId, &imageInfos[channelId]));
+		imageInfos[channelId] = imageInfo;
 	}
+	writes.push_back(
+	    bind.makeWriteArray(m_dstSet, eGPUBindingRaytraceChannels, imageInfos.data()));
 	vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
 	                       nullptr);
 }

@@ -5,18 +5,23 @@
 
 #include <nvvk/descriptorsets_vk.hpp>
 
-class PipelineCorrelated
+#include <array>
+
+class PipelineAware;
+
+struct PipelineInitState
 {
   public:
-	ContextAware *m_pContext = nullptr;
-	Scene        *m_pScene   = nullptr;
+	ContextAware                  *m_pContext = nullptr;
+	Scene                         *m_pScene   = nullptr;
+	std::array<PipelineAware *, 3> m_pCorrPips{};
 };
 
 // All it needs to create a pipeline
 class PipelineAware
 {
   public:
-	virtual void init(PipelineCorrelated *pPipCorr) = 0;
+	virtual void init(PipelineInitState pPis)       = 0;
 	virtual void run(const VkCommandBuffer &cmdBuf) = 0;
 	virtual void deinit()
 	{

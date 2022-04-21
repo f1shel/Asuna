@@ -6,7 +6,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-void Mesh::init(const std::string &meshPath)
+Mesh::Mesh(const std::string &meshPath, bool recomputeNormal)
 {
 	tinyobj::ObjReader reader;
 	reader.ParseFromFile(meshPath);
@@ -18,7 +18,7 @@ void Mesh::init(const std::string &meshPath)
 	}
 	if (reader.GetShapes().size() != 1)
 	{
-		LOGE("[x] Scene loader: load mesh from %s ----> asuna tracer supports only one shape "
+		LOGE("[x] Scene Error: load mesh from %s ----> asuna tracer supports only one shape "
 		     "per mesh\n",
 		     meshPath.c_str());
 		exit(1);
@@ -58,40 +58,25 @@ void Mesh::init(const std::string &meshPath)
 		m_posMax.z = std::max(m_posMax.z, vertex.pos.z);
 	}
 
-	// Compute normal when no normal were provided.
-	// if (attrib.normals.empty())
-	//{
-	//	for (size_t i = 0; i < m_indices.size(); i += 3)
-	//	{
-	//		Vertex& v0 = m_vertices[m_indices[i + 0]];
-	//		Vertex& v1 = m_vertices[m_indices[i + 1]];
-	//		Vertex& v2 = m_vertices[m_indices[i + 2]];
+	// Compute normal when no normal were provided or recomputing is required.
+	if (attrib.normals.empty() || recomputeNormal)
+	{
+		for (size_t i = 0; i < m_indices.size(); i += 3)
+		{
+			GPUVertex &v0 = m_vertices[m_indices[i + 0]];
+			GPUVertex &v1 = m_vertices[m_indices[i + 1]];
+			GPUVertex &v2 = m_vertices[m_indices[i + 2]];
 
-	//		nvmath::vec3f n = nvmath::normalize(nvmath::cross(
-	//			(v1.position - v0.position),
-	//			(v2.position - v0.position)));
-	//		v0.normal = n;
-	//		v1.normal = n;
-	//		v2.normal = n;
-	//	}
-	//}
+			nvmath::vec3f n =
+			    nvmath::normalize(nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
+			v0.normal = n;
+			v1.normal = n;
+			v2.normal = n;
+		}
+	}
 }
 
-void MeshAlloc::init(ContextAware *pContext, Mesh *pMesh)
-{
-	auto             &m_alloc              = pContext->m_alloc;
-	auto              m_device             = pContext->getDevice();
-	auto              m_graphicsQueueIndex = pContext->getQueueFamily();
-	nvvk::CommandPool cmdGen(m_device, m_graphicsQueueIndex);
-	auto              cmdBuf = cmdGen.createCommandBuffer();
-
-	init(pContext, pMesh, cmdBuf);
-
-	cmdGen.submitAndWait(cmdBuf);
-	m_alloc.finalizeAndReleaseStaging();
-}
-
-void MeshAlloc::init(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf)
+MeshAlloc::MeshAlloc(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf)
 {
 	auto &m_alloc = pContext->m_alloc;
 
@@ -117,11 +102,13 @@ void MeshAlloc::deinit(ContextAware *pContext)
 
 	m_alloc.destroy(m_bVertices);
 	m_alloc.destroy(m_bIndices);
+
+	intoReleased();
 }
 
-void SceneDescAlloc::init(ContextAware                          *pContext,
-                          const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
-                          const VkCommandBuffer                 &cmdBuf)
+SceneDescAlloc::SceneDescAlloc(ContextAware                          *pContext,
+                               const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
+                               const VkCommandBuffer                 &cmdBuf)
 {
 	auto m_device = pContext->getDevice();
 
@@ -142,4 +129,6 @@ void SceneDescAlloc::init(ContextAware                          *pContext,
 void SceneDescAlloc::deinit(ContextAware *pContext)
 {
 	pContext->m_alloc.destroy(m_bSceneDesc);
+
+	intoReleased();
 }

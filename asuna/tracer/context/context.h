@@ -25,7 +25,6 @@ class ContextAware : public nvvk::AppBaseVk
 {
   public:
 	ContextInitState m_cis;
-	GLFWwindow      *m_glfw = NULL;
 	// Allocator for buffer, images, acceleration structures
 	nvvk::ResourceAllocatorDedicated m_alloc;
 	// Debugger to name objects
@@ -45,6 +44,7 @@ class ContextAware : public nvvk::AppBaseVk
 	void          setViewport(const VkCommandBuffer &cmdBuf);
 	void          resizeGlfwWindow();
 	void          createOfflineResources();
+	bool          shouldGlfwCloseWindow();
 	nvvk::Texture getOfflineFramebufferTexture();
 
   private:

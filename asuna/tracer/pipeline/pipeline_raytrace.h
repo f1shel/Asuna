@@ -7,16 +7,10 @@
 #include "nvvk/raytraceKHR_vk.hpp"
 #include "nvvk/sbtwrapper_vk.hpp"
 
-class PipelineCorrelatedRaytrace : public PipelineCorrelated
-{
-  public:
-	PipelineGraphics *m_pPipGraphics = nullptr;
-};
-
 class PipelineRaytrace : public PipelineAware
 {
   public:
-	virtual void init(PipelineCorrelated *pPipCorr);
+	virtual void init(PipelineInitState pis);
 	virtual void deinit();
 	virtual void run(const VkCommandBuffer &cmdBuf);
 

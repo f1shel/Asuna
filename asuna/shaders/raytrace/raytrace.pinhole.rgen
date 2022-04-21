@@ -11,12 +11,11 @@
 #include "common/math.glsl"
 #include "common/structs.glsl"
 
-layout(set = 0, binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
-layout(set = 0, binding = eGPUBindingRaytraceChannel0, rgba32f) uniform image2D channel0;
-layout(set = 0, binding = eGPUBindingRaytraceChannel1, rgba32f) uniform image2D channel1;
-layout(set = 0, binding = eGPUBindingRaytraceChannel2, rgba32f) uniform image2D channel2;
-layout(set = 0, binding = eGPUBindingRaytraceChannel3, rgba32f) uniform image2D channel3;
-layout(set = 1, binding = eGPUBindingGraphicsCamera) uniform _Camera
+layout(set     = eGPUSetRaytraceRaytrace,
+       binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
+layout(set = eGPUSetRaytraceRaytrace, binding = eGPUBindingRaytraceChannels,
+       rgba32f) uniform image2D channels[eGPUBindingRaytraceChannelCount];
+layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsCamera) uniform _Camera
 {
 	GPUCamera cameraInfo;
 };
@@ -56,8 +55,5 @@ void main()
 	            0                     // payload (location = 0)
 	);
 
-	imageStore(channel0, ivec2(gl_LaunchIDEXT.xy), vec4(payload.radiance, 1.f));
-	imageStore(channel1, ivec2(gl_LaunchIDEXT.xy), vec4(payload.uv, 0.f, 1.f));
-	imageStore(channel2, ivec2(gl_LaunchIDEXT.xy), vec4(payload.geoNormal, 1.f));
-	imageStore(channel3, ivec2(gl_LaunchIDEXT.xy), vec4(vec3(payload.depth)/1000.0, 1.f));
+	imageStore(channels[0], ivec2(gl_LaunchIDEXT.xy), vec4(payload.radiance, 1.f));
 }

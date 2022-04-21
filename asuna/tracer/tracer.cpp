@@ -12,9 +12,6 @@
 
 using std::filesystem::path;
 
-// **************************************************************************
-// functions exposed to main.cpp
-// **************************************************************************
 void Tracer::init(TracerInitState tis)
 {
 	m_tis = tis;
@@ -30,20 +27,14 @@ void Tracer::init(TracerInitState tis)
 	else
 		m_context.createOfflineResources();
 
-	PipelineCorrelated *pPipCorrGraphic = new PipelineCorrelatedRaytrace;
-	pPipCorrGraphic->m_pContext         = &m_context;
-	pPipCorrGraphic->m_pScene           = &m_scene;
-	m_pipelineGraphics.init(pPipCorrGraphic);
+	PipelineInitState pis{};
+	pis.m_pContext     = &m_context;
+	pis.m_pScene       = &m_scene;
+	pis.m_pCorrPips[0] = &m_pipelineGraphics;
 
-	PipelineCorrelatedRaytrace *pPipCorrRaytrace =
-	    (PipelineCorrelatedRaytrace *) pPipCorrGraphic;
-	pPipCorrRaytrace->m_pPipGraphics = &m_pipelineGraphics;
-	m_pipelineRaytrace.init(pPipCorrRaytrace);
-
-	PipelineCorrelatedPost *pPipCorrPost = (PipelineCorrelatedPost *) pPipCorrRaytrace;
-	m_pipelinePost.init(pPipCorrPost);
-
-	delete pPipCorrGraphic;
+	m_pipelineGraphics.init(pis);
+	m_pipelineRaytrace.init(pis);
+	m_pipelinePost.init(pis);
 }
 
 void Tracer::run()
@@ -69,7 +60,7 @@ void Tracer::runOnline()
 	clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
 	clearValues[1].depthStencil = {1.0f, 0};
 	// Main loop
-	while (!glfwWindowShouldClose(m_context.m_glfw))
+	while (!m_context.shouldGlfwCloseWindow())
 	{
 		glfwPollEvents();
 		if (m_context.isMinimized())
