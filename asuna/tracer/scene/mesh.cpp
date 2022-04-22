@@ -12,15 +12,15 @@ Mesh::Mesh(const std::string &meshPath, bool recomputeNormal)
 	reader.ParseFromFile(meshPath);
 	if (!reader.Valid())
 	{
-		LOGE("[x] Scene Error: load mesh from %s ----> %s\n", meshPath.c_str(),
+		LOGE("[x] %-20s: load mesh from %s ----> %s\n", "Scene Error", meshPath.c_str(),
 		     reader.Error().c_str());
 		exit(1);
 	}
 	if (reader.GetShapes().size() != 1)
 	{
-		LOGE("[x] Scene Error: load mesh from %s ----> asuna tracer supports only one shape "
+		LOGE("[x] %-20s: load mesh from %s ----> asuna tracer supports only one shape "
 		     "per mesh\n",
-		     meshPath.c_str());
+		     "Scene Error", meshPath.c_str());
 		exit(1);
 	}
 	const tinyobj::attrib_t &attrib = reader.GetAttrib();
@@ -102,33 +102,6 @@ void MeshAlloc::deinit(ContextAware *pContext)
 
 	m_alloc.destroy(m_bVertices);
 	m_alloc.destroy(m_bIndices);
-
-	intoReleased();
-}
-
-SceneDescAlloc::SceneDescAlloc(ContextAware                          *pContext,
-                               const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
-                               const VkCommandBuffer                 &cmdBuf)
-{
-	auto m_device = pContext->getDevice();
-
-	for (auto &record : meshAllocLUT)
-	{
-		MeshAlloc  *pMeshAlloc = record.second;
-		GPUMeshDesc desc;
-		desc.vertexAddress =
-		    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bVertices.buffer);
-		desc.indexAddress =
-		    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->m_bIndices.buffer);
-		m_sceneDesc.emplace_back(desc);
-	}
-	m_bSceneDesc =
-	    pContext->m_alloc.createBuffer(cmdBuf, m_sceneDesc, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-}
-
-void SceneDescAlloc::deinit(ContextAware *pContext)
-{
-	pContext->m_alloc.destroy(m_bSceneDesc);
 
 	intoReleased();
 }

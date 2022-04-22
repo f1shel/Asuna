@@ -19,7 +19,7 @@ void PipelineRaytrace::init(PipelineInitState pis)
 	createRtDescriptorSetLayout();
 	createRtPipeline();
 	updateRtDescriptorSet();
-	LOGI("[ ] Pipeline: %6.2fms Raytrace pipeline creation\n", sw_.elapsed());
+	LOGI("[ ] %-20s: %6.2fms Raytrace pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
 void PipelineRaytrace::deinit()
@@ -89,9 +89,9 @@ static nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice         d
 {
 	// BLAS builder requires raw device addresses.
 	VkDeviceAddress vertexAddress =
-	    nvvk::getBufferDeviceAddress(device, meshAlloc.m_bVertices.buffer);
+	    nvvk::getBufferDeviceAddress(device, meshAlloc.getVerticesBuffer());
 	VkDeviceAddress indexAddress =
-	    nvvk::getBufferDeviceAddress(device, meshAlloc.m_bIndices.buffer);
+	    nvvk::getBufferDeviceAddress(device, meshAlloc.getIndicesBuffer());
 
 	uint32_t maxPrimitiveCount = meshAlloc.m_nIndices / 3;
 
@@ -148,11 +148,13 @@ void PipelineRaytrace::createBottomLevelAS()
 void PipelineRaytrace::createTopLevelAS()
 {
 	m_tlas.reserve(m_pScene->getInstancesNum());
-	for (auto pInst : m_pScene->getInstances())
+	const auto &instances = m_pScene->getInstances();
+	for (uint32_t instId = 0; instId < m_pScene->getInstancesNum(); instId++)
 	{
+		auto                               pInst = instances[instId];
 		VkAccelerationStructureInstanceKHR rayInst{};
 		rayInst.transform           = nvvk::toTransformMatrixKHR(pInst->m_transform);
-		rayInst.instanceCustomIndex = pInst->m_meshIndex;        // gl_InstanceCustomIndexEXT
+		rayInst.instanceCustomIndex = instId;        // gl_InstanceCustomIndexEXT
 		rayInst.accelerationStructureReference =
 		    m_rtBuilder.getBlasDeviceAddress(pInst->m_meshIndex);
 		rayInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;

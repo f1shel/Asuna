@@ -8,6 +8,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "../../hostdevice/binding.h"
+#include "../../hostdevice/material.h"
 #include "../../hostdevice/scene.h"
 #include "../../hostdevice/vertex.h"
 #include "common/structs.glsl"
@@ -24,6 +25,10 @@ layout(buffer_reference, scalar) buffer Indices
 {
 	ivec3 i[];
 };        // Triangle indices
+layout(buffer_reference, scalar) buffer Materials
+{
+	GPUMaterial m[];
+};        // Array of all materials on an object
 // descriptor sets
 layout(set     = eGPUSetRaytraceRaytrace,
        binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;
@@ -32,7 +37,7 @@ layout(set     = eGPUSetRaytraceGraphics,
 layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsSceneDesc,
        scalar) buffer _SceneDesc
 {
-	GPUMeshDesc m[];
+	GPUInstanceDesc m[];
 }
 sceneDesc;
 // This will store two of the barycentric coordinates of the intersection
@@ -46,9 +51,10 @@ vec4 textureEval(in int texId, in vec2 uv)
 void main()
 {
 	// Object data
-	GPUMeshDesc meshDesc = sceneDesc.m[gl_InstanceCustomIndexEXT];
-	Indices     indices  = Indices(meshDesc.indexAddress);
-	Vertices    vertices = Vertices(meshDesc.vertexAddress);
+	GPUInstanceDesc instDesc = sceneDesc.m[gl_InstanceCustomIndexEXT];
+	Indices         indices  = Indices(instDesc.indexAddress);
+	Vertices        vertices = Vertices(instDesc.vertexAddress);
+	GPUMaterial     material = Materials(instDesc.materialAddress).m[0];
 	// Indices of the triangle
 	ivec3 id = indices.i[gl_PrimitiveID];
 	// Vertex of the triangle
@@ -64,7 +70,7 @@ void main()
 	const vec3 worldPos  = gl_ObjectToWorldEXT * vec4(pos, 1.0);
 	const vec3 geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
 
-	payload.radiance  = textureEval(4, uv).rgb;
+	payload.radiance  = textureEval(material.normalTextureId, uv).rgb;
 	payload.uv        = uv;
 	payload.geoNormal = geoNormal;
 	payload.depth     = gl_HitTEXT;

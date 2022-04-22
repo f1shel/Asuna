@@ -9,6 +9,8 @@
 class Texture
 {
   public:
+	// Add default texture (size of 1x1) when no texture exists in scene
+	Texture();
 	Texture(const std::string &texturePath, float gamma = 1.0);
 	~Texture();
 	VkExtent2D getSize()
@@ -19,7 +21,7 @@ class Texture
 	{
 		return m_format;
 	}
-	void* getData()
+	void *getData()
 	{
 		return m_data;
 	}
@@ -34,11 +36,12 @@ class TextureAlloc : public GPUAlloc
 {
   public:
 	TextureAlloc(ContextAware *pContext, Texture *pTexture, const VkCommandBuffer &cmdBuf);
-	void deinit(ContextAware *pContext);
+	void          deinit(ContextAware *pContext);
 	nvvk::Texture getTexture()
 	{
 		return m_texture;
 	}
+
   private:
 	nvvk::Texture m_texture;
 };

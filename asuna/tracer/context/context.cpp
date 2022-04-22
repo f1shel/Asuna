@@ -161,7 +161,7 @@ void ContextAware::createGlfwWindow()
 	// Check initialization of glfw library
 	if (!glfwInit())
 	{
-		LOGE("[!] Context Error: failed to initalize glfw");
+		LOGE("[x] %-20s: failed to initalize glfw", "Context Error");
 		exit(1);
 	}
 	// Create a window without OpenGL context
@@ -170,7 +170,7 @@ void ContextAware::createGlfwWindow()
 	// Check glfw support for Vulkan
 	if (!glfwVulkanSupported())
 	{
-		std::cerr << "[!] Context Error: glfw does not support vulkan" << std::endl;
+		LOGE("[x] %-20s: glfw does not support vulkan", "Context Error");
 		exit(1);
 	}
 	assert(glfwVulkanSupported() == 1);
@@ -225,7 +225,7 @@ void ContextAware::initializeVulkan()
 #else         // If not _WIN32
 	putenv("DEBUG_PRINTF_TO_STDOUT=1");
 #endif        // _WIN32
-	          // Create the Vulkan instance and then first compatible device based on info
+              // Create the Vulkan instance and then first compatible device based on info
 	m_vkcontext.init(contextInfo);
 	// Device must support acceleration structures and ray tracing pipelines:
 	if (asFeatures.accelerationStructure != VK_TRUE ||

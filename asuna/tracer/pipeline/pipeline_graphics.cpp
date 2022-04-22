@@ -26,7 +26,7 @@ void PipelineGraphics::init(PipelineInitState pis)
 	createGraphicsPipeline();
 	createCameraBuffer();
 	updateGraphicsDescriptorSet();
-	LOGI("[ ] Pipeline: %6.2fms Graphic pipeline creation\n", sw_.elapsed());
+	LOGI("[ ] %-20s: %6.2fms Graphic pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
 void PipelineGraphics::run(const VkCommandBuffer &cmdBuf)
@@ -266,7 +266,6 @@ void PipelineGraphics::createCameraBuffer()
 	m_debug.setObjectName(m_bCamera.buffer, "Camera");
 }
 
-// TODO: scene description
 void PipelineGraphics::updateGraphicsDescriptorSet()
 {
 	auto &bind     = m_dstSetLayoutBind;
@@ -278,7 +277,7 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
 	VkDescriptorBufferInfo dbiCamera{m_bCamera.buffer, 0, VK_WHOLE_SIZE};
 	writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsCamera, &dbiCamera));
 
-	VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescBuffer().buffer, 0, VK_WHOLE_SIZE};
+	VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescBuffer(), 0, VK_WHOLE_SIZE};
 	writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
 
 	// All texture samplers

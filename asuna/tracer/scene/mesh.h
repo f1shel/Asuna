@@ -44,24 +44,22 @@ class MeshAlloc : public GPUAlloc
   public:
 	MeshAlloc(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf);
 	void deinit(ContextAware *pContext);
+	VkBuffer getIndicesBuffer() const
+	{
+		return m_bIndices.buffer;
+	}
+	VkBuffer getVerticesBuffer() const
+	{
+		return m_bVertices.buffer;
+	}
 
   public:
 	uint32_t      m_nIndices{0};
 	uint32_t      m_nVertices{0};
-	nvvk::Buffer  m_bIndices;         // Device buffer of the indices forming triangles
-	nvvk::Buffer  m_bVertices;        // Device buffer of all 'Vertex'
 	nvmath::vec3f m_posMin{0, 0, 0};
 	nvmath::vec3f m_posMax{0, 0, 0};
-};
 
-class SceneDescAlloc : public GPUAlloc
-{
-  public:
-	SceneDescAlloc(ContextAware *pContext, const std::map<uint32_t, MeshAlloc *> &meshAllocLUT,
-	               const VkCommandBuffer &cmdBuf);
-	void deinit(ContextAware *pContext);
-
-  public:
-	std::vector<GPUMeshDesc> m_sceneDesc{};
-	nvvk::Buffer             m_bSceneDesc;
+  private:
+	nvvk::Buffer m_bIndices;         // Device buffer of the indices forming triangles
+	nvvk::Buffer m_bVertices;        // Device buffer of all 'Vertex'
 };

@@ -20,7 +20,7 @@ void PipelinePost::init(PipelineInitState pis)
 	createPostDescriptorSetLayout();
 	createPostPipeline();
 	updatePostDescriptorSet();
-	LOGI("[ ] Pipeline: %6.2fms Post pipeline creation\n", sw_.elapsed());
+	LOGI("[ ] %-20s: %6.2fms Post pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
 void PipelinePost::run(const VkCommandBuffer &cmdBuf)

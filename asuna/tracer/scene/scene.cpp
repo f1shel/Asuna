@@ -1,6 +1,7 @@
 #include "scene.h"
 
 #include <nvh/fileoperations.hpp>
+#include <nvh/timesampler.hpp>
 #include <nvmath/nvmath.h>
 #include <nvvk/buffers_vk.hpp>
 #include <nvvk/commands_vk.hpp>
@@ -23,7 +24,12 @@ static json defaultSceneOptions = json::parse(R"(
 		"fov": 45.0
 	},
 	"textures": {
-		"gamma": 1.0
+		"gamma": 1.0,
+		"name": "add_by_default_when_no_texture_exists"
+	},
+	"materials": {
+		"type": "brdf_lambertian",
+		"name": "add_by_default_and_apply_to_every_instance_without_material"
 	}
 }
 )");
@@ -35,7 +41,8 @@ void Scene::init(ContextAware *pContext)
 
 void Scene::create(std::string sceneFilePath)
 {
-	bool isRelativePath = path(sceneFilePath).is_relative();
+	nvh::Stopwatch sw_;
+	bool           isRelativePath = path(sceneFilePath).is_relative();
 	if (isRelativePath)
 		sceneFilePath = nvh::findFile(sceneFilePath, m_pContext->m_root, true);
 	if (sceneFilePath.empty())
@@ -43,31 +50,40 @@ void Scene::create(std::string sceneFilePath)
 	m_sceneFileDir = path(sceneFilePath).parent_path().string();
 	parseSceneFile(sceneFilePath);
 	allocScene();
+	LOGI("[ ] %-20s: %6.2fms Scene file parsing and resources creation\n", "Scene", sw_.elapsed());
 }
 
 void Scene::deinit()
 {
-	assert((m_pContext != nullptr) &&
-	       "[!] Scene Error: failed to find belonging context when deinit.");
+	if (m_pContext == nullptr)
+	{
+		LOGE("[x] %-20s: failed to find belonging context when deinit.", "Scene Error");
+		exit(1);
+	}
 	freeRawData();
 	freeAllocData();
 }
 
 void Scene::addInstance(const nlohmann::json &instanceJson)
 {
-	const string &meshName  = instanceJson["mesh"];
+	JsonCheckKeys(instanceJson, {"mesh"});
+	string meshName = instanceJson["mesh"], materialName;
+	if (instanceJson.count("material"))
+		materialName = instanceJson["material"];
+	else
+		materialName = defaultSceneOptions["materials"]["name"];
 	nvmath::mat4f transform = nvmath::mat4f_id;
-	if (instanceJson.contains("transform"))
+	if (instanceJson.contains("toworld"))
 	{
-		for (const auto &singleton : instanceJson["transform"])
+		for (const auto &singleton : instanceJson["toworld"])
 		{
 			nvmath::mat4f t = nvmath::mat4f_id;
-			if (!singleton.contains("type"))
+			JsonCheckKeys(singleton, {"type", "value"});
+			if (singleton["type"] == "matrix")
 			{
-				// TODO
-				exit(1);
+				t = Json2Mat4(singleton["value"]);
 			}
-			if (singleton["type"] == "translate")
+			else if (singleton["type"] == "translate")
 			{
 				t.set_translation(Json2Vec3(singleton["value"]));
 			}
@@ -95,7 +111,7 @@ void Scene::addInstance(const nlohmann::json &instanceJson)
 			transform = t * transform;
 		}
 	}
-	Instance *pInst = new Instance(transform, getMeshId(meshName));
+	Instance *pInst = new Instance(transform, getMeshId(meshName), getMaterialId(materialName));
 	m_instances.emplace_back(pInst);
 }
 
@@ -115,9 +131,13 @@ void Scene::parseSceneFile(std::string sceneFilePath)
 	json     sceneFileJson;
 	sceneFileStream >> sceneFileJson;
 
+	JsonCheckKeys(sceneFileJson,
+	              {"integrator", "camera", "textures", "materials", "meshes", "instances"});
+
 	auto &integratorJson = sceneFileJson["integrator"];
 	auto &cameraJson     = sceneFileJson["camera"];
 	auto &texturesJson   = sceneFileJson["textures"];
+	auto &materialsJson  = sceneFileJson["materials"];
 	auto &meshesJson     = sceneFileJson["meshes"];
 	auto &instancesJson  = sceneFileJson["instances"];
 
@@ -127,9 +147,16 @@ void Scene::parseSceneFile(std::string sceneFilePath)
 	// camera
 	addCamera(cameraJson);
 	// textures
+	addDummyTexture();        // if no texture or material exists, pipeline will complain
 	for (auto &textureJson : texturesJson)
 	{
 		addTexture(textureJson);
+	}
+	// materials
+	addDummyMaterial();        // if no texture or material exists, pipeline will complain
+	for (auto &materialJson : materialsJson)
+	{
+		addMaterial(materialJson);
 	}
 	// meshes
 	for (auto &meshJson : meshesJson)
@@ -157,7 +184,8 @@ void Scene::computeSceneDimensions()
 
 	if (scnBbox.isEmpty() || !scnBbox.isVolume())
 	{
-		LOGE("[!] Scene Warning: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]");
+		LOGE("[!] %-20s: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]",
+		     "Scene Warning");
 		scnBbox.insert({-1.0f, -1.0f, -1.0f});
 		scnBbox.insert({1.0f, 1.0f, 1.0f});
 	}
@@ -176,6 +204,20 @@ void Scene::fitCamera()
 	                m_size.width / static_cast<float>(m_size.height));
 }
 
+void Scene::addDummyTexture()
+{
+	const string &textureName = defaultSceneOptions["textures"]["name"];
+	Texture      *pTexture    = new Texture;
+	m_textureLUT[textureName] = std::make_pair(pTexture, m_textureLUT.size());
+}
+
+void Scene::addDummyMaterial()
+{
+	const string      &materialName = defaultSceneOptions["materials"]["name"];
+	MaterialInterface *pMaterial    = new MaterialBrdfLambertian;
+	m_materialLUT[materialName]     = std::make_pair(pMaterial, m_materialLUT.size());
+}
+
 void Scene::allocScene()
 {
 	// allocate resources on gpu
@@ -189,6 +231,15 @@ void Scene::allocScene()
 		auto        pTexture    = valuePair.first;
 		auto        textureId   = valuePair.second;
 		allocTexture(m_pContext, textureId, textureName, pTexture, cmdBuf);
+	}
+
+	for (auto &record : m_materialLUT)
+	{
+		const auto &materialName = record.first;
+		const auto &valuePair    = record.second;
+		auto        pMaterial    = valuePair.first;
+		auto        materialId   = valuePair.second;
+		allocMaterial(m_pContext, materialId, materialName, pMaterial, cmdBuf);
 	}
 
 	for (auto &record : m_meshLUT)
@@ -264,6 +315,7 @@ void Scene::freeAllocData()
 
 void Scene::addIntegrator(const nlohmann::json &integratorJson)
 {
+	JsonCheckKeys(integratorJson, {"width", "height"});
 	VkExtent2D size = {integratorJson["width"], integratorJson["height"]};
 	if (!(size.width >= 1 && size.height >= 1))
 	{
@@ -281,18 +333,11 @@ void Scene::addIntegrator(const nlohmann::json &integratorJson)
 
 void Scene::addCamera(const nlohmann::json &cameraJson)
 {
-	if (cameraJson.contains("type"))
-	{
-		if (cameraJson["type"] == "perspective")
-			addCameraPerspective(cameraJson);
-		else if (cameraJson["type"] == "pinhole")
-			addCameraPinhole(cameraJson);
-		else
-		{
-			// TODO
-			exit(1);
-		}
-	}
+	JsonCheckKeys(cameraJson, {"type"});
+	if (cameraJson["type"] == "perspective")
+		addCameraPerspective(cameraJson);
+	else if (cameraJson["type"] == "pinhole")
+		addCameraPinhole(cameraJson);
 	else
 	{
 		// TODO
@@ -342,16 +387,18 @@ CameraType Scene::getCameraType()
 
 void Scene::addTexture(const nlohmann::json &textureJson)
 {
+	JsonCheckKeys(textureJson, {"name", "path"});
 	std::string textureName = textureJson["name"];
 	if (m_meshLUT.count(textureName))
 	{
-		// TODO: LOGE
+		LOGE("[x] %-20s: texture %s already exists\n", "Scene Error", textureName.c_str());
 		exit(1);
 	}
 	auto texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
 	if (texturePath.empty())
 	{
-		// TODO: LOGE
+		LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
+		     std::string(textureJson["path"]).c_str());
 		exit(1);
 	}
 	float gamma = defaultSceneOptions["textures"]["gamma"];
@@ -388,6 +435,79 @@ TextureAlloc *Scene::getTextureAlloc(uint32_t textureId)
 	return m_textureAllocLUT[textureId];
 }
 
+void Scene::addMaterial(const nlohmann::json &materialJson)
+{
+	JsonCheckKeys(materialJson, {"type", "name"});
+	std::string materialName = materialJson["name"];
+	if (m_materialLUT.count(materialName))
+	{
+		LOGE("[x] %-20s: material %s already exists\n", "Scene Error", materialName.c_str());
+		exit(1);
+	}
+	if (materialJson["type"] == "brdf_hongzhi")
+		addMaterialBrdfHongzhi(materialJson);
+	else if (materialJson["type"] == "brdf_lambertian")
+		addMaterialBrdfLambertian(materialJson);
+	else
+	{
+		// TODO
+		exit(1);
+	}
+}
+
+void Scene::addMaterialBrdfHongzhi(const nlohmann::json &materialJson)
+{
+	std::string materialName = materialJson["name"];
+	JsonCheckKeys(materialJson, {"diffuse_texture", "specular_texture", "normal_texture",
+	                             "tangent_texture", "alpha_texture"});
+	int                diffuseTextureId  = getTextureId(materialJson["diffuse_texture"]);
+	int                specularTextureId = getTextureId(materialJson["specular_texture"]);
+	int                normalTextureId   = getTextureId(materialJson["normal_texture"]);
+	int                tangentTextureId  = getTextureId(materialJson["tangent_texture"]);
+	int                alphaTextureId    = getTextureId(materialJson["alpha_texture"]);
+	MaterialInterface *pMaterial         = new MaterialBrdfHongzhi(
+	            diffuseTextureId, specularTextureId, alphaTextureId, normalTextureId, tangentTextureId);
+	m_materialLUT[materialName] = std::make_pair(pMaterial, m_materialLUT.size());
+}
+
+void Scene::addMaterialBrdfLambertian(const nlohmann::json &materialJson)
+{
+	std::string materialName = materialJson["name"];
+	JsonCheckKeys(materialJson, {"diffuse_reflectance"});
+	vec3               diffuse   = Json2Vec3(materialJson["diffuse_reflectance"]);
+	MaterialInterface *pMaterial = new MaterialBrdfLambertian(diffuse);
+	m_materialLUT[materialName]  = std::make_pair(pMaterial, m_materialLUT.size());
+}
+
+void Scene::allocMaterial(ContextAware *pContext, uint32_t materialId,
+                          const std::string &materialName, MaterialInterface *pMaterial,
+                          const VkCommandBuffer &cmdBuf)
+{
+	auto &m_debug  = pContext->m_debug;
+	auto  m_device = pContext->getDevice();
+
+	MaterialAlloc *pMaterialAlloc  = new MaterialAlloc(pContext, pMaterial, cmdBuf);
+	m_materialAllocLUT[materialId] = pMaterialAlloc;
+
+	m_debug.setObjectName(pMaterialAlloc->getBuffer(),
+	                      std::string(materialName + "_materialBuffer"));
+}
+
+uint32_t Scene::getMaterialsNum()
+{
+	return m_materialLUT.size();
+}
+
+uint32_t Scene::getMaterialId(const std::string &materialName)
+{
+	return m_materialLUT[materialName].second;
+}
+
+MaterialAlloc *Scene::getMaterialAlloc(uint32_t materialId)
+{
+	return m_materialAllocLUT[materialId];
+}
+
 VkExtent2D Scene::getSensorSize()
 {
 	return m_pIntegrator->getSize();
@@ -395,6 +515,7 @@ VkExtent2D Scene::getSensorSize()
 
 void Scene::addMesh(const nlohmann::json &meshJson)
 {
+	JsonCheckKeys(meshJson, {"name", "path"});
 	std::string meshName = meshJson["name"];
 	if (m_meshLUT.count(meshName))
 	{
@@ -424,9 +545,10 @@ void Scene::allocMesh(ContextAware *pContext, uint32_t meshId, const string &mes
 	MeshAlloc *pMeshAlloc  = new MeshAlloc(pContext, pMesh, cmdBuf);
 	m_meshAllocLUT[meshId] = pMeshAlloc;
 
-	m_debug.setObjectName(pMeshAlloc->m_bVertices.buffer,
+	m_debug.setObjectName(pMeshAlloc->getVerticesBuffer(),
 	                      std::string(meshName + "_vertexBuffer"));
-	m_debug.setObjectName(pMeshAlloc->m_bIndices.buffer, std::string(meshName + "_indexBuffer"));
+	m_debug.setObjectName(pMeshAlloc->getIndicesBuffer(),
+	                      std::string(meshName + "_indexBuffer"));
 }
 
 uint32_t Scene::getMeshesNum()
@@ -436,7 +558,13 @@ uint32_t Scene::getMeshesNum()
 
 uint32_t Scene::getMeshId(const std::string &meshName)
 {
-	return m_meshLUT[meshName].second;
+	if (m_meshLUT.count(meshName))
+		return m_meshLUT[meshName].second;
+	else
+	{
+		// TODO: LOGE()
+		exit(1);
+	}
 }
 
 MeshAlloc *Scene::getMeshAlloc(uint32_t meshId)
@@ -447,10 +575,11 @@ MeshAlloc *Scene::getMeshAlloc(uint32_t meshId)
 void Scene::allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf)
 {
 	// Keeping the obj host model and device description
-	m_pSceneDescAlloc = new SceneDescAlloc(pContext, m_meshAllocLUT, cmdBuf);
+	m_pSceneDescAlloc =
+	    new SceneDescAlloc(pContext, m_instances, m_meshAllocLUT, m_materialAllocLUT, cmdBuf);
 }
 
-nvvk::Buffer Scene::getSceneDescBuffer()
+VkBuffer Scene::getSceneDescBuffer()
 {
-	return m_pSceneDescAlloc->m_bSceneDesc;
+	return m_pSceneDescAlloc->getBuffer();
 }

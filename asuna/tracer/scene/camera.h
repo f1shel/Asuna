@@ -1,13 +1,13 @@
 #pragma once
 
-#include <nvh/cameramanipulator.hpp>
 #include "utils.h"
+#include <nvh/cameramanipulator.hpp>
 
-enum class CameraType
+enum CameraType
 {
-	eCameraTypeUndefined,
-	eCameraTypePerspective,
-	eCameraTypePinhole
+	eCameraTypeUndefined   = 0,
+	eCameraTypePerspective = 1,
+	eCameraTypePinhole     = 2
 };
 
 class CameraInterface
@@ -39,13 +39,13 @@ class CameraInterface
 	}
 
   protected:
-	CameraType m_camType = CameraType::eCameraTypeUndefined;
+	CameraType m_camType = eCameraTypeUndefined;
 };
 
 class CameraGraphicsPerspective : public CameraInterface
 {
   public:
-	CameraGraphicsPerspective(float fov) : CameraInterface(CameraType::eCameraTypePerspective)
+	CameraGraphicsPerspective(float fov) : CameraInterface(eCameraTypePerspective)
 	{
 		CameraManip.setFov(fov);
 	}
@@ -58,15 +58,14 @@ class CameraGraphicsPerspective : public CameraInterface
 class CameraVisionPinhole : public CameraInterface
 {
   public:
-	CameraVisionPinhole(nvmath::mat3f intrinsic) :
-	    CameraInterface(CameraType::eCameraTypePinhole)
+	CameraVisionPinhole(nvmath::mat3f intrinsic) : CameraInterface(eCameraTypePinhole)
 	{
-		m_int     = getFxFyCxCy(intrinsic);
+		m_int = getFxFyCxCy(intrinsic);
 	}
 	CameraVisionPinhole(float fx, float fy, float cx, float cy) :
-	    CameraInterface(CameraType::eCameraTypePinhole)
+	    CameraInterface(eCameraTypePinhole)
 	{
-		m_int     = vec4(fx, fy, cx, cy);
+		m_int = vec4(fx, fy, cx, cy);
 	}
 	virtual nvmath::vec4f getIntrinsic()
 	{

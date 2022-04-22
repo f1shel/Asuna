@@ -4,13 +4,56 @@
 #include "../context/context.h"
 #include "instance.h"
 #include "integrator.h"
+#include "material.h"
 #include "mesh.h"
 #include "texture.h"
 #include "json/json.hpp"
+#include <nvvk/buffers_vk.hpp>
 
 #include <map>
 #include <string>
 #include <vector>
+
+class SceneDescAlloc : public GPUAlloc
+{
+  public:
+	SceneDescAlloc(ContextAware *pContext, const std::vector<Instance *> &instances,
+	               std::map<uint32_t, MeshAlloc *>     &meshAllocLUT,
+	               std::map<uint32_t, MaterialAlloc *> &materialAllocLUT,
+	               const VkCommandBuffer               &cmdBuf)
+	{
+		auto &m_alloc  = pContext->m_alloc;
+		auto  m_device = pContext->getDevice();
+		for (auto pInstance : instances)
+		{
+			auto            pMeshAlloc     = meshAllocLUT[pInstance->m_meshIndex];
+			auto            pMaterialAlloc = materialAllocLUT[pInstance->m_materialIndex];
+			GPUInstanceDesc desc;
+			desc.vertexAddress =
+			    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->getVerticesBuffer());
+			desc.indexAddress =
+			    nvvk::getBufferDeviceAddress(m_device, pMeshAlloc->getIndicesBuffer());
+			desc.materialAddress =
+			    nvvk::getBufferDeviceAddress(m_device, pMaterialAlloc->getBuffer());
+			m_sceneDesc.emplace_back(desc);
+		}
+		m_bSceneDesc =
+		    m_alloc.createBuffer(cmdBuf, m_sceneDesc, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+	}
+	void deinit(ContextAware *pContext)
+	{
+		pContext->m_alloc.destroy(m_bSceneDesc);
+		intoReleased();
+	}
+	VkBuffer getBuffer()
+	{
+		return m_bSceneDesc.buffer;
+	}
+
+  private:
+	std::vector<GPUInstanceDesc> m_sceneDesc{};
+	nvvk::Buffer                 m_bSceneDesc;
+};
 
 class Scene
 {
@@ -55,6 +98,22 @@ class Scene
 	uint32_t      getTextureId(const std::string &textureName);
 	TextureAlloc *getTextureAlloc(uint32_t textureId);
 
+	// Material
+  private:
+	std::map<std::string, std::pair<MaterialInterface *, uint32_t>> m_materialLUT{};
+	std::map<uint32_t, MaterialAlloc *>                             m_materialAllocLUT{};
+	void addMaterial(const nlohmann::json &materialJson);
+	void addMaterialBrdfHongzhi(const nlohmann::json &materialJson);
+	void addMaterialBrdfLambertian(const nlohmann::json &materialJson);
+	void allocMaterial(ContextAware *pContext, uint32_t materialId,
+	                   const std::string &materialName, MaterialInterface *pMaterial,
+	                   const VkCommandBuffer &cmdBuf);
+
+  public:
+	uint32_t       getMaterialsNum();
+	uint32_t       getMaterialId(const std::string &materialName);
+	MaterialAlloc *getMaterialAlloc(uint32_t materialId);
+
 	// Mesh
   private:
 	// meshName -> { pMesh, meshId }
@@ -69,14 +128,6 @@ class Scene
 	uint32_t   getMeshId(const std::string &meshName);
 	MeshAlloc *getMeshAlloc(uint32_t meshId);
 
-	// SceneDesc
-  private:
-	SceneDescAlloc *m_pSceneDescAlloc = nullptr;
-	void            allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf);
-
-  public:
-	nvvk::Buffer getSceneDescBuffer();
-
 	// Instance
   private:
 	std::vector<Instance *> m_instances{};
@@ -86,6 +137,14 @@ class Scene
 	uint32_t                       getInstancesNum();
 	const std::vector<Instance *> &getInstances();
 
+	// SceneDesc
+  private:
+	SceneDescAlloc *m_pSceneDescAlloc = nullptr;
+	void            allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf);
+
+  public:
+	VkBuffer getSceneDescBuffer();
+
 	// Shot
   private:
 	std::vector<int *> m_shots{};
@@ -94,6 +153,8 @@ class Scene
 	void parseSceneFile(std::string sceneFilePath);
 	void computeSceneDimensions();
 	void fitCamera();
+	void addDummyTexture();
+	void addDummyMaterial();
 	void allocScene();
 	void freeRawData();
 	void freeAllocData();

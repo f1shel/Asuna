@@ -7,6 +7,13 @@
 #include <filesystem>
 using path = std::filesystem::path;
 
+Texture::Texture()
+{
+	m_data   = (void *) malloc(1 * 1 * 4 * sizeof(float));
+	m_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	m_shape  = {(uint32_t) 1, (uint32_t) 1};
+}
+
 Texture::Texture(const std::string &texturePath, float gamma)
 {
 	static std::set<std::string> supportExtensions = {".hdr", ".jpg", ".png"};
@@ -16,9 +23,9 @@ Texture::Texture(const std::string &texturePath, float gamma)
 	std::string                  ext = path(texturePath).extension().string();
 	if (!supportExtensions.count(ext))
 	{
-		LOGE("[x] Scene Error: textures only support extensions (.hdr .jpg .png) while %s "
+		LOGE("[x] %-20s: textures only support extensions (.hdr .jpg .png) while %s "
 		     "is passed in",
-		     ext.c_str());
+		     "Scene Error", ext.c_str());
 		exit(1);
 	}
 	VkFormat format = VK_FORMAT_UNDEFINED;
@@ -42,7 +49,7 @@ Texture::Texture(const std::string &texturePath, float gamma)
 	// Handle failure
 	if (!pixels)
 	{
-		LOGE("[x] Scene Error: failed to load %s", texturePath.c_str());
+		LOGE("[x] %-20s: failed to load %s", "Scene Error", texturePath.c_str());
 		exit(1);
 	}
 	m_data   = pixels;
