@@ -1,6 +1,5 @@
 ---
-Language:        Cpp
-# BasedOnStyle:  LLVM
+BasedOnStyle:  Google
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: true
@@ -103,4 +102,4 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard:        Cpp11
 TabWidth:        4
-UseTab:          ForIndentation
+UseTab:          Never

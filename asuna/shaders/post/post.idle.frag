@@ -7,8 +7,7 @@ layout(location = 0) out vec4 o_color;
 
 layout(set = 0, binding = 0) uniform sampler2D g_image;
 
-void main()
-{
-	vec3 R  = texture(g_image, i_uv).xyz;
-	o_color = vec4(R, 1.0);
+void main() {
+  vec3 R = texture(g_image, i_uv).xyz;
+  o_color = vec4(R, 1.0);
 }

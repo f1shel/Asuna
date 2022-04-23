@@ -5,14 +5,14 @@
 
 struct GPUPushConstantGraphics
 {
-	uint placeholder;
+    uint placeholder;
 };
 
 struct GPUPushConstantRaytrace
 {
-	int curFrame;
-	int maxRecursionDepth;
-	int spp;
+    int curFrame;
+    int maxRecursionDepth;
+    int spp;
 };
 
 #endif

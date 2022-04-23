@@ -7,19 +7,27 @@
 class Integrator
 {
   public:
-	Integrator(VkExtent2D size, int spp, int maxRecurDepth)
-	{
-		m_size          = size;
-		m_spp           = spp;
-		m_maxRecurDepth = maxRecurDepth;
-	}
-	VkExtent2D getSize()
-	{
-		return m_size;
-	}
+    Integrator(VkExtent2D size, uint32_t spp, uint32_t maxRecurDepth)
+    {
+        m_size          = size;
+        m_spp           = spp;
+        m_maxRecurDepth = maxRecurDepth;
+    }
+    VkExtent2D getSize()
+    {
+        return m_size;
+    }
+    uint32_t getSpp()
+    {
+        return m_spp;
+    }
+    uint32_t getMaxRecurDepth()
+    {
+        return m_maxRecurDepth;
+    }
 
   private:
-	VkExtent2D m_size{0, 0};
-	int        m_spp           = 1;
-	int        m_maxRecurDepth = 2;
+    VkExtent2D m_size{0, 0};
+    uint32_t   m_spp           = 1;
+    uint32_t   m_maxRecurDepth = 2;
 };

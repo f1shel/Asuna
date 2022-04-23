@@ -17,42 +17,81 @@ layout(set = eGPUSetRaytraceRaytrace, binding = eGPUBindingRaytraceChannels,
        rgba32f) uniform image2D channels[eGPUBindingRaytraceChannelCount];
 layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsCamera) uniform _Camera
 {
-	GPUCamera cameraInfo;
+    GPUCamera cameraInfo;
 };
 layout(location = 0) rayPayloadEXT RayPayload payload;
+layout(push_constant) uniform GPUPushConstantRaytrace_
+{
+    GPUPushConstantRaytrace pc;
+};
 
 void main()
 {
-	mat4 projInv = cameraInfo.projInverse;
-	mat4 viewInv = cameraInfo.viewInverse;
+    const vec4 origin = cameraInfo.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
 
-	uint  rayFlags = gl_RayFlagsOpaqueEXT;
-	float tMin     = MINIMUM;
-	float tMax     = INFINITY;
+    uint spp      = pc.spp;        // Samples per pixel
+    vec3 radiance = vec3(0);
 
-	const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy);
-	const vec2 inUV        = pixelCenter / vec2(gl_LaunchSizeEXT.xy);
-	const vec2 d           = inUV * 2.0 - 1.0;
+    uint  rayFlags = gl_RayFlagsOpaqueEXT;
+    float tMin     = MINIMUM;
+    float tMax     = INFINITY;
 
-	const vec4 origin    = cameraInfo.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
-	const vec4 target    = cameraInfo.projInverse * vec4(d.x, d.y, 1.0, 1.0);
-	const vec4 direction = cameraInfo.viewInverse * vec4(normalize(target.xyz), 0.0);
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy);
+    for (uint i = 0; i < spp; ++i)
+    {
+        vec2 jitter =
+            pc.curFrame == 0 ? vec2(0.5f, 0.5f) : vec2(rand(payload.seed), rand(payload.seed));
+        vec2       pixel = pixelCenter + jitter;
+        const vec2 inUV  = pixel / vec2(gl_LaunchSizeEXT.xy);
+        const vec2 d     = inUV * 2.0 - 1.0;
 
-	// debugPrintfEXT("Target = %v3f", target.xyz);
-	// debugPrintfEXT("direction = %v3f origin = %v3f", direction.xyz, origin.xyz);
+        const vec4 target    = cameraInfo.projInverse * vec4(d.x, d.y, 1.0, 1.0);
+        const vec4 direction = cameraInfo.viewInverse * vec4(normalize(target.xyz), 0.0);
 
-	traceRayEXT(topLevelAS,           // acceleration structure
-	            rayFlags,             // rayFlags
-	            0xFF,                 // cullMask
-	            0,                    // sbtRecordOffset
-	            0,                    // sbtRecordStride
-	            0,                    // missIndex
-	            origin.xyz,           // ray origin
-	            tMin,                 // ray min range
-	            direction.xyz,        // ray direction
-	            tMax,                 // ray max range
-	            0                     // payload (location = 0)
-	);
+        payload.seed       = xxhash32(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
+        payload.ray        = Ray(origin.xyz, direction.xyz);
+        payload.bsdf       = BsdfSample(vec3(0.0), 0.0);
+        payload.radiance   = vec3(0);
+        payload.throughput = vec3(1);
+        payload.stop       = false;
 
-	imageStore(channels[0], ivec2(gl_LaunchIDEXT.xy), vec4(payload.radiance, 1.f));
+        for (uint j = 0; j < pc.maxRecursionDepth; ++j)
+        {
+            payload.recur = j;
+            traceRayEXT(topLevelAS,                   // acceleration structure
+                        rayFlags,                     // rayFlags
+                        0xFF,                         // cullMask
+                        0,                            // sbtRecordOffset
+                        0,                            // sbtRecordStride
+                        0,                            // missIndex
+                        payload.ray.origin,           // ray origin
+                        tMin,                         // ray min range
+                        payload.ray.direction,        // ray direction
+                        tMax,                         // ray max range
+                        0                             // payload (location = 0)
+            );
+            if (payload.stop)
+                break;
+        }
+
+        radiance += payload.radiance;
+        // debugPrintfEXT("%v3f", payload.radiance);
+    }
+
+    radiance /= float(pc.spp);
+
+    // Saving result
+    if (pc.curFrame == 0)
+    {
+        // First frame, replace the value in the buffer
+        imageStore(channels[0], ivec2(gl_LaunchIDEXT.xy), vec4(radiance, 1.f));
+    }
+    else
+    {
+        // Do accumulation over time
+        float a         = 1.0f / float(pc.curFrame + 1);
+        vec3  old_color = imageLoad(channels[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
+        imageStore(channels[0], ivec2(gl_LaunchIDEXT.xy),
+                   vec4(mix(old_color, radiance, a), 1.f));
+    }
 }

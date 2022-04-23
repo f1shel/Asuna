@@ -95,8 +95,13 @@ file(GLOB SRC_3RDPARTY_JSON
     ${PROJNAME}/third_party/json/json/json.hpp
 )
 
+file(GLOB SRC_3RDPARTY_TQDM
+    ${PROJNAME}/third_party/tqdm/tqdm/tqdm.h
+)
+
 source_group("asuna" FILES ${ENTRY})
 source_group("asuna\\third_party\\json" FILES ${SRC_3RDPARTY_JSON})
+source_group("asuna\\third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
 source_group("asuna\\tracer" FILES ${SRC_TRACER})
 source_group("asuna\\tracer\\context" FILES ${SRC_TRACER_CONTEXT})
 source_group("asuna\\tracer\\scene" FILES ${SRC_TRACER_SCENE})
@@ -151,6 +156,7 @@ compile_glsl(
 add_executable(${PROJNAME}
     ${ENTRY}
     ${SRC_3RDPARTY_JSON}
+    ${SRC_3RDPARTY_TQDM}
     ${SRC_TRACER}
     ${SRC_TRACER_CONTEXT}
     ${SRC_TRACER_SCENE}
@@ -166,6 +172,7 @@ target_sources(${PROJNAME} PUBLIC
 
 target_include_directories(${PROJNAME} PUBLIC
     ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/json
+    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/tqdm
 )
 
 

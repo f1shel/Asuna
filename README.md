@@ -1,6 +1,10 @@
 # Asuna
 Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 
+## Gallery
+
+<img src="./demo/dragon.png">
+
 ## Dependencies
 
 + C++ compiler. `MSVC 19.31.31105` and `gcc 9.4.0` was tested.
