@@ -2,8 +2,8 @@
 #define BINDING_H
 
 #ifdef __cplusplus
-#    include "nvmath/nvmath.h"
 #    include <cstdint>
+#    include "nvmath/nvmath.h"
 using vec2 = nvmath::vec2f;
 using vec3 = nvmath::vec3f;
 using vec4 = nvmath::vec4f;
@@ -41,8 +41,8 @@ eGPUSetPostPost = 0, eGPUSetPostCount = 1 END_ENUM();
 START_BINDING(GPUBindingGraphics)
 eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
     eGPUBindingGraphicsSceneDesc = 1,        // Access to the scene descriptions
-    eGPUBindingGraphicsTextures  = 2         // Access to textures
-    END_BINDING();
+    eGPUBindingGraphicsTextures  = 2,        // Access to textures
+    eGPUBindingGraphicsEmitters  = 3 END_BINDING();
 
 #define eGPUBindingRaytraceChannelCount 4
 START_BINDING(GPUBindingRaytrace)

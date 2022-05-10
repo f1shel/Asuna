@@ -12,6 +12,7 @@ class Integrator
         m_size          = size;
         m_spp           = spp;
         m_maxRecurDepth = maxRecurDepth;
+        CameraManip.setWindowSize(m_size.width, m_size.height);
     }
     VkExtent2D getSize()
     {

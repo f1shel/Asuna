@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     if (parser.exist("--offline"))
         tis.m_offline = true;
     tis.m_outputname = parser.getString("--out", "asuna_out.hdr");
-    tis.m_scenefile  = parser.getString("--scene", "../scenes/dragon/scene.json");
+    tis.m_scenefile  = parser.getString("--scene", "scenes/dragon/scene.json");
 
     Tracer asuna;
     asuna.init(tis);

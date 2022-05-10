@@ -214,6 +214,10 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout()
                     m_pScene->getTexturesNum(),
                     VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
+    // Emitters
+    bind.addBinding(eGPUBindingGraphicsEmitters, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                    VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+
     m_dstLayout = bind.createLayout(m_device);
     m_dstPool   = bind.createPool(m_device, 1);
     m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
@@ -288,6 +292,10 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
         diit.emplace_back((m_pScene->getTextureAlloc(textureId)->getTexture()).descriptor);
     }
     writes.emplace_back(bind.makeWriteArray(m_dstSet, eGPUBindingGraphicsTextures, diit.data()));
+
+    VkDescriptorBufferInfo emittersInfo{m_pScene->getEmitterAlloc()->getBuffer(), 0,
+                                        VK_WHOLE_SIZE};
+    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsEmitters, &emittersInfo));
 
     // Writing the information
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,

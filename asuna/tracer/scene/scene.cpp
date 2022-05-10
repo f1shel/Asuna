@@ -126,6 +126,13 @@ const std::vector<Instance *> &Scene::getInstances()
     return m_instances;
 }
 
+void Scene::addShot(const nlohmann::json &shotJson)
+{
+    JsonCheckKeys(shotJson, {"eye", "lookat", "up"});
+    m_shots.emplace_back(CameraShot{Json2Vec3(shotJson["lookat"]), Json2Vec3(shotJson["eye"]),
+                                    Json2Vec3(shotJson["up"])});
+}
+
 void Scene::parseSceneFile(std::string sceneFilePath)
 {
     ifstream sceneFileStream(sceneFilePath);
@@ -133,14 +140,16 @@ void Scene::parseSceneFile(std::string sceneFilePath)
     sceneFileStream >> sceneFileJson;
 
     JsonCheckKeys(sceneFileJson,
-                  {"integrator", "camera", "meshes", "instances"});
+                  {"integrator", "camera", "emitters", "meshes", "instances", "shots"});
 
     auto &integratorJson = sceneFileJson["integrator"];
     auto &cameraJson     = sceneFileJson["camera"];
+    auto &emittersJson   = sceneFileJson["emitters"];
     auto &texturesJson   = sceneFileJson["textures"];
     auto &materialsJson  = sceneFileJson["materials"];
     auto &meshesJson     = sceneFileJson["meshes"];
     auto &instancesJson  = sceneFileJson["instances"];
+    auto &shotsJson      = sceneFileJson["shots"];
 
     // parse scene file to generate raw data
     // integrator
@@ -159,6 +168,10 @@ void Scene::parseSceneFile(std::string sceneFilePath)
     {
         addMaterial(materialJson);
     }
+    for (auto &emitterJson : emittersJson)
+    {
+        addEmitter(emitterJson);
+    }
     // meshes
     for (auto &meshJson : meshesJson)
     {
@@ -168,6 +181,11 @@ void Scene::parseSceneFile(std::string sceneFilePath)
     for (auto &instanceJson : instancesJson)
     {
         addInstance(instanceJson);
+    }
+    // shots
+    for (auto &shotJson : shotsJson)
+    {
+        addShot(shotJson);
     }
 }
 
@@ -225,6 +243,8 @@ void Scene::allocScene()
     nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), m_pContext->getQueueFamily());
     VkCommandBuffer   cmdBuf = cmdBufGet.createCommandBuffer();
 
+    allocEmitters(m_pContext, cmdBuf);
+
     for (auto &record : m_textureLUT)
     {
         const auto &textureName = record.first;
@@ -263,7 +283,10 @@ void Scene::allocScene()
     {
         computeSceneDimensions();
         fitCamera();
+        auto cam = CameraManip.getCamera();
+        m_shots.emplace_back(CameraShot{cam.ctr, cam.eye, cam.up});
     }
+    m_pCamera->setToWorld(m_shots[0]);
 }
 
 void Scene::freeRawData()
@@ -290,10 +313,16 @@ void Scene::freeRawData()
         pInst = nullptr;
     }
     m_instances.clear();
+    m_shots.clear();
+    m_emitters.clear();
 }
 
 void Scene::freeAllocData()
 {
+    m_pEmitterAlloc->deinit(m_pContext);
+    delete m_pEmitterAlloc;
+    m_pEmitterAlloc = nullptr;
+
     // free textures alloc data
     for (auto &record : m_textureAllocLUT)
     {
@@ -384,6 +413,42 @@ CameraInterface *Scene::getCamera()
 CameraType Scene::getCameraType()
 {
     return m_pCamera->getType();
+}
+
+void Scene::addEmitter(const nlohmann::json &emitterJson)
+{
+    JsonCheckKeys(emitterJson, {"type"});
+    if (emitterJson["type"] == "distant")
+        addEmitterDistant(emitterJson);
+    else
+    {
+        // TODO
+        exit(1);
+    }
+}
+
+void Scene::addEmitterDistant(const nlohmann::json &emitterJson)
+{
+    JsonCheckKeys(emitterJson, {"emittance", "direction"});
+    GPUEmitter emitter;
+    emitter.direction = Json2Vec3(emitterJson["direction"]);
+    emitter.emittance = Json2Vec3(emitterJson["emittance"]);
+    m_emitters.emplace_back(emitter);
+}
+
+void Scene::allocEmitters(ContextAware *pContext, const VkCommandBuffer &cmdBuf)
+{
+    m_pEmitterAlloc = new EmitterAlloc(pContext, m_emitters, cmdBuf);
+}
+
+EmitterAlloc *Scene::getEmitterAlloc()
+{
+    return m_pEmitterAlloc;
+}
+
+int Scene::getEmittersNum()
+{
+    return m_emitters.size();
 }
 
 void Scene::addTexture(const nlohmann::json &textureJson)

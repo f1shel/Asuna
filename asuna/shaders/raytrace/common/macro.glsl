@@ -2,9 +2,11 @@
 #define MACRO_GLSL
 
 #include "../../../hostdevice/binding.h"
+#include "../../../hostdevice/emitter.h"
 #include "../../../hostdevice/material.h"
 #include "../../../hostdevice/scene.h"
 #include "../../../hostdevice/vertex.h"
+#include "../../../hostdevice/pushconstant.h"
 #include "math.glsl"
 #include "structs.glsl"
 
@@ -45,6 +47,16 @@
         GPUInstanceDesc m[];                                                                \
     }                                                                                       \
     sceneDesc;                                                                              \
+    layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsEmitters, scalar)    \
+        buffer _Emitters                                                                    \
+    {                                                                                       \
+        GPUEmitter e[];                                                                     \
+    }                                                                                       \
+    emitters;                                                                               \
+    layout(push_constant) uniform GPUPushConstantRaytrace_                                  \
+    {                                                                                       \
+        GPUPushConstantRaytrace pc;                                                         \
+    };                                                                                      \
     hitAttributeEXT vec2 hitbary;                                                           \
     void                 main()                                                             \
     {                                                                                       \

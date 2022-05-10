@@ -37,4 +37,8 @@ class Tracer
     void imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut);
     void saveImageTest();
     void saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId = -1);
+
+  private:
+    void renderGUI();
+    bool guiCamera();
 };

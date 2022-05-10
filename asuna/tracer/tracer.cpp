@@ -1,6 +1,7 @@
 #include "tracer.h"
 
 #include <backends/imgui_impl_glfw.h>
+#include <nvh/timesampler.hpp>
 #include <nvvk/context_vk.hpp>
 #include <nvvk/images_vk.hpp>
 #include <nvvk/structs_vk.hpp>
@@ -12,6 +13,7 @@
 #include <iostream>
 
 using std::filesystem::path;
+using GuiH = ImGuiH::Control;
 
 void Tracer::init(TracerInitState tis)
 {
@@ -83,6 +85,9 @@ void Tracer::runOnline()
                 m_pipelineGraphics.run(cmdBuf);
             }
             {
+                renderGUI();
+            }
+            {
                 m_pipelineRaytrace.run(cmdBuf);
             }
             {
@@ -119,6 +124,8 @@ void Tracer::runOnline()
 
 void Tracer::runOffline()
 {
+    return;
+
     std::array<VkClearValue, 2> clearValues{};
     clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
     clearValues[1].depthStencil = {1.0f, 0};
@@ -130,7 +137,7 @@ void Tracer::runOffline()
     int  tot         = m_scene.getSpp();
     int  sppPerRound = 1;
     m_pipelineRaytrace.setSpp(sppPerRound);
-    for (int spp = 0; spp < tot; spp += sppPerRound)
+    for (int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))
     {
         bar.progress(spp, tot);
         const VkCommandBuffer &cmdBuf = genCmdBuf.createCommandBuffer();
@@ -140,6 +147,7 @@ void Tracer::runOffline()
         {
             m_pipelineRaytrace.run(cmdBuf);
         }
+        if (spp == tot)
         {
             VkRenderPassBeginInfo postRenderPassBeginInfo{
                 VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
@@ -149,7 +157,6 @@ void Tracer::runOffline()
             postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer();
             postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
 
-            // Rendering to the swapchain framebuffer the rendered image and apply a tonemapper
             vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
             m_pipelinePost.run(cmdBuf);
@@ -230,4 +237,26 @@ void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int cha
     stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4,
                    reinterpret_cast<float *>(data));
     m_alloc.unmap(pixelBuffer);
+}
+
+void Tracer::renderGUI()
+{
+    // Show UI panel window.
+    float panelAlpha                = 1.0f;
+    ImGuiH::Control::style.ctrlPerc = 0.55f;
+    ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
+    
+    bool changed{false};
+
+    if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+        changed |= guiCamera();
+
+    ImGui::End();        // ImGui::Panel::end()
+}
+
+bool Tracer::guiCamera()
+{
+    bool changed{false};
+    changed |= ImGuiH::CameraWidget();
+    return changed;
 }

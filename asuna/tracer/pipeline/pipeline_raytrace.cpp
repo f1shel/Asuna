@@ -92,6 +92,7 @@ void PipelineRaytrace::initRayTracing()
     m_pcRaytrace.curFrame          = -1;
     m_pcRaytrace.spp               = m_pScene->getSpp();
     m_pcRaytrace.maxRecursionDepth = m_pScene->getMaxRecurDepth();
+    m_pcRaytrace.emittersNum         = m_pScene->getEmittersNum();
 }
 
 static nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice         device,
@@ -299,7 +300,7 @@ void PipelineRaytrace::createRtPipeline()
     rayPipelineInfo.pStages                      = stages.data();
     rayPipelineInfo.groupCount                   = static_cast<uint32_t>(shaderGroups.size());
     rayPipelineInfo.pGroups                      = shaderGroups.data();
-    rayPipelineInfo.maxPipelineRayRecursionDepth = 2;        // Ray depth
+    rayPipelineInfo.maxPipelineRayRecursionDepth = 4;        // Ray depth
     rayPipelineInfo.layout                       = m_pipelineLayout;
     vkCreateRayTracingPipelinesKHR(m_device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayPipelineInfo,
                                    nullptr, &m_pipeline);

@@ -13,6 +13,7 @@ struct GPUPushConstantRaytrace
     int curFrame;
     int maxRecursionDepth;
     int spp;
+    int emittersNum;
 };
 
 #endif

@@ -10,6 +10,13 @@ enum CameraType
     eCameraTypePinhole     = 2
 };
 
+typedef struct
+{
+    nvmath::vec3f lookat;
+    nvmath::vec3f eye;
+    nvmath::vec3f up;
+} CameraShot;
+
 class CameraInterface
 {
   public:
@@ -33,14 +40,18 @@ class CameraInterface
     {
         CameraManip.setLookat(eye, lookat, up);
     }
-    virtual void setToWorld(nvmath::mat4f extrinsic)
+    virtual void setToWorld(CameraShot shot)
     {
-        CameraManip.setMatrix(extrinsic);
+        CameraManip.setLookat(shot.eye, shot.lookat, shot.up);
+    }
+    virtual nvh::CameraManipulator::Camera getCamera()
+    {
+        return CameraManip.getCamera();
     }
 
   protected:
     CameraType m_camType = eCameraTypeUndefined;
-};
+};  
 
 class CameraGraphicsPerspective : public CameraInterface
 {

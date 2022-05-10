@@ -24,13 +24,23 @@ struct LightSample
 struct RayPayload
 {
     uint       seed;
-    uint       recur;
+    uint       depth;
     bool       stop;
     Ray        ray;
     vec3       hit;
     vec3       radiance;
     vec3       throughput;
+    vec3       absorption;
+    float      hitDis;
     BsdfSample bsdf;
+};
+
+struct VisibilityContribution
+{
+    vec3  radiance;         // Radiance at the point if light is visible
+    vec3  lightDir;         // Direction to the light, to shoot shadow ray
+    float lightDist;        // Distance to the light (1e32 for infinite or sky)
+    bool  visible;          // true if in front of the face and should shoot shadow ray
 };
 
 #endif

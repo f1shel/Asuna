@@ -1,8 +1,10 @@
 #pragma once
 
 #include <nvvk/buffers_vk.hpp>
+#include "../../hostdevice/emitter.h"
 #include "../../hostdevice/scene.h"
 #include "../context/context.h"
+#include "emitter.h"
 #include "instance.h"
 #include "integrator.h"
 #include "json/json.hpp"
@@ -87,6 +89,18 @@ class Scene
     CameraInterface *getCamera();
     CameraType       getCameraType();
 
+    // Emitter
+  private:
+    std::vector<GPUEmitter> m_emitters      = {};
+    EmitterAlloc        *m_pEmitterAlloc = nullptr;
+    void                 addEmitter(const nlohmann::json &emitterJson);
+    void                 addEmitterDistant(const nlohmann::json &emitterJson);
+    void                 allocEmitters(ContextAware *pContext, const VkCommandBuffer &cmdBuf);
+
+  public:
+    EmitterAlloc *getEmitterAlloc();
+    int           getEmittersNum();
+
     // Texture
   private:
     std::map<std::string, std::pair<Texture *, uint32_t>> m_textureLUT{};
@@ -149,7 +163,8 @@ class Scene
 
     // Shot
   private:
-    std::vector<int *> m_shots{};
+    std::vector<CameraShot> m_shots{};
+    void                    addShot(const nlohmann::json &shotJson);
 
   private:
     void parseSceneFile(std::string sceneFilePath);
