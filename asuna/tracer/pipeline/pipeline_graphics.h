@@ -13,6 +13,9 @@ class PipelineGraphics : public PipelineAware
     virtual void run(const VkCommandBuffer &cmdBuf);
     virtual void deinit();
 
+    void updateCameraBuffer(const VkCommandBuffer &cmdBuf);
+    void updateSunAndSky(const VkCommandBuffer &cmdBuf);
+
   public:
     // Canvas we draw things on
     std::vector<nvvk::Texture> m_tChannels{};

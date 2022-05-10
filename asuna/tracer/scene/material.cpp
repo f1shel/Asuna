@@ -2,7 +2,7 @@
 
 #include <nvvk/buffers_vk.hpp>
 
-MaterialAlloc::MaterialAlloc(ContextAware *pContext, MaterialInterface *pMaterial,
+MaterialAlloc::MaterialAlloc(ContextAware *pContext, Material *pMaterial,
                              const VkCommandBuffer &cmdBuf)
 {
     auto              &m_alloc         = pContext->m_alloc;
@@ -16,20 +16,4 @@ void MaterialAlloc::deinit(ContextAware *pContext)
 {
     pContext->m_alloc.destroy(m_bMaterial);
     intoReleased();
-}
-
-MaterialBrdfHongzhi::MaterialBrdfHongzhi(int diffuseTextureId, int specularTextureId,
-                                         int alphaTextureId, int normalTextureId,
-                                         int tangentTextureId)
-{
-    m_material.diffuseTextureId  = diffuseTextureId;
-    m_material.specularTextureId = specularTextureId;
-    m_material.alphaTextureId    = alphaTextureId;
-    m_material.normalTextureId   = normalTextureId;
-    m_material.tangentTextureId  = tangentTextureId;
-}
-
-MaterialBrdfLambertian::MaterialBrdfLambertian(vec3 diffuse)
-{
-    m_material.diffuse = diffuse;
 }

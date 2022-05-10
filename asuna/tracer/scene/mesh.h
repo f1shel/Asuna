@@ -4,6 +4,7 @@
 #include "../../hostdevice/vertex.h"
 #include "../context/context.h"
 #include "alloc.h"
+#include "nvvk/raytraceKHR_vk.hpp"
 #include "utils.h"
 
 #include <map>
@@ -63,3 +64,6 @@ class MeshAlloc : public GPUAlloc
     nvvk::Buffer m_bIndices;         // Device buffer of the indices forming triangles
     nvvk::Buffer m_bVertices;        // Device buffer of all 'Vertex'
 };
+
+nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice         device,
+                                                       const MeshAlloc &meshAlloc);

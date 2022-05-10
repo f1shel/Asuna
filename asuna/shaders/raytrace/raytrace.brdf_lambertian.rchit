@@ -36,9 +36,9 @@ TRACE_BLOCK
             isLight = true;
 
             // randomly select one of the lights
-            int emitter_index =
+            int emitterIndex =
                 int(min(rand(payload.seed) * pc.emittersNum, pc.emittersNum - 1));
-            GPUEmitter emitter = emitters.e[emitter_index];
+            GPUEmitter emitter = emitters.e[emitterIndex];
 
             lightContrib = emitter.emittance;
             lightDir     = normalize(emitter.direction);

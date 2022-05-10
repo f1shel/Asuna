@@ -45,6 +45,10 @@ _add_project_definitions(${PROJNAME})
 file(GLOB ENTRY
     ${PROJNAME}/main.cpp)
 
+file(GLOB SRC_LOADER
+    ${PROJNAME}/loader/*.h
+    ${PROJNAME}/loader/*.cpp)
+
 file(GLOB SRC_TRACER
     ${PROJNAME}/tracer/tracer.h
     ${PROJNAME}/tracer/tracer.cpp)
@@ -102,10 +106,10 @@ file(GLOB SRC_3RDPARTY_TQDM
 source_group("asuna" FILES ${ENTRY})
 source_group("asuna\\third_party\\json" FILES ${SRC_3RDPARTY_JSON})
 source_group("asuna\\third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
+source_group("asuna\\loader" FILES ${SRC_LOADER})
 source_group("asuna\\tracer" FILES ${SRC_TRACER})
 source_group("asuna\\tracer\\context" FILES ${SRC_TRACER_CONTEXT})
 source_group("asuna\\tracer\\scene" FILES ${SRC_TRACER_SCENE})
-source_group("asuna\\tracer\\resource" FILES ${SRC_TRACER_RESOURCE})
 source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
 source_group("asuna\\hostdevice" FILES ${SRC_HOSTDEVICE})
 source_group("asuna\\shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
@@ -157,6 +161,7 @@ add_executable(${PROJNAME}
     ${ENTRY}
     ${SRC_3RDPARTY_JSON}
     ${SRC_3RDPARTY_TQDM}
+    ${SRC_LOADER}
     ${SRC_TRACER}
     ${SRC_TRACER_CONTEXT}
     ${SRC_TRACER_SCENE}

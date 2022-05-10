@@ -6,14 +6,13 @@
 
 enum GPUMaterialType
 {
-    eMaterialBrdfHongzhi = 0,
-    eMaterialTypeCount   = 1
+    eMaterialTypeCount = 0
 };
 
-class MaterialInterface
+class Material
 {
   public:
-    MaterialInterface()
+    Material()
     {
         m_material.diffuse            = 0.0;
         m_material.specular           = 0.0;
@@ -31,27 +30,14 @@ class MaterialInterface
         return m_material;
     }
 
-  protected:
-    GPUMaterial m_material;
-};
-
-class MaterialBrdfLambertian : public MaterialInterface
-{
-  public:
-    MaterialBrdfLambertian(vec3 diffuse = {0.3});
-};
-
-class MaterialBrdfHongzhi : public MaterialInterface
-{
-  public:
-    MaterialBrdfHongzhi(int diffuseTextureId, int specularTextureId, int alphaTextureId,
-                        int normalTextureId, int tangentTextureId);
+    GPUMaterialType m_type{eMaterialTypeCount};
+    GPUMaterial     m_material;
 };
 
 class MaterialAlloc : public GPUAlloc
 {
   public:
-    MaterialAlloc(ContextAware *pContext, MaterialInterface *pMaterial,
+    MaterialAlloc(ContextAware *pContext, Material *pMaterial,
                   const VkCommandBuffer &cmdBuf);
     void     deinit(ContextAware *pContext);
     VkBuffer getBuffer()

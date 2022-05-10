@@ -105,3 +105,49 @@ void MeshAlloc::deinit(ContextAware *pContext)
 
     intoReleased();
 }
+
+nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice         device,
+                                                       const MeshAlloc &meshAlloc)
+{
+    // BLAS builder requires raw device addresses.
+    VkDeviceAddress vertexAddress =
+        nvvk::getBufferDeviceAddress(device, meshAlloc.getVerticesBuffer());
+    VkDeviceAddress indexAddress =
+        nvvk::getBufferDeviceAddress(device, meshAlloc.getIndicesBuffer());
+
+    uint32_t maxPrimitiveCount = meshAlloc.m_nIndices / 3;
+
+    // Describe buffer as array of Vertex.
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles{
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
+    triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;        // vec3 vertex position data.
+    triangles.vertexData.deviceAddress = vertexAddress;
+    triangles.vertexStride             = sizeof(GPUVertex);
+    // Describe index data (32-bit unsigned int)
+    triangles.indexType               = VK_INDEX_TYPE_UINT32;
+    triangles.indexData.deviceAddress = indexAddress;
+    // Indicate identity transform by setting transformData to null device pointer.
+    // triangles.transformData = {};
+    triangles.maxVertex = meshAlloc.m_nVertices;
+
+    // Identify the above data as containing opaque triangles.
+    VkAccelerationStructureGeometryKHR asGeom{
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+    asGeom.geometryType       = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    asGeom.flags              = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    asGeom.geometry.triangles = triangles;
+
+    // The entire array will be used to build the BLAS.
+    VkAccelerationStructureBuildRangeInfoKHR offset;
+    offset.firstVertex     = 0;
+    offset.primitiveCount  = maxPrimitiveCount;
+    offset.primitiveOffset = 0;
+    offset.transformOffset = 0;
+
+    // Our blas is made from only one geometry, but could be made of many geometries
+    nvvk::RaytracingBuilderKHR::BlasInput input;
+    input.asGeometry.emplace_back(asGeom);
+    input.asBuildOffsetInfo.emplace_back(offset);
+
+    return input;
+}

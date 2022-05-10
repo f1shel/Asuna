@@ -31,6 +31,35 @@ void PipelineGraphics::init(PipelineInitState pis)
 
 void PipelineGraphics::run(const VkCommandBuffer &cmdBuf)
 {
+    updateCameraBuffer(cmdBuf);
+    updateSunAndSky(cmdBuf);
+}
+
+void PipelineGraphics::deinit()
+{
+    auto &m_alloc   = m_pContext->m_alloc;
+    auto  m_device  = m_pContext->getDevice();
+    auto  m_cmdPool = m_pContext->getCommandPool();
+
+    vkFreeCommandBuffers(m_device, m_cmdPool, 1, &m_recordedCmdBuffer);
+    m_recordedCmdBuffer = VK_NULL_HANDLE;
+
+    for (auto &m_tColor : m_tChannels)
+        m_alloc.destroy(m_tColor);
+    m_alloc.destroy(m_tDepth);
+    m_alloc.destroy(m_bCamera);
+    vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
+    vkDestroyFramebuffer(m_device, m_offscreenFramebuffer, nullptr);
+    m_offscreenRenderPass  = VK_NULL_HANDLE;
+    m_offscreenFramebuffer = VK_NULL_HANDLE;
+
+    m_pcGraphics = {0};
+
+    PipelineAware::deinit();
+}
+
+void PipelineGraphics::updateCameraBuffer(const VkCommandBuffer &cmdBuf)
+{
     // Upload updated camera information to GPU
     // Prepare new UBO contents on host.
     auto        m_size      = m_pContext->getSize();
@@ -38,7 +67,7 @@ void PipelineGraphics::run(const VkCommandBuffer &cmdBuf)
     GPUCamera   hostCamera  = {};
     // proj[1][1] *= -1;  // Inverting Y for Vulkan (not needed with perspectiveVK).
 
-    auto cam               = m_pScene->getCamera();
+    auto cam               = m_pScene->getCameraPtr();
     hostCamera.viewInverse = nvmath::invert(cam->getView());
     hostCamera.projInverse = nvmath::invert(cam->getProj(aspectRatio));
     hostCamera.intrinsic   = cam->getIntrinsic();
@@ -81,28 +110,8 @@ void PipelineGraphics::run(const VkCommandBuffer &cmdBuf)
     }
 }
 
-void PipelineGraphics::deinit()
-{
-    auto &m_alloc   = m_pContext->m_alloc;
-    auto  m_device  = m_pContext->getDevice();
-    auto  m_cmdPool = m_pContext->getCommandPool();
-
-    vkFreeCommandBuffers(m_device, m_cmdPool, 1, &m_recordedCmdBuffer);
-    m_recordedCmdBuffer = VK_NULL_HANDLE;
-
-    for (auto &m_tColor : m_tChannels)
-        m_alloc.destroy(m_tColor);
-    m_alloc.destroy(m_tDepth);
-    m_alloc.destroy(m_bCamera);
-    vkDestroyRenderPass(m_device, m_offscreenRenderPass, nullptr);
-    vkDestroyFramebuffer(m_device, m_offscreenFramebuffer, nullptr);
-    m_offscreenRenderPass  = VK_NULL_HANDLE;
-    m_offscreenFramebuffer = VK_NULL_HANDLE;
-
-    m_pcGraphics = {0};
-
-    PipelineAware::deinit();
-}
+void PipelineGraphics::updateSunAndSky(const VkCommandBuffer &cmdBuf)
+{}
 
 void PipelineGraphics::createOffscreenResources()
 {
@@ -281,7 +290,7 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
     VkDescriptorBufferInfo dbiCamera{m_bCamera.buffer, 0, VK_WHOLE_SIZE};
     writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsCamera, &dbiCamera));
 
-    VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescBuffer(), 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescDescriptor(), 0, VK_WHOLE_SIZE};
     writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
 
     // All texture samplers
@@ -289,11 +298,11 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
     diit.reserve(m_pScene->getTexturesNum());
     for (uint textureId = 0; textureId < m_pScene->getTexturesNum(); textureId++)
     {
-        diit.emplace_back((m_pScene->getTextureAlloc(textureId)->getTexture()).descriptor);
+        diit.emplace_back(m_pScene->getTextureDescriptor(textureId));
     }
     writes.emplace_back(bind.makeWriteArray(m_dstSet, eGPUBindingGraphicsTextures, diit.data()));
 
-    VkDescriptorBufferInfo emittersInfo{m_pScene->getEmitterAlloc()->getBuffer(), 0,
+    VkDescriptorBufferInfo emittersInfo{m_pScene->getEmittersDescriptor(), 0,
                                         VK_WHOLE_SIZE};
     writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsEmitters, &emittersInfo));
 

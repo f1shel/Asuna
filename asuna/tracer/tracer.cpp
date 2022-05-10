@@ -1,4 +1,5 @@
 #include "tracer.h"
+#include "../loader/loader.h"
 
 #include <backends/imgui_impl_glfw.h>
 #include <nvh/timesampler.hpp>
@@ -22,7 +23,9 @@ void Tracer::init(TracerInitState tis)
     m_context.init({m_tis.m_offline});
 
     m_scene.init(&m_context);
-    m_scene.create(m_tis.m_scenefile);
+
+    Loader loader(&m_scene);
+    loader.loadSceneFromJson(m_tis.m_scenefile, m_context.m_root);
 
     m_context.m_size = m_scene.getSize();
     if (!m_tis.m_offline)
@@ -245,7 +248,7 @@ void Tracer::renderGUI()
     float panelAlpha                = 1.0f;
     ImGuiH::Control::style.ctrlPerc = 0.55f;
     ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
-    
+
     bool changed{false};
 
     if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
