@@ -42,7 +42,9 @@ START_BINDING(GPUBindingGraphics)
 eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
     eGPUBindingGraphicsSceneDesc = 1,        // Access to the scene descriptions
     eGPUBindingGraphicsTextures  = 2,        // Access to textures
-    eGPUBindingGraphicsEmitters  = 3 END_BINDING();
+    eGPUBindingGraphicsEmitters  = 3,        // Access to emitters
+    eGPUBindingGraphicsSunAndSky = 4         // Access to sun_and_sky
+    END_BINDING();
 
 #define eGPUBindingRaytraceChannelCount 4
 START_BINDING(GPUBindingRaytrace)

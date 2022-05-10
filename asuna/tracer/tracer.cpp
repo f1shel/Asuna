@@ -6,15 +6,18 @@
 #include <nvvk/context_vk.hpp>
 #include <nvvk/images_vk.hpp>
 #include <nvvk/structs_vk.hpp>
+#include "imgui_helper.h"
+#include "imgui_orient.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "tqdm/tqdm.h"
 
+#include <bitset>  // std::bitset
 #include <filesystem>
 #include <iostream>
 
-using std::filesystem::path;
 using GuiH = ImGuiH::Control;
+using std::filesystem::path;
 
 void Tracer::init(TracerInitState tis)
 {
@@ -59,6 +62,9 @@ void Tracer::deinit()
     m_scene.deinit();
     m_context.deinit();
 }
+
+void Tracer::resetFrame()
+{}
 
 void Tracer::runOnline()
 {
@@ -253,8 +259,17 @@ void Tracer::renderGUI()
 
     if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
         changed |= guiCamera();
+    if (ImGui::CollapsingHeader("Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+        changed |= guiEnvironment();
+    if (ImGui::CollapsingHeader("Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+        changed |= guiTonemapper();
 
     ImGui::End();        // ImGui::Panel::end()
+
+    if (changed)
+    {
+        m_pipelineRaytrace.resetFrame();
+    }
 }
 
 bool Tracer::guiCamera()
@@ -262,4 +277,145 @@ bool Tracer::guiCamera()
     bool changed{false};
     changed |= ImGuiH::CameraWidget();
     return changed;
+}
+
+bool Tracer::guiEnvironment()
+{
+    static SunAndSky dss{
+        {1, 1, 1},                  // rgb_unit_conversion;
+        0.0000101320f,              // multiplier;
+        0.0f,                       // haze;
+        0.0f,                       // redblueshift;
+        1.0f,                       // saturation;
+        0.0f,                       // horizon_height;
+        {0.4f, 0.4f, 0.4f},         // ground_color;
+        0.1f,                       // horizon_blur;
+        {0.0, 0.0, 0.01f},          // night_color;
+        0.8f,                       // sun_disk_intensity;
+        {0.00, 0.78, 0.62f},        // sun_direction;
+        5.0f,                       // sun_disk_scale;
+        1.0f,                       // sun_glow_intensity;
+        1,                          // y_is_up;
+        1,                          // physically_scaled_sun;
+        0,                          // in_use;
+    };
+
+    bool  changed{false};
+    auto &sunAndSky(m_scene.getSunAndSky());
+
+    changed |= ImGui::Checkbox("Use Sun & Sky", (bool *) &sunAndSky.in_use);
+
+    // Adjusting the up with the camera
+    nvmath::vec3f eye, center, up;
+    CameraManip.getLookat(eye, center, up);
+    sunAndSky.y_is_up = (up.y == 1);
+
+    if (sunAndSky.in_use)
+    {
+        GuiH::Group<bool>("Sun", true, [&] {
+            changed |= GuiH::Custom("Direction", "Sun Direction", [&] {
+                float indent = ImGui::GetCursorPos().x;
+                changed |= ImGui::DirectionGizmo("", &sunAndSky.sun_direction.x, true);
+                ImGui::NewLine();
+                ImGui::SameLine(indent);
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                changed |= ImGui::InputFloat3("##IG", &sunAndSky.sun_direction.x);
+                return changed;
+            });
+            changed |= GuiH::Slider("Disk Scale", "", &sunAndSky.sun_disk_scale,
+                                    &dss.sun_disk_scale, GuiH::Flags::Normal, 0.f, 100.f);
+            changed |= GuiH::Slider("Glow Intensity", "", &sunAndSky.sun_glow_intensity,
+                                    &dss.sun_glow_intensity, GuiH::Flags::Normal, 0.f, 5.f);
+            changed |= GuiH::Slider("Disk Intensity", "", &sunAndSky.sun_disk_intensity,
+                                    &dss.sun_disk_intensity, GuiH::Flags::Normal, 0.f, 5.f);
+            changed |= GuiH::Color("Night Color", "", &sunAndSky.night_color.x,
+                                   &dss.night_color.x, GuiH::Flags::Normal);
+            return changed;
+        });
+
+        GuiH::Group<bool>("Ground", true, [&] {
+            changed |= GuiH::Slider("Horizon Height", "", &sunAndSky.horizon_height,
+                                    &dss.horizon_height, GuiH::Flags::Normal, -1.f, 1.f);
+            changed |= GuiH::Slider("Horizon Blur", "", &sunAndSky.horizon_blur,
+                                    &dss.horizon_blur, GuiH::Flags::Normal, 0.f, 1.f);
+            changed |= GuiH::Color("Ground Color", "", &sunAndSky.ground_color.x,
+                                   &dss.ground_color.x, GuiH::Flags::Normal);
+            changed |= GuiH::Slider("Haze", "", &sunAndSky.haze, &dss.haze, GuiH::Flags::Normal,
+                                    0.f, 15.f);
+            return changed;
+        });
+
+        GuiH::Group<bool>("Other", false, [&] {
+            changed |= GuiH::Drag("Multiplier", "", &sunAndSky.multiplier, &dss.multiplier,
+                                  GuiH::Flags::Normal, 0.f, std::numeric_limits<float>::max(), 2,
+                                  "%5.5f");
+            changed |= GuiH::Slider("Saturation", "", &sunAndSky.saturation, &dss.saturation,
+                                    GuiH::Flags::Normal, 0.f, 1.f);
+            changed |= GuiH::Slider("Red Blue Shift", "", &sunAndSky.redblueshift,
+                                    &dss.redblueshift, GuiH::Flags::Normal, -1.f, 1.f);
+            changed |= GuiH::Color("RGB Conversion", "", &sunAndSky.rgb_unit_conversion.x,
+                                   &dss.rgb_unit_conversion.x, GuiH::Flags::Normal);
+
+            nvmath::vec3f eye, center, up;
+            CameraManip.getLookat(eye, center, up);
+            sunAndSky.y_is_up = up.y == 1;
+            changed |= GuiH::Checkbox("Y is Up", "", (bool *) &sunAndSky.y_is_up, nullptr,
+                                      GuiH::Flags::Disabled);
+            return changed;
+        });
+    }
+
+    return changed;
+}
+
+bool Tracer::guiTonemapper()
+{
+    static GPUPushConstantPost default_tm{
+        1.0f,                // brightness;
+        1.0f,                // contrast;
+        1.0f,                // saturation;
+        0.0f,                // vignette;
+        1.0f,                // avgLum;
+        1.0f,                // zoom;
+        {1.0f, 1.0f},        // renderingRatio;
+        0,                   // autoExposure;
+        0.5f,                // Ywhite;  // Burning white
+        0.5f,                // key;     // Log-average luminance
+    };
+
+    auto          &tm = m_pipelinePost.m_pcPost;
+    bool           changed{false};
+    std::bitset<8> b(tm.autoExposure);
+
+    bool autoExposure = b.test(0);
+
+    changed |= GuiH::Checkbox("Auto Exposure", "Adjust exposure", (bool *) &autoExposure);
+    changed |= GuiH::Slider("Exposure", "Scene Exposure", &tm.avgLum, &default_tm.avgLum,
+                            GuiH::Flags::Normal, 0.001f, 5.00f);
+    changed |= GuiH::Slider("Brightness", "", &tm.brightness, &default_tm.brightness,
+                            GuiH::Flags::Normal, 0.0f, 2.0f);
+    changed |= GuiH::Slider("Contrast", "", &tm.contrast, &default_tm.contrast,
+                            GuiH::Flags::Normal, 0.0f, 2.0f);
+    changed |= GuiH::Slider("Saturation", "", &tm.saturation, &default_tm.saturation,
+                            GuiH::Flags::Normal, 0.0f, 5.0f);
+    changed |= GuiH::Slider("Vignette", "", &tm.vignette, &default_tm.vignette,
+                            GuiH::Flags::Normal, 0.0f, 2.0f);
+
+    if (autoExposure)
+    {
+        bool localExposure = b.test(1);
+        GuiH::Group<bool>("Auto Settings", true, [&] {
+            changed |= GuiH::Checkbox("Local", "", &localExposure);
+            changed |= GuiH::Slider("Burning White", "", &tm.Ywhite, &default_tm.Ywhite,
+                                    GuiH::Flags::Normal, 0.0f, 1.0f);
+            changed |= GuiH::Slider("Brightness", "", &tm.key, &default_tm.key,
+                                    GuiH::Flags::Normal, 0.0f, 1.0f);
+            b.set(1, localExposure);
+            return changed;
+        });
+    }
+    b.set(0, autoExposure);
+    tm.autoExposure = b.to_ulong();
+
+    return false;        // no need to restart the renderer
 }

@@ -8,8 +8,8 @@
 #include "../../hostdevice/binding.h"
 #include "../../hostdevice/camera.h"
 #include "../../hostdevice/pushconstant.h"
-#include "common/math.glsl"
-#include "common/structs.glsl"
+#include "utils/math.glsl"
+#include "utils/structs.glsl"
 
 layout(set     = eGPUSetRaytraceRaytrace,
        binding = eGPUBindingRaytraceTlas) uniform accelerationStructureEXT topLevelAS;

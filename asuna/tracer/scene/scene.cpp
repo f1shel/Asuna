@@ -63,6 +63,8 @@ void Scene::submit()
     // Keeping the mesh description at host and device
     allocSceneDesc(m_pContext, cmdBuf);
 
+    allocSunAndSky(m_pContext, cmdBuf);
+
     cmdBufGet.submitAndWait(cmdBuf);
     m_pContext->m_alloc.finalizeAndReleaseStaging();
 
@@ -93,6 +95,24 @@ void Scene::reset()
     Material          *pMaterial = new Material;
     m_pTextures[tn]              = std::make_pair(pTexture, m_pTextures.size());
     m_pMaterials[mn]             = std::make_pair(pMaterial, m_pMaterials.size());
+    m_sunAndSky                  = {
+        {1, 1, 1},                  // rgb_unit_conversion;
+        0.0000101320f,              // multiplier;
+        0.0f,                       // haze;
+        0.0f,                       // redblueshift;
+        1.0f,                       // saturation;
+        0.0f,                       // horizon_height;
+        {0.4f, 0.4f, 0.4f},         // ground_color;
+        0.1f,                       // horizon_blur;
+        {0.0, 0.0, 0.01f},          // night_color;
+        0.8f,                       // sun_disk_intensity;
+        {0.00, 0.78, 0.62f},        // sun_direction;
+        5.0f,                       // sun_disk_scale;
+        1.0f,                       // sun_glow_intensity;
+        1,                          // y_is_up;
+        1,                          // physically_scaled_sun;
+        0,                          // in_use;
+    };
 }
 
 void Scene::freeAllocData()
@@ -126,6 +146,9 @@ void Scene::freeAllocData()
     m_pSceneDescAlloc->deinit(m_pContext);
     delete m_pSceneDescAlloc;
     m_pSceneDescAlloc = nullptr;
+
+    // free sun and sky
+    m_pContext->m_alloc.destroy(m_bSunAndSky);
 }
 
 void Scene::freeRawData()
@@ -334,6 +357,16 @@ VkBuffer Scene::getEmittersDescriptor()
     return m_pEmittersAlloc->getBuffer();
 }
 
+VkBuffer Scene::getSunAndSkyDescriptor()
+{
+    return m_bSunAndSky.buffer;
+}
+
+SunAndSky &Scene::getSunAndSky()
+{
+    return m_sunAndSky;
+}
+
 void Scene::allocEmitters(ContextAware *pContext, const VkCommandBuffer &cmdBuf)
 {
     m_pEmittersAlloc = new EmitterAlloc(pContext, m_emitters, cmdBuf);
@@ -384,6 +417,16 @@ void Scene::allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf
     // Keeping the obj host model and device description
     m_pSceneDescAlloc =
         new SceneDescAlloc(pContext, m_pInstances, m_pMeshesAlloc, m_pMaterialsAlloc, cmdBuf);
+}
+
+void Scene::allocSunAndSky(ContextAware *pContext, const VkCommandBuffer &cmdBuf)
+{
+    auto &m_alloc = pContext->m_alloc;
+    auto &m_debug = pContext->m_debug;
+    m_bSunAndSky  = m_alloc.createBuffer(
+         sizeof(SunAndSky), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    NAME_VK(m_bSunAndSky.buffer);
 }
 
 void Scene::computeSceneDimensions()

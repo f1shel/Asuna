@@ -19,6 +19,7 @@ class Tracer
     void init(TracerInitState tis);
     void run();
     void deinit();
+    void resetFrame();
 
   private:
     TracerInitState m_tis;
@@ -41,4 +42,6 @@ class Tracer
   private:
     void renderGUI();
     bool guiCamera();
+    bool guiEnvironment();
+    bool guiTonemapper();
 };

@@ -4,11 +4,13 @@
 #include "../../../hostdevice/binding.h"
 #include "../../../hostdevice/emitter.h"
 #include "../../../hostdevice/material.h"
-#include "../../../hostdevice/scene.h"
-#include "../../../hostdevice/vertex.h"
 #include "../../../hostdevice/pushconstant.h"
+#include "../../../hostdevice/scene.h"
+#include "../../../hostdevice/sun_and_sky.h"
+#include "../../../hostdevice/vertex.h"
 #include "math.glsl"
 #include "structs.glsl"
+#include "sun_and_sky.glsl"
 
 /* Accessble variables:
  * -- RayPayload payload
@@ -56,6 +58,11 @@
     layout(push_constant) uniform GPUPushConstantRaytrace_                                  \
     {                                                                                       \
         GPUPushConstantRaytrace pc;                                                         \
+    };                                                                                      \
+    layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsSunAndSky, scalar)   \
+        uniform _SSBuffer                                                                   \
+    {                                                                                       \
+        SunAndSky sunAndSky;                                                               \
     };                                                                                      \
     hitAttributeEXT vec2 hitbary;                                                           \
     void                 main()                                                             \

@@ -30,8 +30,8 @@ void PipelinePost::run(const VkCommandBuffer &cmdBuf)
     LABEL_SCOPE_VK(cmdBuf);
 
     m_pContext->setViewport(cmdBuf);
-    // vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-    // sizeof(Tonemapper), &m_tonemapper);
+    vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                       sizeof(GPUPushConstantPost), &m_pcPost);
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1,
                             &m_dstSet, 0, nullptr);
@@ -64,9 +64,9 @@ void PipelinePost::createPostPipeline()
     auto &m_debug  = m_pContext->m_debug;
     auto  m_device = m_pContext->getDevice();
 
-    //// Push constants in the fragment shader
-    // VkPushConstantRange pushConstantRanges = { VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-    // sizeof(Tonemapper) };
+    // Push constants in the fragment shader
+    VkPushConstantRange pushConstantRanges{VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                                           sizeof(GPUPushConstantPost)};
 
     // Creating the pipeline layout
     VkPipelineLayoutCreateInfo createInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};

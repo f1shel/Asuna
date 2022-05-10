@@ -3,6 +3,7 @@
 #include <nvvk/buffers_vk.hpp>
 #include "../../hostdevice/emitter.h"
 #include "../../hostdevice/scene.h"
+#include "../../hostdevice/sun_and_sky.h"
 #include "../context/context.h"
 #include "emitter.h"
 #include "instance.h"
@@ -109,6 +110,8 @@ class Scene
     VkBuffer                              getSceneDescDescriptor();
     VkDescriptorImageInfo                 getTextureDescriptor(int textureId);
     VkBuffer                              getEmittersDescriptor();
+    VkBuffer                              getSunAndSkyDescriptor();
+    SunAndSky                            &getSunAndSky();
 
   private:
     std::string   m_sceneFileDir = "";
@@ -123,12 +126,14 @@ class Scene
     MaterialPtrs m_pMaterials  = {};
     InstancePtrs m_pInstances  = {};
     Shots        m_shots       = {};
+    SunAndSky    m_sunAndSky   = {};
     // ---------------- GPU resources ----------------
     EmitterAlloc     *m_pEmittersAlloc  = nullptr;
     TextureAllocPtrs  m_pTexturesAlloc  = {};
     MaterialAllocPtrs m_pMaterialsAlloc = {};
     MeshAllocPtrs     m_pMeshesAlloc    = {};
     SceneDescAlloc   *m_pSceneDescAlloc = nullptr;
+    nvvk::Buffer      m_bSunAndSky;
     // ---------------- ------------- ----------------
     struct Dimensions
     {
@@ -149,6 +154,7 @@ class Scene
     void allocMesh(ContextAware *pContext, uint32_t meshId, const std::string &meshName,
                    Mesh *pMesh, const VkCommandBuffer &cmdBuf);
     void allocSceneDesc(ContextAware *pContext, const VkCommandBuffer &cmdBuf);
+    void allocSunAndSky(ContextAware *pContext, const VkCommandBuffer &cmdBuf);
     void computeSceneDimensions();
     void fitCamera();
 };

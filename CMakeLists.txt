@@ -33,6 +33,7 @@ set(OUTPUT_PATH ${PROJ_ROOT_DIR}/bin_${ARCH})
 
 _add_package_VulkanSDK()
 _add_package_ImGUI()
+# _add_package_NVML()
 _add_nvpro_core_lib()
 
 project(${PROJNAME} LANGUAGES C CXX)
@@ -75,7 +76,7 @@ file(GLOB SRC_HOSTDEVICE
 )
 
 file(GLOB SRC_SHADERS_RAYTRACE_COMMON
-    ${PROJNAME}/shaders/raytrace/common/*.glsl
+    ${PROJNAME}/shaders/raytrace/utils/*.glsl
 )
 
 file(GLOB SRC_SHADERS_RAYTRACE
@@ -88,6 +89,10 @@ file(GLOB SRC_SHADERS_RAYTRACE
 file(GLOB SRC_SHADERS_GRAPHICS
     ${PROJNAME}/shaders/graphics/*.frag
     ${PROJNAME}/shaders/graphics/*.vert
+)
+
+file(GLOB SRC_SHADERS_POST_COMMON
+    ${PROJNAME}/shaders/post/utils/*.glsl
 )
 
 file(GLOB SRC_SHADERS_POST
@@ -113,9 +118,10 @@ source_group("asuna\\tracer\\scene" FILES ${SRC_TRACER_SCENE})
 source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
 source_group("asuna\\hostdevice" FILES ${SRC_HOSTDEVICE})
 source_group("asuna\\shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
-source_group("asuna\\shaders\\raytrace\\common" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
+source_group("asuna\\shaders\\raytrace\\utils" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
 source_group("asuna\\shaders\\graphics" FILES ${SRC_SHADERS_GRAPHICS})
 source_group("asuna\\shaders\\post" FILES ${SRC_SHADERS_POST})
+source_group("asuna\\shaders\\post\\utils" FILES ${SRC_SHADERS_POST_COMMON})
 
 # GLSL to SPIR-V custom build
 set(SAMPLES_BASESAMPLE_DEPENDENCIES OFF CACHE BOOL "Create dependies on GLSL files")
@@ -149,6 +155,7 @@ compile_glsl(
         ${SRC_SHADERS_POST}
     HEADER_FILES
         ${SRC_HOSTDEVICE}
+        ${SRC_SHADERS_POST_COMMON}
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
@@ -173,6 +180,7 @@ target_sources(${PROJNAME} PUBLIC
     ${SRC_SHADERS_GRAPHICS}
     ${SRC_SHADERS_POST}
     ${SRC_SHADERS_RAYTRACE_COMMON}
+    ${SRC_SHADERS_POST_COMMON}
     ${SRC_SHADERS_RAYTRACE})
 
 target_include_directories(${PROJNAME} PUBLIC

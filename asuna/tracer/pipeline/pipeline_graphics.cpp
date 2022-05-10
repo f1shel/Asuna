@@ -111,7 +111,10 @@ void PipelineGraphics::updateCameraBuffer(const VkCommandBuffer &cmdBuf)
 }
 
 void PipelineGraphics::updateSunAndSky(const VkCommandBuffer &cmdBuf)
-{}
+{
+    vkCmdUpdateBuffer(cmdBuf, m_pScene->getSunAndSkyDescriptor(), 0, sizeof(SunAndSky),
+                      &m_pScene->getSunAndSky());
+}
 
 void PipelineGraphics::createOffscreenResources()
 {
@@ -227,6 +230,11 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout()
     bind.addBinding(eGPUBindingGraphicsEmitters, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                     VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
+    // SunAndSky
+    bind.addBinding(eGPUBindingGraphicsSunAndSky, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+                    VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                        VK_SHADER_STAGE_MISS_BIT_KHR);
+
     m_dstLayout = bind.createLayout(m_device);
     m_dstPool   = bind.createPool(m_device, 1);
     m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
@@ -293,6 +301,9 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
     VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescDescriptor(), 0, VK_WHOLE_SIZE};
     writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
 
+    VkDescriptorBufferInfo dbiSunAndSky{m_pScene->getSunAndSkyDescriptor(), 0, VK_WHOLE_SIZE};
+    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSunAndSky, &dbiSunAndSky));
+
     // All texture samplers
     std::vector<VkDescriptorImageInfo> diit{};
     diit.reserve(m_pScene->getTexturesNum());
@@ -302,8 +313,7 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
     }
     writes.emplace_back(bind.makeWriteArray(m_dstSet, eGPUBindingGraphicsTextures, diit.data()));
 
-    VkDescriptorBufferInfo emittersInfo{m_pScene->getEmittersDescriptor(), 0,
-                                        VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo emittersInfo{m_pScene->getEmittersDescriptor(), 0, VK_WHOLE_SIZE};
     writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsEmitters, &emittersInfo));
 
     // Writing the information

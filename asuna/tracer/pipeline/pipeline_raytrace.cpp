@@ -73,6 +73,11 @@ void PipelineRaytrace::setSpp(int spp)
     m_pcRaytrace.spp = spp;
 }
 
+void PipelineRaytrace::resetFrame()
+{
+    m_pcRaytrace.curFrame = -1;
+}
+
 void PipelineRaytrace::initRayTracing()
 {
     auto &m_alloc              = m_pContext->m_alloc;

@@ -14,6 +14,7 @@ class PipelineRaytrace : public PipelineAware
     virtual void deinit();
     virtual void run(const VkCommandBuffer &cmdBuf);
     void         setSpp(int spp = 1);
+    void         resetFrame();
 
   private:
     // Request ray tracing pipeline properties
@@ -42,6 +43,8 @@ class PipelineRaytrace : public PipelineAware
     std::vector<VkAccelerationStructureInstanceKHR> m_tlas{};
     // Bottom level acceleration structures
     std::vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};
+
+  public:
     // Push constant
     GPUPushConstantRaytrace m_pcRaytrace{0};
 };

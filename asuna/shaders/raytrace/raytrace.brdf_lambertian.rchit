@@ -7,7 +7,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-#include "common/macro.glsl"
+#include "utils/macro.glsl"
 
 TRACE_BLOCK
 {
@@ -27,17 +27,17 @@ TRACE_BLOCK
         vec3  Li = vec3(0);
         float lightPdf;
         vec3  lightContrib;
-        vec3  lightDir;
+        vec3  lightDir  = -ffnormal;
         float lightDist = 1e32;
         bool  isLight   = false;
 
         // Emitter
+        if (pc.emittersNum > 0)
         {
             isLight = true;
 
             // randomly select one of the lights
-            int emitterIndex =
-                int(min(rand(payload.seed) * pc.emittersNum, pc.emittersNum - 1));
+            int emitterIndex = int(min(rand(payload.seed) * pc.emittersNum, pc.emittersNum - 1));
             GPUEmitter emitter = emitters.e[emitterIndex];
 
             lightContrib = emitter.emittance;
@@ -46,12 +46,10 @@ TRACE_BLOCK
         }
 
         // Environment Light
-        /*
-        {
+        /* {
             lightDir     = uniformSampleSphere(payload.seed, lightPdf);
             lightContrib = vec3(1.0);
-        }
-        */
+        } */
 
         if (dot(lightDir, ffnormal) > 0.0)
         {
