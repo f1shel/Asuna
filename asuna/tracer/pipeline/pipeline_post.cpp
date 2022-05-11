@@ -9,17 +9,17 @@
 #include <cstdint>
 #include <vector>
 
-void PipelinePost::init(PipelineInitState pis)
+void PipelinePost::init(ContextAware *pContext, Scene *pScene,
+                        const VkDescriptorImageInfo *pImageInfo)
 {
-    m_pContext = pis.m_pContext;
-    m_pScene   = pis.m_pScene;
-    // pis.m_pCorrPips[0] should points to a graphics pipeline
-    m_pPipGraphics = dynamic_cast<PipelineGraphics *>(pis.m_pCorrPips[0]);
+    m_pContext = pContext;
+    m_pScene   = pScene;
     // Ray tracing
     nvh::Stopwatch sw_;
     createPostDescriptorSetLayout();
+    update({&m_descriptorSets[0]});
     createPostPipeline();
-    updatePostDescriptorSet();
+    updatePostDescriptorSet(pImageInfo);
     LOGI("[ ] %-20s: %6.2fms Post pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
@@ -34,14 +34,12 @@ void PipelinePost::run(const VkCommandBuffer &cmdBuf)
                        sizeof(GPUPushConstantPost), &m_pcPost);
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1,
-                            &m_dstSet, 0, nullptr);
+                            m_runSets.data(), 0, nullptr);
     vkCmdDraw(cmdBuf, 3, 1, 0, 0);
 }
 
 void PipelinePost::deinit()
 {
-    m_pPipGraphics = nullptr;
-
     PipelineAware::deinit();
 }
 
@@ -51,12 +49,13 @@ void PipelinePost::createPostDescriptorSetLayout()
 
     // The descriptor layout is the description of the data that is passed to the vertex or the
     // fragment program.
-    nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
-    bind.addBinding(GPUBindingPost::eGPUBindingPostImage,
-                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
-    m_dstLayout = bind.createLayout(m_device);
-    m_dstPool   = bind.createPool(m_device);
-    m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
+    nvvk::DescriptorSetBindings &bind = m_descriptorSets[0].m_dstSetLayoutBind;
+    bind.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                    VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_descriptorSets[0].m_dstLayout = bind.createLayout(m_device);
+    m_descriptorSets[0].m_dstPool   = bind.createPool(m_device);
+    m_descriptorSets[0].m_dstSet    = nvvk::allocateDescriptorSet(
+           m_device, m_descriptorSets[0].m_dstPool, m_descriptorSets[0].m_dstLayout);
 }
 
 void PipelinePost::createPostPipeline()
@@ -70,11 +69,10 @@ void PipelinePost::createPostPipeline()
 
     // Creating the pipeline layout
     VkPipelineLayoutCreateInfo createInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    createInfo.setLayoutCount = 1;
-    createInfo.pSetLayouts    = &m_dstLayout;
-    // createInfo.pushConstantRangeCount = 1;
-    createInfo.pushConstantRangeCount = 0;
-    createInfo.pPushConstantRanges    = VK_NULL_HANDLE;
+    createInfo.setLayoutCount         = 1;
+    createInfo.pSetLayouts            = &m_descriptorSets[0].m_dstLayout;
+    createInfo.pushConstantRangeCount = 1;
+    createInfo.pPushConstantRanges    = &pushConstantRanges;
     vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_pipelineLayout);
 
     // Pipeline: completely generic, no vertices
@@ -92,15 +90,15 @@ void PipelinePost::createPostPipeline()
     NAME2_VK(m_pipeline, "Post");
 }
 
-void PipelinePost::updatePostDescriptorSet()
+void PipelinePost::updatePostDescriptorSet(const VkDescriptorImageInfo *pImageInfo)
 {
     auto m_device = m_pContext->getDevice();
 
     VkWriteDescriptorSet wds{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    wds.dstSet          = m_dstSet;
-    wds.dstBinding      = GPUBindingPost::eGPUBindingPostImage;
+    wds.dstSet          = m_descriptorSets[0].m_dstSet;
+    wds.dstBinding      = 0;
     wds.descriptorCount = 1;
     wds.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    wds.pImageInfo      = &m_pPipGraphics->m_tChannels[0].descriptor;
+    wds.pImageInfo      = pImageInfo;
     vkUpdateDescriptorSets(m_device, 1, &wds, 0, nullptr);
 }

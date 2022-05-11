@@ -11,48 +11,49 @@ using mat4 = nvmath::mat4f;
 using uint = unsigned int;
 #endif
 
+// clang-format off
 #ifdef __cplusplus        // Descriptor binding helper for C++ and GLSL
-#    define START_BINDING(a) \
-        enum a               \
-        {
-#    define END_BINDING() }
+#define START_ENUM(a) enum a {
+#define END_ENUM()    }
 #else
-#    define START_BINDING(a) const uint
-#    define END_BINDING()
+#define START_ENUM(a) const uint
+#define END_ENUM()
 #endif
 
-#ifdef __cplusplus        // glsl reserve enum keyword
-#    define START_ENUM(a) \
-        enum a            \
-        {
-#    define END_ENUM() }
-#else
-#    define START_ENUM(a) const uint
-#    define END_ENUM()
-#endif
+// Sets
+START_ENUM(GPUSet)
+  S_ACCEL = 0,  // Acceleration structure
+  S_OUT   = 1,  // Offscreen output image
+  S_SCENE = 2,  // Scene data
+  S_ENV   = 3,  // Environment / Sun & Sky
+  S_CNT   = 4
+END_ENUM();
 
-START_ENUM(GPUSetGraphics)
-eGPUSetGraphicsGraphics = 0, eGPUSetGraphicsCount = 1 END_ENUM();
-START_ENUM(GPUSetRaytrace)
-eGPUSetRaytraceGraphics = 0, eGPUSetRaytraceRaytrace = 1, eGPUSetRaytraceCount = 2 END_ENUM();
-START_ENUM(GPUSetPost)
-eGPUSetPostPost = 0, eGPUSetPostCount = 1 END_ENUM();
+// Acceleration Structure - Set 0
+START_ENUM(AccelBindings)
+  eTlas = 0 
+END_ENUM();
 
-START_BINDING(GPUBindingGraphics)
-eGPUBindingGraphicsCamera        = 0,        // Global uniform containing camera matrices
-    eGPUBindingGraphicsSceneDesc = 1,        // Access to the scene descriptions
-    eGPUBindingGraphicsTextures  = 2,        // Access to textures
-    eGPUBindingGraphicsEmitters  = 3,        // Access to emitters
-    eGPUBindingGraphicsSunAndSky = 4         // Access to sun_and_sky
-    END_BINDING();
+// Output image - Set 1
+START_ENUM(OutputBindings)
+  eStore   = 0  // As storage
+END_ENUM();
 
-#define eGPUBindingRaytraceChannelCount 4
-START_BINDING(GPUBindingRaytrace)
-eGPUBindingRaytraceChannels = 0,        // Ray tracer channels
-    eGPUBindingRaytraceTlas = 1         // Top level acceleration structure,
-    END_BINDING();
+// Scene Data - Set 2
+START_ENUM(SceneBindings)
+  eCamera    = 0, 
+  eInstData  = 1, 
+  eLights    = 2,            
+  eTextures  = 3  // must be last elem            
+END_ENUM();
 
-START_BINDING(GPUBindingPost)
-eGPUBindingPostImage = 0 END_BINDING();
+// Environment - Set 3
+START_ENUM(EnvBindings)
+  eSunSky     = 0
+END_ENUM();
+
+#define eNStores 4
+
+// clang-format on
 
 #endif

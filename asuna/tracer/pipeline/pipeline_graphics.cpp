@@ -14,15 +14,22 @@
 #include <cstdint>
 #include <vector>
 
-void PipelineGraphics::init(PipelineInitState pis)
+void PipelineGraphics::init(ContextAware *pContext, Scene *pScene)
 {
-    m_pContext = pis.m_pContext;
-    m_pScene   = pis.m_pScene;
-    // pis.m_pCorrPips not used
+    m_pContext = pContext;
+    m_pScene   = pScene;
     // Graphics pipeine
     nvh::Stopwatch sw_;
     createOffscreenResources();
     createGraphicsDescriptorSetLayout();
+    // must after done creating descriptor set layout
+    // and before starting to create pipeline
+    std::vector<DescriptorSetWrapper *> pWrappers = {};
+    pWrappers.resize(3);
+    pWrappers[RunSet::eRunSetOut]   = &m_descriptorSets[Set::eSetOut];
+    pWrappers[RunSet::eRunSetEnv]   = &m_descriptorSets[Set::eSetEnv];
+    pWrappers[RunSet::eRunSetScene] = &m_descriptorSets[Set::eSetScene];
+    update(pWrappers);
     createGraphicsPipeline();
     createCameraBuffer();
     updateGraphicsDescriptorSet();
@@ -116,6 +123,26 @@ void PipelineGraphics::updateSunAndSky(const VkCommandBuffer &cmdBuf)
                       &m_pScene->getSunAndSky());
 }
 
+const VkDescriptorImageInfo *PipelineGraphics::getHdrOutImageInfo()
+{
+    return &m_tChannels[0].descriptor;
+}
+
+DescriptorSetWrapper *PipelineGraphics::getOutDescriptorSet()
+{
+    return &m_descriptorSets[Set::eSetOut];
+}
+
+DescriptorSetWrapper *PipelineGraphics::getSceneDescriptorSet()
+{
+    return &m_descriptorSets[Set::eSetScene];
+}
+
+DescriptorSetWrapper *PipelineGraphics::getEnvDescriptorSet()
+{
+    return &m_descriptorSets[Set::eSetEnv];
+}
+
 void PipelineGraphics::createOffscreenResources()
 {
     auto &m_alloc              = m_pContext->m_alloc;
@@ -139,7 +166,7 @@ void PipelineGraphics::createOffscreenResources()
 
     // Creating the color image
     {
-        for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelCount; channelId++)
+        for (uint channelId = 0; channelId < eNStores; channelId++)
         {
             VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
             auto                colorCreateInfo = nvvk::makeImage2DCreateInfo(
@@ -212,35 +239,51 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout()
 {
     auto m_device = m_pContext->getDevice();
 
-    nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
+    // Out Set: S_Out
+    auto &dswOut  = m_descriptorSets[Set::eSetOut];
+    auto &outBind = dswOut.m_dstSetLayoutBind;
+    // Storage images
+    outBind.addBinding(eStore, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, eNStores, VK_SHADER_STAGE_ALL);
+    dswOut.m_dstLayout = outBind.createLayout(m_device);
+    dswOut.m_dstPool   = outBind.createPool(m_device, 1);
+    dswOut.m_dstSet =
+        nvvk::allocateDescriptorSet(m_device, dswOut.m_dstPool, dswOut.m_dstLayout);
 
+    // Scene Set: S_SCENE
+    auto &dswScene  = m_descriptorSets[Set::eSetScene];
+    auto &sceneBind = dswScene.m_dstSetLayoutBind;
     // Camera matrices
-    bind.addBinding(eGPUBindingGraphicsCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
-    // Mesh descriptions
-    bind.addBinding(eGPUBindingGraphicsSceneDesc, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
-                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+    sceneBind.addBinding(eCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
+    // Instance description
+    sceneBind.addBinding(eInstData, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
+                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
     // Textures
-    bind.addBinding(eGPUBindingGraphicsTextures, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    m_pScene->getTexturesNum(),
-                    VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+    sceneBind.addBinding(eTextures, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                         m_pScene->getTexturesNum(),
+                         VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+    // Lights
+    sceneBind.addBinding(eLights, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                         VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+    dswScene.m_dstLayout = sceneBind.createLayout(m_device);
+    dswScene.m_dstPool   = sceneBind.createPool(m_device, 1);
+    dswScene.m_dstSet =
+        nvvk::allocateDescriptorSet(m_device, dswScene.m_dstPool, dswScene.m_dstLayout);
 
-    // Emitters
-    bind.addBinding(eGPUBindingGraphicsEmitters, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-                    VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
-
+    // Environment Set: S_ENV
+    auto &dswEnv  = m_descriptorSets[Set::eSetEnv];
+    auto &envBind = dswEnv.m_dstSetLayoutBind;
     // SunAndSky
-    bind.addBinding(eGPUBindingGraphicsSunAndSky, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
-                    VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-                        VK_SHADER_STAGE_MISS_BIT_KHR);
-
-    m_dstLayout = bind.createLayout(m_device);
-    m_dstPool   = bind.createPool(m_device, 1);
-    m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
+    envBind.addBinding(eSunSky, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+                       VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                           VK_SHADER_STAGE_MISS_BIT_KHR);
+    dswEnv.m_dstLayout = envBind.createLayout(m_device);
+    dswEnv.m_dstPool   = envBind.createPool(m_device, 1);
+    dswEnv.m_dstSet =
+        nvvk::allocateDescriptorSet(m_device, dswEnv.m_dstPool, dswEnv.m_dstLayout);
 }
 
-// TODO: push constant
 void PipelineGraphics::createGraphicsPipeline()
 {
     auto &m_debug  = m_pContext->m_debug;
@@ -251,10 +294,14 @@ void PipelineGraphics::createGraphicsPipeline()
                                                   VK_SHADER_STAGE_FRAGMENT_BIT,
                                               0, sizeof(GPUPushConstantGraphics)};
     VkPipelineLayoutCreateInfo createInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    createInfo.setLayoutCount         = 1;
-    createInfo.pSetLayouts            = &m_dstLayout;
-    createInfo.pushConstantRangeCount = 1;
-    createInfo.pPushConstantRanges    = &pushConstantRanges;
+    // we do not use graphics rasterizer, so no set order here
+    const std::vector<VkDescriptorSetLayout> &descSetLayouts = {m_descriptorSets[0].m_dstLayout,
+                                                                m_descriptorSets[1].m_dstLayout,
+                                                                m_descriptorSets[2].m_dstLayout};
+    createInfo.setLayoutCount                                = descSetLayouts.size();
+    createInfo.pSetLayouts                                   = descSetLayouts.data();
+    createInfo.pushConstantRangeCount                        = 1;
+    createInfo.pPushConstantRanges                           = &pushConstantRanges;
     vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_pipelineLayout);
 
     // Creating the Pipeline
@@ -289,34 +336,53 @@ void PipelineGraphics::createCameraBuffer()
 
 void PipelineGraphics::updateGraphicsDescriptorSet()
 {
-    auto &bind     = m_dstSetLayoutBind;
-    auto  m_device = m_pContext->getDevice();
+    auto m_device = m_pContext->getDevice();
 
-    std::vector<VkWriteDescriptorSet> writes;
-
+    // S_SCENE
+    auto                             &dswScene  = m_descriptorSets[Set::eSetScene];
+    auto                             &sceneBind = dswScene.m_dstSetLayoutBind;
+    std::vector<VkWriteDescriptorSet> writesScene;
     // Camera matrices and scene description
     VkDescriptorBufferInfo dbiCamera{m_bCamera.buffer, 0, VK_WHOLE_SIZE};
-    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsCamera, &dbiCamera));
-
+    writesScene.emplace_back(sceneBind.makeWrite(dswScene.m_dstSet, eCamera, &dbiCamera));
+    // Instance description
     VkDescriptorBufferInfo dbiSceneDesc{m_pScene->getSceneDescDescriptor(), 0, VK_WHOLE_SIZE};
-    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSceneDesc, &dbiSceneDesc));
-
-    VkDescriptorBufferInfo dbiSunAndSky{m_pScene->getSunAndSkyDescriptor(), 0, VK_WHOLE_SIZE};
-    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsSunAndSky, &dbiSunAndSky));
-
+    writesScene.emplace_back(sceneBind.makeWrite(dswScene.m_dstSet, eInstData, &dbiSceneDesc));
     // All texture samplers
     std::vector<VkDescriptorImageInfo> diit{};
     diit.reserve(m_pScene->getTexturesNum());
     for (uint textureId = 0; textureId < m_pScene->getTexturesNum(); textureId++)
-    {
         diit.emplace_back(m_pScene->getTextureDescriptor(textureId));
-    }
-    writes.emplace_back(bind.makeWriteArray(m_dstSet, eGPUBindingGraphicsTextures, diit.data()));
-
+    writesScene.emplace_back(
+        sceneBind.makeWriteArray(dswScene.m_dstSet, eTextures, diit.data()));
+    // Lights
     VkDescriptorBufferInfo emittersInfo{m_pScene->getEmittersDescriptor(), 0, VK_WHOLE_SIZE};
-    writes.emplace_back(bind.makeWrite(m_dstSet, eGPUBindingGraphicsEmitters, &emittersInfo));
-
+    writesScene.emplace_back(sceneBind.makeWrite(dswScene.m_dstSet, eLights, &emittersInfo));
     // Writing the information
-    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
-                           nullptr);
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writesScene.size()),
+                           writesScene.data(), 0, nullptr);
+
+    // S_ENV
+    auto                             &dswEnv  = m_descriptorSets[Set::eSetEnv];
+    auto                             &envBind = dswEnv.m_dstSetLayoutBind;
+    std::vector<VkWriteDescriptorSet> writesEnv;
+    VkDescriptorBufferInfo dbiSunAndSky{m_pScene->getSunAndSkyDescriptor(), 0, VK_WHOLE_SIZE};
+    writesEnv.emplace_back(envBind.makeWrite(dswEnv.m_dstSet, eSunSky, &dbiSunAndSky));
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writesEnv.size()), writesEnv.data(),
+                           0, nullptr);
+
+    // S_OUT
+    auto                                       &dswOut  = m_descriptorSets[Set::eSetOut];
+    auto                                       &outBind = dswOut.m_dstSetLayoutBind;
+    std::vector<VkWriteDescriptorSet>           writesOut;
+    std::array<VkDescriptorImageInfo, eNStores> imageInfos{};
+    for (uint channelId = 0; channelId < eNStores; channelId++)
+    {
+        VkDescriptorImageInfo imageInfo{
+            {}, m_tChannels[channelId].descriptor.imageView, VK_IMAGE_LAYOUT_GENERAL};
+        imageInfos[channelId] = imageInfo;
+    }
+    writesOut.push_back(outBind.makeWriteArray(dswOut.m_dstSet, eStore, imageInfos.data()));
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writesOut.size()), writesOut.data(),
+                           0, nullptr);
 }

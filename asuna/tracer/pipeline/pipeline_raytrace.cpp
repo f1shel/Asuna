@@ -5,18 +5,26 @@
 #include <nvvk/buffers_vk.hpp>
 #include "nvvk/shaders_vk.hpp"
 
-void PipelineRaytrace::init(PipelineInitState pis)
+void PipelineRaytrace::init(ContextAware *pContext, Scene *pScene, DescriptorSetWrapper *pDswOut,
+                            DescriptorSetWrapper *pDswScene, DescriptorSetWrapper *pDswEnv)
 {
-    m_pContext = pis.m_pContext;
-    m_pScene   = pis.m_pScene;
-    // pis.m_pCorrPips[0] should points to a graphics pipeline
-    m_pPipGraphics = dynamic_cast<PipelineGraphics *>(pis.m_pCorrPips[0]);
+    m_pContext = pContext;
+    m_pScene   = pScene;
     // Ray tracing
     nvh::Stopwatch sw_;
     initRayTracing();
     createBottomLevelAS();
     createTopLevelAS();
     createRtDescriptorSetLayout();
+    // must after done creating descriptor set layout
+    // and before starting to create pipeline
+    std::vector<DescriptorSetWrapper *> pWrappers = {};
+    pWrappers.resize(4);
+    pWrappers[RunSet::eRunSetAccel] = &m_descriptorSets[0];
+    pWrappers[RunSet::eRunSetOut]   = pDswOut;
+    pWrappers[RunSet::eRunSetEnv]   = pDswEnv;
+    pWrappers[RunSet::eRunSetScene] = pDswScene;
+    update(pWrappers);
     createRtPipeline();
     updateRtDescriptorSet();
     LOGI("[ ] %-20s: %6.2fms Raytrace pipeline creation\n", "Pipeline", sw_.elapsed());
@@ -26,8 +34,7 @@ void PipelineRaytrace::deinit()
 {
     m_blas.clear();
     m_tlas.clear();
-    m_pPipGraphics = nullptr;
-    m_pcRaytrace   = {0};
+    m_pcRaytrace = {0};
 
     m_rtBuilder.destroy();
     m_sbt.destroy();
@@ -53,12 +60,9 @@ void PipelineRaytrace::run(const VkCommandBuffer &cmdBuf)
     m_pcRaytrace.curFrame++;
 
     // Do ray tracing
-    std::array<VkDescriptorSet, eGPUSetRaytraceCount> descSets{};
-    descSets[eGPUSetRaytraceRaytrace] = m_dstSet;
-    descSets[eGPUSetRaytraceGraphics] = m_pPipGraphics->m_dstSet;
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipeline);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipelineLayout, 0,
-                            (uint32_t) descSets.size(), descSets.data(), 0, nullptr);
+                            (uint32_t) m_runSets.size(), m_runSets.data(), 0, nullptr);
     vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_ALL, 0,
                        sizeof(GPUPushConstantRaytrace), &m_pcRaytrace);
 
@@ -97,7 +101,7 @@ void PipelineRaytrace::initRayTracing()
     m_pcRaytrace.curFrame          = -1;
     m_pcRaytrace.spp               = m_pScene->getSpp();
     m_pcRaytrace.maxRecursionDepth = m_pScene->getMaxPathDepth();
-    m_pcRaytrace.emittersNum       = m_pScene->getEmittersNum();
+    m_pcRaytrace.lightsNum         = m_pScene->getEmittersNum();
 }
 
 void PipelineRaytrace::createBottomLevelAS()
@@ -139,19 +143,19 @@ void PipelineRaytrace::createTopLevelAS()
 
 void PipelineRaytrace::createRtDescriptorSetLayout()
 {
-    auto m_device = m_pContext->getDevice();
+    auto  m_device = m_pContext->getDevice();
+    auto &dswAccel = m_descriptorSets[Set::eSetAccel];
 
     // This descriptor set, holds the top level acceleration structure and the output image
-    nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
+    nvvk::DescriptorSetBindings &bind = dswAccel.m_dstSetLayoutBind;
 
     // Create Binding Set
-    bind.addBinding(eGPUBindingRaytraceTlas, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1,
+    bind.addBinding(eTlas, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1,
                     VK_SHADER_STAGE_ALL);
-    bind.addBinding(eGPUBindingRaytraceChannels, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                    eGPUBindingRaytraceChannelCount, VK_SHADER_STAGE_ALL);
-    m_dstPool   = bind.createPool(m_device);
-    m_dstLayout = bind.createLayout(m_device);
-    m_dstSet    = nvvk::allocateDescriptorSet(m_device, m_dstPool, m_dstLayout);
+    dswAccel.m_dstPool   = bind.createPool(m_device);
+    dswAccel.m_dstLayout = bind.createLayout(m_device);
+    dswAccel.m_dstSet =
+        nvvk::allocateDescriptorSet(m_device, dswAccel.m_dstPool, dswAccel.m_dstLayout);
 }
 
 void PipelineRaytrace::createRtPipeline()
@@ -240,14 +244,13 @@ void PipelineRaytrace::createRtPipeline()
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
     pipelineLayoutCreateInfo.pPushConstantRanges    = &pushConstant;
 
-    // Descriptor sets: one specific to ray tracing, and one shared with the rasterization
-    // pipeline
-    std::array<VkDescriptorSetLayout, eGPUSetRaytraceCount> rtDescSetLayouts{};
-
-    rtDescSetLayouts[eGPUSetRaytraceRaytrace] = m_dstLayout;
-    rtDescSetLayouts[eGPUSetRaytraceGraphics] = m_pPipGraphics->m_dstLayout;
-    pipelineLayoutCreateInfo.setLayoutCount   = static_cast<uint32_t>(rtDescSetLayouts.size());
-    pipelineLayoutCreateInfo.pSetLayouts      = rtDescSetLayouts.data();
+    std::array<VkDescriptorSetLayout, S_CNT> rtDescSetLayouts{};
+    rtDescSetLayouts[S_ACCEL]               = m_runWrappers[RunSet::eRunSetAccel]->m_dstLayout;
+    rtDescSetLayouts[S_OUT]                 = m_runWrappers[RunSet::eRunSetOut]->m_dstLayout;
+    rtDescSetLayouts[S_SCENE]               = m_runWrappers[RunSet::eRunSetScene]->m_dstLayout;
+    rtDescSetLayouts[S_ENV]                 = m_runWrappers[RunSet::eRunSetEnv]->m_dstLayout;
+    pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(rtDescSetLayouts.size());
+    pipelineLayoutCreateInfo.pSetLayouts    = rtDescSetLayouts.data();
     vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout);
 
     // Assemble the shader stages and recursion depth info into the ray tracing pipeline
@@ -277,7 +280,7 @@ void PipelineRaytrace::updateRtDescriptorSet()
 
     std::vector<VkWriteDescriptorSet> writes;
     // This descriptor set, holds the top level acceleration structure and the output image
-    nvvk::DescriptorSetBindings &bind = m_dstSetLayoutBind;
+    nvvk::DescriptorSetBindings &bind = m_descriptorSets[Set::eSetAccel].m_dstSetLayoutBind;
 
     // Write to descriptors
     VkAccelerationStructureKHR                   tlas = m_rtBuilder.getAccelerationStructure();
@@ -286,19 +289,7 @@ void PipelineRaytrace::updateRtDescriptorSet()
     descASInfo.accelerationStructureCount = 1;
     descASInfo.pAccelerationStructures    = &tlas;
     writes.emplace_back(
-        bind.makeWrite(m_dstSet, GPUBindingRaytrace::eGPUBindingRaytraceTlas, &descASInfo));
-
-    std::array<VkDescriptorImageInfo, eGPUBindingRaytraceChannelCount> imageInfos{};
-    for (uint channelId = 0; channelId < eGPUBindingRaytraceChannelCount; channelId++)
-    {
-        VkDescriptorImageInfo imageInfo{
-            {},
-            m_pPipGraphics->m_tChannels[channelId].descriptor.imageView,
-            VK_IMAGE_LAYOUT_GENERAL};
-        imageInfos[channelId] = imageInfo;
-    }
-    writes.push_back(
-        bind.makeWriteArray(m_dstSet, eGPUBindingRaytraceChannels, imageInfos.data()));
-    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
-                           nullptr);
+        bind.makeWrite(m_descriptorSets[Set::eSetAccel].m_dstSet, eTlas, &descASInfo));
+    vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writes.size()), writes.data(),
+                           0, nullptr);
 }

@@ -7,10 +7,29 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-#include "utils/macro.glsl"
+#include "utils/layouts.glsl"
 
-TRACE_BLOCK
+layout(location = 0) rayPayloadInEXT RayPayload payload;
+layout(location = 1) rayPayloadEXT bool isShadowed;
+
+void main()
 {
+    GPUInstanceDesc instDesc = instances.i[gl_InstanceCustomIndexEXT];
+    Indices         indices  = Indices(instDesc.indexAddress);
+    Vertices        vertices = Vertices(instDesc.vertexAddress);
+    GPUMaterial     material = Materials(instDesc.materialAddress).m[0];
+    const ivec3     id       = indices.i[gl_PrimitiveID];
+    const GPUVertex v0       = vertices.v[id.x];
+    const GPUVertex v1       = vertices.v[id.y];
+    const GPUVertex v2       = vertices.v[id.z];
+    const vec3      bary     = vec3(1.0 - bary.x - bary.y, bary.x, bary.y);
+    const vec2      uv       = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
+    const vec3      pos      = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
+    const vec3 normal = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
+    const vec3 hitPos = gl_ObjectToWorldEXT * vec4(pos, 1.0);
+    const vec3 geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
+    payload.hitPos       = hitPos;
+
     vec3 ffnormal = dot(geoNormal, gl_WorldRayDirectionEXT) <= 0.0 ? geoNormal : -geoNormal;
     // Reset absorption when ray is going out of surface
     if (dot(geoNormal, ffnormal) > 0.0)
@@ -32,16 +51,16 @@ TRACE_BLOCK
         bool  isLight   = false;
 
         // Emitter
-        if (pc.emittersNum > 0)
+        if (pc.lightsNum > 0)
         {
             isLight = true;
 
             // randomly select one of the lights
-            int emitterIndex = int(min(rand(payload.seed) * pc.emittersNum, pc.emittersNum - 1));
-            GPUEmitter emitter = emitters.e[emitterIndex];
+            int lightIndex   = int(min(rand(payload.seed) * pc.lightsNum, pc.lightsNum - 1));
+            GPUEmitter light = lights.l[lightIndex];
 
-            lightContrib = emitter.emittance;
-            lightDir     = normalize(emitter.direction);
+            lightContrib = light.emittance;
+            lightDir     = normalize(light.direction);
             lightPdf     = 1.0;
         }
 
@@ -91,7 +110,7 @@ TRACE_BLOCK
     // Next ray
     payload.ray.direction = bsdfSample.bsdfDir;
     payload.ray.origin    = offsetPositionAlongNormal(
-           payload.hit, dot(bsdfSample.bsdfDir, ffnormal) > 0 ? ffnormal : -ffnormal);
+           payload.hitPos, dot(bsdfSample.bsdfDir, ffnormal) > 0 ? ffnormal : -ffnormal);
     // We are adding the contribution to the radiance only if the ray is not occluded by an
     // object. This is done here to minimize live state across ray-trace calls.
     if (contrib.visible == true)
@@ -132,4 +151,3 @@ TRACE_BLOCK
     }
     payload.throughput /= rrPcont;        // boost the energy of the non-terminated paths
 }
-END_TRACE

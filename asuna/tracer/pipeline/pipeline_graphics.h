@@ -9,12 +9,22 @@
 class PipelineGraphics : public PipelineAware
 {
   public:
-    virtual void init(PipelineInitState pis);
+    START_ENUM(Set)
+    eSetOut = 0, eSetScene = 1, eSetEnv = 2 END_ENUM();
+    START_ENUM(RunSet)
+    eRunSetOut = 0, eRunSetScene = 1, eRunSetEnv = 2 END_ENUM();
+    PipelineGraphics() : PipelineAware(3, 3)
+    {}
+    virtual void init(ContextAware *pContext, Scene *pScene);
     virtual void run(const VkCommandBuffer &cmdBuf);
     virtual void deinit();
 
-    void updateCameraBuffer(const VkCommandBuffer &cmdBuf);
-    void updateSunAndSky(const VkCommandBuffer &cmdBuf);
+    void                         updateCameraBuffer(const VkCommandBuffer &cmdBuf);
+    void                         updateSunAndSky(const VkCommandBuffer &cmdBuf);
+    const VkDescriptorImageInfo *getHdrOutImageInfo();
+    DescriptorSetWrapper        *getOutDescriptorSet();
+    DescriptorSetWrapper        *getSceneDescriptorSet();
+    DescriptorSetWrapper        *getEnvDescriptorSet();
 
   public:
     // Canvas we draw things on

@@ -10,12 +10,10 @@
 #include "utils/structs.glsl"
 #include "utils/sun_and_sky.glsl"
 
+// clang-format off
 layout(location = 0) rayPayloadInEXT RayPayload payload;
-layout(set = eGPUSetRaytraceGraphics, binding = eGPUBindingGraphicsSunAndSky,
-       scalar) uniform _SSBuffer
-{
-    SunAndSky sunAndSky;
-};
+layout(set = S_ENV, binding = eSunSky, scalar) uniform _SSBuffer { SunAndSky sunAndSky; };
+// clang-format on
 
 void main()
 {

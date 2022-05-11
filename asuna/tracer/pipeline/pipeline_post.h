@@ -7,17 +7,16 @@
 class PipelinePost : public PipelineAware
 {
   public:
-    // pis.
-    virtual void init(PipelineInitState pis);
+    START_ENUM(Set) eSetOut = 0 END_ENUM();
+    START_ENUM(RunSet) eRunSetOut = 0 END_ENUM();
+    PipelinePost() : PipelineAware(1, 1)
+    {}
+    virtual void init(ContextAware *pContext, Scene *pScene, const VkDescriptorImageInfo *pImageInfo);
     virtual void run(const VkCommandBuffer &cmdBuf);
     virtual void deinit();
 
-  private:
-    // Accompanied graphic pipeline
-    PipelineGraphics   *m_pPipGraphics = nullptr;
-
   public:
-    GPUPushConstantPost m_pcPost       = {
+    GPUPushConstantPost m_pcPost = {
         1.0f,                // brightness;
         1.0f,                // contrast;
         1.0f,                // saturation;
@@ -35,5 +34,5 @@ class PipelinePost : public PipelineAware
     // Create post-processing pipeline
     void createPostPipeline();
     // Update the descriptor pointer
-    void updatePostDescriptorSet();
+    void updatePostDescriptorSet(const VkDescriptorImageInfo *pImageInfo);
 };

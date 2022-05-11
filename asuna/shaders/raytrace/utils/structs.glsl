@@ -27,7 +27,7 @@ struct RayPayload
     uint       depth;
     bool       stop;
     Ray        ray;
-    vec3       hit;
+    vec3       hitPos;
     vec3       radiance;
     vec3       throughput;
     vec3       absorption;

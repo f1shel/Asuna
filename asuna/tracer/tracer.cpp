@@ -12,7 +12,7 @@
 #include "stb_image_write.h"
 #include "tqdm/tqdm.h"
 
-#include <bitset>  // std::bitset
+#include <bitset>        // std::bitset
 #include <filesystem>
 #include <iostream>
 
@@ -36,14 +36,11 @@ void Tracer::init(TracerInitState tis)
     else
         m_context.createOfflineResources();
 
-    PipelineInitState pis{};
-    pis.m_pContext     = &m_context;
-    pis.m_pScene       = &m_scene;
-    pis.m_pCorrPips[0] = &m_pipelineGraphics;
-
-    m_pipelineGraphics.init(pis);
-    m_pipelineRaytrace.init(pis);
-    m_pipelinePost.init(pis);
+    m_pipelineGraphics.init(&m_context, &m_scene);
+    m_pipelineRaytrace.init(&m_context, &m_scene, m_pipelineGraphics.getOutDescriptorSet(),
+                            m_pipelineGraphics.getSceneDescriptorSet(),
+                            m_pipelineGraphics.getEnvDescriptorSet());
+    m_pipelinePost.init(&m_context, &m_scene, m_pipelineGraphics.getHdrOutImageInfo());
 }
 
 void Tracer::run()

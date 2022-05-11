@@ -10,7 +10,13 @@
 class PipelineRaytrace : public PipelineAware
 {
   public:
-    virtual void init(PipelineInitState pis);
+    START_ENUM(Set) eSetAccel = 0 END_ENUM();
+    START_ENUM(RunSet)
+    eRunSetAccel = 0, eRunSetOut = 1, eRunSetScene = 2, eRunSetEnv = 3 END_ENUM();
+    PipelineRaytrace() : PipelineAware(1, 4)
+    {}
+    virtual void init(ContextAware *pContext, Scene *pScene, DescriptorSetWrapper *pDswOut,
+                      DescriptorSetWrapper *pDswScene, DescriptorSetWrapper *pDswEnv);
     virtual void deinit();
     virtual void run(const VkCommandBuffer &cmdBuf);
     void         setSpp(int spp = 1);
@@ -30,8 +36,6 @@ class PipelineRaytrace : public PipelineAware
     void updateRtDescriptorSet();
 
   private:
-    // Accompanied graphic pipeline
-    PipelineGraphics *m_pPipGraphics = nullptr;
     // Pipeline properties
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
