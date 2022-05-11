@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <fstream>
 
+#define PI 3.14159265358979323846f
+
 using nlohmann::json;
 using std::ifstream;
 using std::string;
@@ -166,13 +168,50 @@ void Loader::addCamera(const nlohmann::json &cameraJson)
 
 void Loader::addEmitter(const nlohmann::json &emitterJson)
 {
-    JsonCheckKeys(emitterJson, {"type"});
-    GPUEmitter emitter;
-    if (emitterJson["type"] == "distant")
+    JsonCheckKeys(emitterJson, {"type", "emittance"});
+    GPUEmitter emitter = {
+        GPUEmitterType::eUndefinedLight,        // type
+        vec3(0.0),                              // position
+        vec3(0.0),                              // direction
+        vec3(0.0),                              // emittance
+        vec3(0.0),                              // u
+        vec3(0.0),                              // v
+        0.0,                                    // radius
+        0.0                                     // area
+    };
+    emitter.emittance = Json2Vec3(emitterJson["emittance"]);
+    if (emitterJson["type"] == "quad")
     {
-        JsonCheckKeys(emitterJson, {"emittance", "direction"});
+        JsonCheckKeys(emitterJson, {"position", "v1", "v2"});
+        vec3 v1          = Json2Vec3(emitterJson["v1"]);
+        vec3 v2          = Json2Vec3(emitterJson["v2"]);
+        emitter.position = Json2Vec3(emitterJson["position"]);
+        emitter.u        = v1 - emitter.position;
+        emitter.v        = v2 - emitter.position;
+        emitter.area     = nvmath::length(nvmath::cross(emitter.u, emitter.v));
+        emitter.type     = GPUEmitterType::eRectLight;
+    }
+    else if (emitterJson["type"] == "sphere")
+    {
+        JsonCheckKeys(emitterJson, {"position", "radius"});
+        emitter.position = Json2Vec3(emitterJson["position"]);
+        emitter.radius   = emitterJson["radius"];
+        emitter.area     = 4.0f * PI * emitter.radius * emitter.radius;
+        emitter.type     = GPUEmitterType::eSphereLight;
+    }
+    //else if (emitterJson["type"] == "point")
+    //{
+    //    JsonCheckKeys(emitterJson, {"position", "radius"});
+    //    emitter.position = Json2Vec3(emitterJson["position"]);
+    //    emitter.radius   = emitterJson["radius"];
+    //    emitter.area     = 4.0f * PI * emitter.radius * emitter.radius;
+    //    emitter.type     = GPUEmitterType::eSphereLight;
+    //}
+    else if (emitterJson["type"] == "distant")
+    {
+        JsonCheckKeys(emitterJson, {"direction"});
         emitter.direction = Json2Vec3(emitterJson["direction"]);
-        emitter.emittance = Json2Vec3(emitterJson["emittance"]);
+        emitter.type      = GPUEmitterType::eDirectionalLight;
     }
     else
     {

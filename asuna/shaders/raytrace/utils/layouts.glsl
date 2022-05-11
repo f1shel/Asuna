@@ -8,9 +8,6 @@
 #include "../../../hostdevice/scene.h"
 #include "../../../hostdevice/sun_and_sky.h"
 #include "../../../hostdevice/vertex.h"
-#include "math.glsl"
-#include "structs.glsl"
-#include "sun_and_sky.glsl"
 
 // clang-format off
 layout(buffer_reference, scalar) buffer Vertices  { GPUVertex v[];   };

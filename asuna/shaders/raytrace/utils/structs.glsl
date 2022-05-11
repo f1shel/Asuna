@@ -16,9 +16,11 @@ struct BsdfSample
 struct LightSample
 {
     vec3  normal;
-    vec3  position;
-    vec3  emission;
+    vec3  direction;
+    vec3  emittance;
+    float dist;
     float pdf;
+    float shouldMIS;
 };
 
 struct RayPayload

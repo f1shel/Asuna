@@ -8,6 +8,10 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "utils/layouts.glsl"
+#include "utils/math.glsl"
+#include "utils/sample_light.glsl"
+#include "utils/structs.glsl"
+#include "utils/sun_and_sky.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
@@ -43,25 +47,18 @@ void main()
     contrib.radiance = vec3(0);
     contrib.visible  = false;
     {
-        vec3  Li = vec3(0);
-        float lightPdf;
-        vec3  lightContrib;
-        vec3  lightDir  = -ffnormal;
-        float lightDist = 1e32;
-        bool  isLight   = false;
-
+        vec3        Li = vec3(0);
+        LightSample lightSample;
         // Emitter
         if (pc.lightsNum > 0)
         {
-            isLight = true;
-
             // randomly select one of the lights
             int lightIndex   = int(min(rand(payload.seed) * pc.lightsNum, pc.lightsNum - 1));
             GPUEmitter light = lights.l[lightIndex];
 
-            lightContrib = light.emittance;
-            lightDir     = normalize(light.direction);
-            lightPdf     = 1.0;
+            SampleOneLight(payload.seed, light, payload.hitPos, lightSample);
+
+            lightSample.emittance *= pc.lightsNum;        // selection pdf
         }
 
         // Environment Light
@@ -70,19 +67,22 @@ void main()
             lightContrib = vec3(1.0);
         } */
 
-        if (dot(lightDir, ffnormal) > 0.0)
+        if (dot(lightSample.direction, ffnormal) > 0.0)
         {
             BsdfSample bsdfSample;
 
-            vec3  bsdfSampleVal = material.diffuse * INV_PI;
-            float misWeight = isLight ? 1.0 : max(0.0, powerHeuristic(lightPdf, bsdfSample.pdf));
+            vec3 bsdfSampleVal = material.diffuse * INV_PI;
+            bsdfSample.pdf     = 0.25*INV_PI;
+            float misWeight    = lightSample.shouldMIS > 0.0 ?
+                                     max(0.0, powerHeuristic(lightSample.pdf, bsdfSample.pdf)) :
+                                     1.0;
 
-            Li += misWeight * bsdfSampleVal * abs(dot(lightDir, ffnormal)) * lightContrib /
-                  lightPdf;
+            Li += misWeight * bsdfSampleVal * abs(dot(lightSample.direction, ffnormal)) *
+                  lightSample.emittance / lightSample.pdf;
 
             contrib.visible   = true;
-            contrib.lightDir  = lightDir;
-            contrib.lightDist = lightDist;
+            contrib.lightDir  = lightSample.direction;
+            contrib.lightDist = lightSample.dist;
             contrib.radiance  = Li;
         }
     }
@@ -119,7 +119,7 @@ void main()
         Ray  shadowRay = Ray(payload.ray.origin, contrib.lightDir);
         uint rayFlags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT |
                         gl_RayFlagsCullBackFacingTrianglesEXT;
-        float maxDist = contrib.lightDist;
+        float maxDist = contrib.lightDist - EPS;
         isShadowed    = true;
         traceRayEXT(topLevelAS,                 // acceleration structure
                     rayFlags,                   // rayFlags

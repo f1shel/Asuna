@@ -150,6 +150,37 @@ float powerHeuristic(float a, float b)
 }
 
 /*
+ * Normal to orthonormal basis using quaternion similarity
+ *
+ * NOTE:
+ *  (1) Reference:
+ *      https://www.shadertoy.com/view/lldGRM
+ */
+#define HANDLE_SINGULARITY
+void basis(in vec3 n, out vec3 f, out vec3 r)
+{
+#ifdef HANDLE_SINGULARITY
+    if (n.z < -0.999999)
+    {
+        f = vec3(0, -1, 0);
+        r = vec3(-1, 0, 0);
+    }
+    else
+    {
+        float a = 1. / (1. + n.z);
+        float b = -n.x * n.y * a;
+        f       = vec3(1. - n.x * n.x * a, b, -n.x);
+        r       = vec3(b, 1. - n.y * n.y * a, -n.y);
+    }
+#else
+    float a = 1. / (1. + n.z);
+    float b = -n.x * n.y * a;
+    f       = vec3(1. - n.x * n.x * a, b, -n.x);
+    r       = vec3(b, 1. - n.y * n.y * a, -n.y);
+#endif
+}
+
+/*
  * offsetPositionAlongNormal shifts a point on a triangle surface so that a
  * ray bouncing off the surface with tMin = 0.0 is no longer treated as
  * intersecting the surface it originated from.
