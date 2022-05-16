@@ -6,3 +6,4 @@ build/
 asuna/third_party/downloaded_resources/
 scenes/
 log_asuna.txt
+.vscode
