@@ -4,47 +4,38 @@
 #include "../context/context.h"
 #include "alloc.h"
 
-enum GPUMaterialType
-{
-    eMaterialTypeCount = 0
-};
-
 class Material
 {
-  public:
-    Material()
-    {
-        m_material.diffuse            = 0.0;
-        m_material.specular           = 0.0;
-        m_material.axay               = 0.0;
-        m_material.roughness          = 0.0;
-        m_material.diffuseTextureId   = -1;
-        m_material.specularTextureId  = -1;
-        m_material.alphaTextureId     = -1;
-        m_material.roughnessTextureId = -1;
-        m_material.normalTextureId    = -1;
-        m_material.tangentTextureId   = -1;
-    }
-    GPUMaterial &getMaterial()
-    {
-        return m_material;
-    }
+public:
+  Material() {}
+  Material(const GpuMaterial& material)
+      : m_material(material)
+  {
+  }
+  GpuMaterial& getMaterial() { return m_material; }
 
-    GPUMaterialType m_type{eMaterialTypeCount};
-    GPUMaterial     m_material;
+private:
+  GpuMaterial m_material = {
+      vec3(0.0),  // diffuse albedo
+      vec3(0.0),  // specular albedo
+      vec2(0.0),  // alpha x and y
+      vec2(0.0),  // roughness x and y
+      -1,         // diffuse albedo texture id
+      -1,         // specular albedo texture id
+      -1,         // alpha texture id
+      -1,         // roughness texture id
+      -1,         // normal texture id
+      -1,         // tangent texture id
+  };
 };
 
-class MaterialAlloc : public GPUAlloc
+class MaterialAlloc : public GpuAlloc
 {
-  public:
-    MaterialAlloc(ContextAware *pContext, Material *pMaterial,
-                  const VkCommandBuffer &cmdBuf);
-    void     deinit(ContextAware *pContext);
-    VkBuffer getBuffer()
-    {
-        return m_bMaterial.buffer;
-    }
+public:
+  MaterialAlloc(ContextAware* pContext, Material* pMaterial, const VkCommandBuffer& cmdBuf);
+  void     deinit(ContextAware* pContext);
+  VkBuffer getBuffer() { return m_bMaterial.buffer; }
 
-  private:
-    nvvk::Buffer m_bMaterial;
+private:
+  nvvk::Buffer m_bMaterial;
 };

@@ -3,7 +3,7 @@
 
 #include "binding.h"
 
-struct GPUMaterial
+struct GpuMaterial
 {
     vec3 diffuse;                   // diffuse albedo
     vec3 specular;                  // specular albedo

@@ -3,52 +3,48 @@
 #include "../../hostdevice/pushconstant.h"
 #include "pipeline.h"
 #include "pipeline_graphics.h"
-
 #include "nvvk/raytraceKHR_vk.hpp"
 #include "nvvk/sbtwrapper_vk.hpp"
 
+struct PipelineRaytraceInitState
+{
+  DescriptorSetWrapper* pDswOut   = nullptr;
+  DescriptorSetWrapper* pDswScene = nullptr;
+  DescriptorSetWrapper* pDswEnv   = nullptr;
+};
+
 class PipelineRaytrace : public PipelineAware
 {
-  public:
-    START_ENUM(Set) eSetAccel = 0 END_ENUM();
-    START_ENUM(RunSet)
-    eRunSetAccel = 0, eRunSetOut = 1, eRunSetScene = 2, eRunSetEnv = 3 END_ENUM();
-    PipelineRaytrace() : PipelineAware(1, 4)
-    {}
-    virtual void init(ContextAware *pContext, Scene *pScene, DescriptorSetWrapper *pDswOut,
-                      DescriptorSetWrapper *pDswScene, DescriptorSetWrapper *pDswEnv);
-    virtual void deinit();
-    virtual void run(const VkCommandBuffer &cmdBuf);
-    void         setSpp(int spp = 1);
-    void         resetFrame();
+public:
+  enum class HoldSet
+  {
+    Accel = 0,
+    Num   = 1,
+  };
+  PipelineRaytrace()
+      : PipelineAware(uint(HoldSet::Num), RtBindSet::RtNum)
+  {
+  }
+  virtual void             init(ContextAware* pContext, Scene* pScene, PipelineRaytraceInitState& pis);
+  virtual void             deinit();
+  virtual void             run(const VkCommandBuffer& cmdBuf);
+  GpuPushConstantRaytrace& getPushconstant() { return m_pushconstant; }
+  void                     setSpp(int spp = 1);
+  void                     resetFrame();
+  void                     incrementFrame();
 
-  private:
-    // Request ray tracing pipeline properties
-    void initRayTracing();
-    // Create bottom level acceleration structures
-    void createBottomLevelAS();
-    // Create top level acceleration structures
-    void createTopLevelAS();
-    void createRtDescriptorSetLayout();
-    // Create ray tracing pipeline
-    void createRtPipeline();
-    // Update the descriptor pointer
-    void updateRtDescriptorSet();
+private:
+  void initRayTracing();               // Request ray tracing pipeline properties
+  void createBottomLevelAS();          // Create bottom level acceleration structures
+  void createTopLevelAS();             // Create top level acceleration structures
+  void createRtDescriptorSetLayout();  // Create descriptor sets
+  void createRtPipeline();             // Create ray tracing pipeline
+  void updateRtDescriptorSet();        // Update the descriptor pointer
 
-  private:
-    // Pipeline properties
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
-    // Shading binding table wrapper
-    nvvk::SBTWrapper m_sbt;
-    // Pipeline builder
-    nvvk::RaytracingBuilderKHR m_rtBuilder;
-    // Top level acceleration structures
-    std::vector<VkAccelerationStructureInstanceKHR> m_tlas{};
-    // Bottom level acceleration structures
-    std::vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};
-
-  public:
-    // Push constant
-    GPUPushConstantRaytrace m_pcRaytrace{0};
+private:
+  nvvk::SBTWrapper                              m_sbt;              // Shading binding table wrapper
+  nvvk::RaytracingBuilderKHR                    m_rtBuilder;        // Pipeline builder
+  vector<VkAccelerationStructureInstanceKHR>    m_tlas{};           // Top level acceleration structures
+  vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};           // Bottom level acceleration structures
+  GpuPushConstantRaytrace                       m_pushconstant{0};  // Push constant
 };

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../../hostdevice/scene.h"
 #include "../../hostdevice/vertex.h"
 #include "../context/context.h"
 #include "alloc.h"
+#include "bounding_box.h"
+#include "primitive.h"
 #include "nvvk/raytraceKHR_vk.hpp"
-#include "utils.h"
 
 #include <map>
 #include <string>
@@ -13,57 +13,42 @@
 
 class Mesh
 {
-  public:
-    Mesh(const std::string &meshPath, bool recomputeNormal = false);
-    ~Mesh()
-    {
-        m_vertices.clear();
-        m_indices.clear();
-    }
+public:
+  Mesh(Primitive& prim);
+  Mesh(const std::string& meshPath, bool recomputeNormal = false);
+  uint                     getVerticesNum() { return m_vertices.size(); }
+  uint                     getIndicesNum() { return m_indices.size(); }
+  const vector<GpuVertex>& getVertices() { return m_vertices; }
+  const vector<uint>&      getIndices() { return m_indices; }
+  const vec3&              getPosMin() { return m_posMin; }
+  const vec3&              getPosMax() { return m_posMax; }
 
-  public:
-    std::vector<GPUVertex> m_vertices{};
-    std::vector<uint32_t>  m_indices{};
-
-  private:
-    nvmath::vec3f m_posMin{BBOX_MAXF, BBOX_MAXF, BBOX_MAXF};
-    nvmath::vec3f m_posMax{BBOX_MINF, BBOX_MINF, BBOX_MINF};
-
-  public:
-    nvmath::vec3f getPosMin()
-    {
-        return m_posMin;
-    }
-    nvmath::vec3f getPosMax()
-    {
-        return m_posMax;
-    }
+private:
+  vector<GpuVertex> m_vertices{};
+  vector<uint>      m_indices{};
+  vec3              m_posMin{BBOX_MAXF};
+  vec3              m_posMax{BBOX_MINF};
 };
 
-class MeshAlloc : public GPUAlloc
+class MeshAlloc : public GpuAlloc
 {
-  public:
-    MeshAlloc(ContextAware *pContext, Mesh *pMesh, const VkCommandBuffer &cmdBuf);
-    void     deinit(ContextAware *pContext);
-    VkBuffer getIndicesBuffer() const
-    {
-        return m_bIndices.buffer;
-    }
-    VkBuffer getVerticesBuffer() const
-    {
-        return m_bVertices.buffer;
-    }
+public:
+  MeshAlloc(ContextAware* pContext, Mesh* pMesh, const VkCommandBuffer& cmdBuf);
+  void        deinit(ContextAware* pContext);
+  VkBuffer    getIndicesBuffer() { return m_bIndices.buffer; }
+  VkBuffer    getVerticesBuffer() { return m_bVertices.buffer; }
+  uint        getIndicesNum() { return m_numIndices; }
+  uint        getVerticesNum() { return m_numVertices; }
+  const vec3& getPosMin() { return m_posMin; }
+  const vec3& getPosMax() { return m_posMax; }
 
-  public:
-    uint32_t      m_nIndices{0};
-    uint32_t      m_nVertices{0};
-    nvmath::vec3f m_posMin{0, 0, 0};
-    nvmath::vec3f m_posMax{0, 0, 0};
-
-  private:
-    nvvk::Buffer m_bIndices;         // Device buffer of the indices forming triangles
-    nvvk::Buffer m_bVertices;        // Device buffer of all 'Vertex'
+private:
+  uint         m_numIndices{0};
+  uint         m_numVertices{0};
+  vec3         m_posMin{0, 0, 0};
+  vec3         m_posMax{0, 0, 0};
+  nvvk::Buffer m_bIndices;   // Device buffer of the indices forming triangles
+  nvvk::Buffer m_bVertices;  // Device buffer of all 'Vertex'
 };
 
-nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice         device,
-                                                       const MeshAlloc &meshAlloc);
+nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice device, MeshAlloc& meshAlloc);

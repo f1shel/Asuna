@@ -8,40 +8,37 @@
 
 struct TracerInitState
 {
-    bool        m_offline    = false;
-    std::string m_scenefile  = "";
-    std::string m_outputname = "";
+  bool   offline    = false;
+  string scenefile  = "";
+  string outputname = "";
 };
 
 class Tracer
 {
-  public:
-    void init(TracerInitState tis);
-    void run();
-    void deinit();
-    void resetFrame();
+public:
+  void init(TracerInitState tis);
+  void run();
+  void deinit();
+  void resetFrame();
 
-  private:
-    TracerInitState m_tis;
-    // context
-    ContextAware m_context;
-    // scene
-    Scene m_scene;
-    // pipelines
-    PipelineGraphics m_pipelineGraphics;
-    PipelineRaytrace m_pipelineRaytrace;
-    PipelinePost     m_pipelinePost;
+private:
+  TracerInitState  m_tis;
+  ContextAware     m_context;           // context
+  Scene            m_scene;             // scene
+  PipelineGraphics m_pipelineGraphics;  // pipelines
+  PipelineRaytrace m_pipelineRaytrace;
+  PipelinePost     m_pipelinePost;
 
-  private:
-    void runOnline();
-    void runOffline();
-    void imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut);
-    void saveImageTest();
-    void saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId = -1);
+private:
+  void runOnline();
+  void runOffline();
+  void imageToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut);
+  void saveImageTest();
+  void saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId = -1);
 
-  private:
-    void renderGUI();
-    bool guiCamera();
-    bool guiEnvironment();
-    bool guiTonemapper();
+private:
+  void renderGUI();
+  bool guiCamera();
+  bool guiEnvironment();
+  bool guiTonemapper();
 };

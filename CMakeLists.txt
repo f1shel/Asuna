@@ -204,11 +204,11 @@ endforeach(RELEASELIB)
 # copies binaries that need to be put next to the exe files (ZLib, etc.)
 _finalize_target(${PROJNAME})
 
-set(SCENE_SOURCE "${PROJ_ROOT_DIR}/scenes")
-set(SCENE_DESTINATION "${OUTPUT_PATH}/scenes")
-add_custom_command(
-    TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${SCENE_SOURCE} ${SCENE_DESTINATION} 
-    DEPENDS ${SCENE_SOURCE}
-    COMMENT "symbolic link resources folder from ${SCENE_SOURCE} => ${SCENE_DESTINATION}")
+# set(SCENE_SOURCE "${PROJ_ROOT_DIR}/scenes")
+# set(SCENE_DESTINATION "${OUTPUT_PATH}/scenes")
+# add_custom_command(
+#     TARGET ${PROJECT_NAME} POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory ${SCENE_SOURCE} ${SCENE_DESTINATION} 
+#     DEPENDS ${SCENE_SOURCE}
+#     COMMENT "symbolic link resources folder from ${SCENE_SOURCE} => ${SCENE_DESTINATION}")
 # file(COPY ${PROJ_ROOT_DIR}/scenes DESTINATION ${OUTPUT_PATH})

@@ -3,32 +3,33 @@
 
 #include "binding.h"
 
-struct GPUPushConstantGraphics
+struct GpuPushConstantGraphics
 {
-    uint placeholder;
+  uint placeholder;
 };
 
-struct GPUPushConstantRaytrace
+struct GpuPushConstantRaytrace
 {
-    int curFrame;
-    int maxRecursionDepth;
-    int spp;
-    int lightsNum;
+  int spp;
+  int curFrame;
+  int maxPathDepth;
+  int numLights;
 };
 
 // Tonemapper used in post.frag
-struct GPUPushConstantPost
+struct GpuPushConstantPost
 {
-    float brightness;
-    float contrast;
-    float saturation;
-    float vignette;
-    float avgLum;
-    float zoom;
-    vec2  renderingRatio;
-    int   autoExposure;
-    float Ywhite;        // Burning white
-    float key;           // Log-average luminance
+  float brightness;
+  float contrast;
+  float saturation;
+  float vignette;
+  float avgLum;
+  float zoom;
+  vec2  renderingRatio;
+  int   autoExposure;
+  float Ywhite;  // Burning white
+  float key;     // Log-average luminance
+  uint  useTonemapping;
 };
 
 #endif

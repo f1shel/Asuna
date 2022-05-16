@@ -12,7 +12,7 @@
 #include "stb_image_write.h"
 #include "tqdm/tqdm.h"
 
-#include <bitset>        // std::bitset
+#include <bitset>  // std::bitset
 #include <filesystem>
 #include <iostream>
 
@@ -21,398 +21,388 @@ using std::filesystem::path;
 
 void Tracer::init(TracerInitState tis)
 {
-    m_tis = tis;
+  m_tis = tis;
 
-    m_context.init({m_tis.m_offline});
+  m_context.init({m_tis.offline});
 
-    m_scene.init(&m_context);
+  m_scene.init(&m_context);
 
-    Loader loader(&m_scene);
-    loader.loadSceneFromJson(m_tis.m_scenefile, m_context.m_root);
+  Loader loader(&m_scene);
+  loader.loadSceneFromJson(m_tis.scenefile, m_context.getRoot());
 
-    m_context.m_size = m_scene.getSize();
-    if (!m_tis.m_offline)
-        m_context.resizeGlfwWindow();
-    else
-        m_context.createOfflineResources();
+  m_context.setSize(m_scene.getSize());
+  if(!m_context.getOfflineMode())
+    m_context.resizeGlfwWindow();
+  else
+    m_context.createOfflineResources();
 
-    m_pipelineGraphics.init(&m_context, &m_scene);
-    m_pipelineRaytrace.init(&m_context, &m_scene, m_pipelineGraphics.getOutDescriptorSet(),
-                            m_pipelineGraphics.getSceneDescriptorSet(),
-                            m_pipelineGraphics.getEnvDescriptorSet());
-    m_pipelinePost.init(&m_context, &m_scene, m_pipelineGraphics.getHdrOutImageInfo());
+  PipelineRaytraceInitState pis;
+  pis.pDswOut   = &m_pipelineGraphics.getOutDescriptorSet();
+  pis.pDswEnv   = &m_pipelineGraphics.getEnvDescriptorSet();
+  pis.pDswScene = &m_pipelineGraphics.getSceneDescriptorSet();
+
+  m_pipelineGraphics.init(&m_context, &m_scene);
+  m_pipelineRaytrace.init(&m_context, &m_scene, pis);
+  m_pipelinePost.init(&m_context, &m_scene, &m_pipelineGraphics.getHdrOutImageInfo());
 }
 
 void Tracer::run()
 {
-    if (m_tis.m_offline)
-        runOffline();
-    else
-        runOnline();
+  if(m_context.getOfflineMode())
+    runOffline();
+  else
+    runOnline();
 }
 
 void Tracer::deinit()
 {
-    m_pipelineGraphics.deinit();
-    m_pipelineRaytrace.deinit();
-    m_pipelinePost.deinit();
-    m_scene.deinit();
-    m_context.deinit();
+  m_pipelineGraphics.deinit();
+  m_pipelineRaytrace.deinit();
+  m_pipelinePost.deinit();
+  m_scene.deinit();
+  m_context.deinit();
 }
 
-void Tracer::resetFrame()
-{}
+void Tracer::resetFrame() {}
 
 void Tracer::runOnline()
 {
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
-    clearValues[1].depthStencil = {1.0f, 0};
-    // Main loop
-    while (!m_context.shouldGlfwCloseWindow())
+  std::array<VkClearValue, 2> clearValues{};
+  clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
+  clearValues[1].depthStencil = {1.0f, 0};
+  // Main loop
+  while(!m_context.shouldGlfwCloseWindow())
+  {
+    glfwPollEvents();
+    if(m_context.isMinimized())
+      continue;
+    // Start the Dear ImGui frame
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    // Start rendering the scene
+    m_context.prepareFrame();
+    // Start command buffer of this frame
+    uint32_t                 curFrame  = m_context.getCurFrame();
+    const VkCommandBuffer&   cmdBuf    = m_context.getCommandBuffers()[curFrame];
+    VkCommandBufferBeginInfo beginInfo = nvvk::make<VkCommandBufferBeginInfo>();
+    beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
     {
-        glfwPollEvents();
-        if (m_context.isMinimized())
-            continue;
-        // Start the Dear ImGui frame
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        // Start rendering the scene
-        m_context.prepareFrame();
-        // Start command buffer of this frame
-        uint32_t                 curFrame  = m_context.getCurFrame();
-        const VkCommandBuffer   &cmdBuf    = m_context.getCommandBuffers()[curFrame];
-        VkCommandBufferBeginInfo beginInfo = nvvk::make<VkCommandBufferBeginInfo>();
-        beginInfo.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      vkBeginCommandBuffer(cmdBuf, &beginInfo);
+      {
+        m_pipelineGraphics.run(cmdBuf);
+      }
+      {
+        renderGUI();
+      }
+      {
+        m_pipelineRaytrace.run(cmdBuf);
+      }
+      {
+        VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        postRenderPassBeginInfo.clearValueCount = 2;
+        postRenderPassBeginInfo.pClearValues    = clearValues.data();
+        postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
+        postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer(curFrame);
+        postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
 
-        {
-            vkBeginCommandBuffer(cmdBuf, &beginInfo);
-            {
-                m_pipelineGraphics.run(cmdBuf);
-            }
-            {
-                renderGUI();
-            }
-            {
-                m_pipelineRaytrace.run(cmdBuf);
-            }
-            {
-                VkRenderPassBeginInfo postRenderPassBeginInfo{
-                    VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-                postRenderPassBeginInfo.clearValueCount = 2;
-                postRenderPassBeginInfo.pClearValues    = clearValues.data();
-                postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
-                postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer(curFrame);
-                postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
+        // Rendering to the swapchain framebuffer the rendered image and apply a
+        // tonemapper
+        vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-                // Rendering to the swapchain framebuffer the rendered image and apply a
-                // tonemapper
-                vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
-                                     VK_SUBPASS_CONTENTS_INLINE);
+        m_pipelinePost.run(cmdBuf);
 
-                m_pipelinePost.run(cmdBuf);
+        // Rendering UI
+        ImGui::Render();
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
 
-                // Rendering UI
-                ImGui::Render();
-                ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
+        // Display axis in the lower left corner.
+        // vkAxis.display(cmdBuf, CameraManip.getMatrix(), vkSample.getSize());
 
-                // Display axis in the lower left corner.
-                // vkAxis.display(cmdBuf, CameraManip.getMatrix(), vkSample.getSize());
-
-                vkCmdEndRenderPass(cmdBuf);
-            }
-        }
-        vkEndCommandBuffer(cmdBuf);
-        m_context.submitFrame();
+        vkCmdEndRenderPass(cmdBuf);
+      }
     }
-    vkDeviceWaitIdle(m_context.getDevice());
+    vkEndCommandBuffer(cmdBuf);
+    m_context.submitFrame();
+  }
+  vkDeviceWaitIdle(m_context.getDevice());
 }
 
 void Tracer::runOffline()
 {
-    return;
+  return;
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
-    clearValues[1].depthStencil = {1.0f, 0};
+  std::array<VkClearValue, 2> clearValues{};
+  clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
+  clearValues[1].depthStencil = {1.0f, 0};
 
-    nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
+  nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
 
-    // Main loop
-    tqdm bar;
-    int  tot         = m_scene.getSpp();
-    int  sppPerRound = 1;
-    m_pipelineRaytrace.setSpp(sppPerRound);
-    for (int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))
+  // Main loop
+  tqdm bar;
+  int  tot         = m_scene.getSpp();
+  int  sppPerRound = 1;
+  m_pipelineRaytrace.setSpp(sppPerRound);
+  for(int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))
+  {
+    bar.progress(spp, tot);
+    const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
     {
-        bar.progress(spp, tot);
-        const VkCommandBuffer &cmdBuf = genCmdBuf.createCommandBuffer();
-        {
-            m_pipelineGraphics.run(cmdBuf);
-        }
-        {
-            m_pipelineRaytrace.run(cmdBuf);
-        }
-        if (spp == tot)
-        {
-            VkRenderPassBeginInfo postRenderPassBeginInfo{
-                VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-            postRenderPassBeginInfo.clearValueCount = 2;
-            postRenderPassBeginInfo.pClearValues    = clearValues.data();
-            postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
-            postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer();
-            postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
-
-            vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            m_pipelinePost.run(cmdBuf);
-
-            vkCmdEndRenderPass(cmdBuf);
-        }
-        genCmdBuf.submitAndWait(cmdBuf);
+      m_pipelineGraphics.run(cmdBuf);
     }
-    bar.finish();
-    vkDeviceWaitIdle(m_context.getDevice());
-    saveImageTest();
+    {
+      m_pipelineRaytrace.run(cmdBuf);
+    }
+    if(spp == tot)
+    {
+      VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+      postRenderPassBeginInfo.clearValueCount = 2;
+      postRenderPassBeginInfo.pClearValues    = clearValues.data();
+      postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
+      postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer();
+      postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
+
+      vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+      m_pipelinePost.run(cmdBuf);
+
+      vkCmdEndRenderPass(cmdBuf);
+    }
+    genCmdBuf.submitAndWait(cmdBuf);
+  }
+  bar.finish();
+  vkDeviceWaitIdle(m_context.getDevice());
+  saveImageTest();
 }
 
-void Tracer::imageToBuffer(const nvvk::Texture &imgIn, const VkBuffer &pixelBufferOut)
+void Tracer::imageToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut)
 {
-    nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
-    VkCommandBuffer   cmdBuf = genCmdBuf.createCommandBuffer();
+  nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
+  VkCommandBuffer   cmdBuf = genCmdBuf.createCommandBuffer();
 
-    // Make the image layout eTransferSrcOptimal to copy to buffer
-    nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_GENERAL,
-                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+  // Make the image layout eTransferSrcOptimal to copy to buffer
+  nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                              VK_IMAGE_ASPECT_COLOR_BIT);
 
-    // Copy the image to the buffer
-    VkBufferImageCopy copyRegion;
-    copyRegion.imageSubresource  = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    copyRegion.imageExtent       = {m_context.getSize().width, m_context.getSize().height, 1};
-    copyRegion.imageOffset       = {0};
-    copyRegion.bufferOffset      = 0;
-    copyRegion.bufferImageHeight = m_context.getSize().height;
-    copyRegion.bufferRowLength   = m_context.getSize().width;
-    vkCmdCopyImageToBuffer(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           pixelBufferOut, 1, &copyRegion);
+  // Copy the image to the buffer
+  VkBufferImageCopy copyRegion;
+  copyRegion.imageSubresource  = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  copyRegion.imageExtent       = {m_context.getSize().width, m_context.getSize().height, 1};
+  copyRegion.imageOffset       = {0};
+  copyRegion.bufferOffset      = 0;
+  copyRegion.bufferImageHeight = m_context.getSize().height;
+  copyRegion.bufferRowLength   = m_context.getSize().width;
+  vkCmdCopyImageToBuffer(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pixelBufferOut, 1, &copyRegion);
 
-    // Put back the image as it was
-    nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
-    genCmdBuf.submitAndWait(cmdBuf);
+  // Put back the image as it was
+  nvvk::cmdBarrierImageLayout(cmdBuf, imgIn.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                              VK_IMAGE_ASPECT_COLOR_BIT);
+  genCmdBuf.submitAndWait(cmdBuf);
 }
 
 void Tracer::saveImageTest()
 {
-    auto &m_alloc = m_context.m_alloc;
-    auto  m_size  = m_context.getSize();
+  auto& m_alloc = m_context.getAlloc();
+  auto  m_size  = m_context.getSize();
 
-    // Create a temporary buffer to hold the pixels of the image
-    VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                             VK_BUFFER_USAGE_TRANSFER_DST_BIT};
-    VkDeviceSize       bufferSize = 4 * sizeof(float) * m_size.width * m_size.height;
-    nvvk::Buffer       pixelBuffer =
-        m_context.m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+  // Create a temporary buffer to hold the pixels of the image
+  VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+  VkDeviceSize       bufferSize  = 4 * sizeof(float) * m_size.width * m_size.height;
+  nvvk::Buffer       pixelBuffer = m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    saveImage(pixelBuffer, m_tis.m_outputname);
-    // saveImage(pixelBuffer, "channel0.hdr", 0);
-    // saveImage(pixelBuffer, "channel1.hdr", 1);
-    // saveImage(pixelBuffer, "channel2.hdr", 2);
-    // saveImage(pixelBuffer, "channel3.hdr", 3);
+  saveImage(pixelBuffer, m_tis.outputname);
+  // saveImage(pixelBuffer, "channel0.hdr", 0);
+  // saveImage(pixelBuffer, "channel1.hdr", 1);
+  // saveImage(pixelBuffer, "channel2.hdr", 2);
+  // saveImage(pixelBuffer, "channel3.hdr", 3);
 
-    // Destroy temporary buffer
-    m_alloc.destroy(pixelBuffer);
+  // Destroy temporary buffer
+  m_alloc.destroy(pixelBuffer);
 }
 
 void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId)
 {
-    bool isRelativePath = path(outputpath).is_relative();
-    if (isRelativePath)
-        outputpath = NVPSystem::exePath() + outputpath;
+  bool isRelativePath = path(outputpath).is_relative();
+  if(isRelativePath)
+    outputpath = NVPSystem::exePath() + outputpath;
 
-    auto &m_alloc = m_context.m_alloc;
-    auto  m_size  = m_context.getSize();
+  auto& m_alloc = m_context.getAlloc();
+  auto  m_size  = m_context.getSize();
 
-    if (channelId == -1)
-        imageToBuffer(m_context.getOfflineFramebufferTexture(), pixelBuffer.buffer);
-    else
-        imageToBuffer(m_pipelineGraphics.m_tChannels[channelId], pixelBuffer.buffer);
+  if(channelId == -1)
+    imageToBuffer(m_context.getOfflineColor(), pixelBuffer.buffer);
+  else
+    imageToBuffer(m_pipelineGraphics.getColorTexture(channelId), pixelBuffer.buffer);
 
-    // Write the buffer to disk
-    void *data = m_alloc.map(pixelBuffer);
-    stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4,
-                   reinterpret_cast<float *>(data));
-    m_alloc.unmap(pixelBuffer);
+  // Write the buffer to disk
+  void* data = m_alloc.map(pixelBuffer);
+  stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4, reinterpret_cast<float*>(data));
+  m_alloc.unmap(pixelBuffer);
 }
 
 void Tracer::renderGUI()
 {
-    // Show UI panel window.
-    float panelAlpha                = 1.0f;
-    ImGuiH::Control::style.ctrlPerc = 0.55f;
-    ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
+  static bool showGui = true;
+  if(ImGui::IsKeyPressed(ImGuiKey_H))
+    showGui = !showGui;
+  if(!showGui)
+    return;
 
-    bool changed{false};
+  // Show UI panel window.
+  float panelAlpha                = 1.0f;
+  ImGuiH::Control::style.ctrlPerc = 0.55f;
+  ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
 
-    if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-        changed |= guiCamera();
-    if (ImGui::CollapsingHeader("Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-        changed |= guiEnvironment();
-    if (ImGui::CollapsingHeader("Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-        changed |= guiTonemapper();
+  bool changed{false};
 
-    ImGui::End();        // ImGui::Panel::end()
+  if(ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiCamera();
+  if(ImGui::CollapsingHeader("Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiEnvironment();
+  if(ImGui::CollapsingHeader("Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiTonemapper();
 
-    if (changed)
-    {
-        m_pipelineRaytrace.resetFrame();
-    }
+  ImGui::End();  // ImGui::Panel::end()
+
+  if(changed)
+  {
+    m_pipelineRaytrace.resetFrame();
+  }
 }
 
 bool Tracer::guiCamera()
 {
-    bool changed{false};
-    changed |= ImGuiH::CameraWidget();
-    return changed;
+  bool changed{false};
+  changed |= ImGuiH::CameraWidget();
+  return changed;
 }
 
 bool Tracer::guiEnvironment()
 {
-    static SunAndSky dss{
-        {1, 1, 1},                  // rgb_unit_conversion;
-        0.0000101320f,              // multiplier;
-        0.0f,                       // haze;
-        0.0f,                       // redblueshift;
-        1.0f,                       // saturation;
-        0.0f,                       // horizon_height;
-        {0.4f, 0.4f, 0.4f},         // ground_color;
-        0.1f,                       // horizon_blur;
-        {0.0, 0.0, 0.01f},          // night_color;
-        0.8f,                       // sun_disk_intensity;
-        {0.00, 0.78, 0.62f},        // sun_direction;
-        5.0f,                       // sun_disk_scale;
-        1.0f,                       // sun_glow_intensity;
-        1,                          // y_is_up;
-        1,                          // physically_scaled_sun;
-        0,                          // in_use;
-    };
+  static GpuSunAndSky dss{
+      {1, 1, 1},            // rgb_unit_conversion;
+      0.0000101320f,        // multiplier;
+      0.0f,                 // haze;
+      0.0f,                 // redblueshift;
+      1.0f,                 // saturation;
+      0.0f,                 // horizon_height;
+      {0.4f, 0.4f, 0.4f},   // ground_color;
+      0.1f,                 // horizon_blur;
+      {0.0, 0.0, 0.01f},    // night_color;
+      0.8f,                 // sun_disk_intensity;
+      {0.00, 0.78, 0.62f},  // sun_direction;
+      5.0f,                 // sun_disk_scale;
+      1.0f,                 // sun_glow_intensity;
+      1,                    // y_is_up;
+      1,                    // physically_scaled_sun;
+      0,                    // in_use;
+  };
 
-    bool  changed{false};
-    auto &sunAndSky(m_scene.getSunAndSky());
+  bool  changed{false};
+  auto& sunAndSky(m_scene.getSunsky());
 
-    changed |= ImGui::Checkbox("Use Sun & Sky", (bool *) &sunAndSky.in_use);
+  changed |= ImGui::Checkbox("Use Sun & Sky", (bool*)&sunAndSky.in_use);
 
-    // Adjusting the up with the camera
-    nvmath::vec3f eye, center, up;
-    CameraManip.getLookat(eye, center, up);
-    sunAndSky.y_is_up = (up.y == 1);
+  // Adjusting the up with the camera
+  nvmath::vec3f eye, center, up;
+  CameraManip.getLookat(eye, center, up);
+  sunAndSky.y_is_up = (up.y == 1);
 
-    if (sunAndSky.in_use)
-    {
-        GuiH::Group<bool>("Sun", true, [&] {
-            changed |= GuiH::Custom("Direction", "Sun Direction", [&] {
-                float indent = ImGui::GetCursorPos().x;
-                changed |= ImGui::DirectionGizmo("", &sunAndSky.sun_direction.x, true);
-                ImGui::NewLine();
-                ImGui::SameLine(indent);
-                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-                changed |= ImGui::InputFloat3("##IG", &sunAndSky.sun_direction.x);
-                return changed;
-            });
-            changed |= GuiH::Slider("Disk Scale", "", &sunAndSky.sun_disk_scale,
-                                    &dss.sun_disk_scale, GuiH::Flags::Normal, 0.f, 100.f);
-            changed |= GuiH::Slider("Glow Intensity", "", &sunAndSky.sun_glow_intensity,
-                                    &dss.sun_glow_intensity, GuiH::Flags::Normal, 0.f, 5.f);
-            changed |= GuiH::Slider("Disk Intensity", "", &sunAndSky.sun_disk_intensity,
-                                    &dss.sun_disk_intensity, GuiH::Flags::Normal, 0.f, 5.f);
-            changed |= GuiH::Color("Night Color", "", &sunAndSky.night_color.x,
-                                   &dss.night_color.x, GuiH::Flags::Normal);
-            return changed;
-        });
+  if(sunAndSky.in_use)
+  {
+    GuiH::Group<bool>("Sun", true, [&] {
+      changed |= GuiH::Custom("Direction", "Sun Direction", [&] {
+        float indent = ImGui::GetCursorPos().x;
+        changed |= ImGui::DirectionGizmo("", &sunAndSky.sun_direction.x, true);
+        ImGui::NewLine();
+        ImGui::SameLine(indent);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        changed |= ImGui::InputFloat3("##IG", &sunAndSky.sun_direction.x);
+        return changed;
+      });
+      changed |= GuiH::Slider("Disk Scale", "", &sunAndSky.sun_disk_scale, &dss.sun_disk_scale, GuiH::Flags::Normal, 0.f, 100.f);
+      changed |= GuiH::Slider("Glow Intensity", "", &sunAndSky.sun_glow_intensity, &dss.sun_glow_intensity,
+                              GuiH::Flags::Normal, 0.f, 5.f);
+      changed |= GuiH::Slider("Disk Intensity", "", &sunAndSky.sun_disk_intensity, &dss.sun_disk_intensity,
+                              GuiH::Flags::Normal, 0.f, 5.f);
+      changed |= GuiH::Color("Night Color", "", &sunAndSky.night_color.x, &dss.night_color.x, GuiH::Flags::Normal);
+      return changed;
+    });
 
-        GuiH::Group<bool>("Ground", true, [&] {
-            changed |= GuiH::Slider("Horizon Height", "", &sunAndSky.horizon_height,
-                                    &dss.horizon_height, GuiH::Flags::Normal, -1.f, 1.f);
-            changed |= GuiH::Slider("Horizon Blur", "", &sunAndSky.horizon_blur,
-                                    &dss.horizon_blur, GuiH::Flags::Normal, 0.f, 1.f);
-            changed |= GuiH::Color("Ground Color", "", &sunAndSky.ground_color.x,
-                                   &dss.ground_color.x, GuiH::Flags::Normal);
-            changed |= GuiH::Slider("Haze", "", &sunAndSky.haze, &dss.haze, GuiH::Flags::Normal,
-                                    0.f, 15.f);
-            return changed;
-        });
+    GuiH::Group<bool>("Ground", true, [&] {
+      changed |= GuiH::Slider("Horizon Height", "", &sunAndSky.horizon_height, &dss.horizon_height, GuiH::Flags::Normal, -1.f, 1.f);
+      changed |= GuiH::Slider("Horizon Blur", "", &sunAndSky.horizon_blur, &dss.horizon_blur, GuiH::Flags::Normal, 0.f, 1.f);
+      changed |= GuiH::Color("Ground Color", "", &sunAndSky.ground_color.x, &dss.ground_color.x, GuiH::Flags::Normal);
+      changed |= GuiH::Slider("Haze", "", &sunAndSky.haze, &dss.haze, GuiH::Flags::Normal, 0.f, 15.f);
+      return changed;
+    });
 
-        GuiH::Group<bool>("Other", false, [&] {
-            changed |= GuiH::Drag("Multiplier", "", &sunAndSky.multiplier, &dss.multiplier,
-                                  GuiH::Flags::Normal, 0.f, std::numeric_limits<float>::max(), 2,
-                                  "%5.5f");
-            changed |= GuiH::Slider("Saturation", "", &sunAndSky.saturation, &dss.saturation,
-                                    GuiH::Flags::Normal, 0.f, 1.f);
-            changed |= GuiH::Slider("Red Blue Shift", "", &sunAndSky.redblueshift,
-                                    &dss.redblueshift, GuiH::Flags::Normal, -1.f, 1.f);
-            changed |= GuiH::Color("RGB Conversion", "", &sunAndSky.rgb_unit_conversion.x,
-                                   &dss.rgb_unit_conversion.x, GuiH::Flags::Normal);
+    GuiH::Group<bool>("Other", false, [&] {
+      changed |= GuiH::Drag("Multiplier", "", &sunAndSky.multiplier, &dss.multiplier, GuiH::Flags::Normal, 0.f,
+                            std::numeric_limits<float>::max(), 2, "%5.5f");
+      changed |= GuiH::Slider("Saturation", "", &sunAndSky.saturation, &dss.saturation, GuiH::Flags::Normal, 0.f, 1.f);
+      changed |= GuiH::Slider("Red Blue Shift", "", &sunAndSky.redblueshift, &dss.redblueshift, GuiH::Flags::Normal, -1.f, 1.f);
+      changed |= GuiH::Color("RGB Conversion", "", &sunAndSky.rgb_unit_conversion.x, &dss.rgb_unit_conversion.x, GuiH::Flags::Normal);
 
-            nvmath::vec3f eye, center, up;
-            CameraManip.getLookat(eye, center, up);
-            sunAndSky.y_is_up = up.y == 1;
-            changed |= GuiH::Checkbox("Y is Up", "", (bool *) &sunAndSky.y_is_up, nullptr,
-                                      GuiH::Flags::Disabled);
-            return changed;
-        });
-    }
+      nvmath::vec3f eye, center, up;
+      CameraManip.getLookat(eye, center, up);
+      sunAndSky.y_is_up = up.y == 1;
+      changed |= GuiH::Checkbox("Y is Up", "", (bool*)&sunAndSky.y_is_up, nullptr, GuiH::Flags::Disabled);
+      return changed;
+    });
+  }
 
-    return changed;
+  return changed;
 }
 
 bool Tracer::guiTonemapper()
 {
-    static GPUPushConstantPost default_tm{
-        1.0f,                // brightness;
-        1.0f,                // contrast;
-        1.0f,                // saturation;
-        0.0f,                // vignette;
-        1.0f,                // avgLum;
-        1.0f,                // zoom;
-        {1.0f, 1.0f},        // renderingRatio;
-        0,                   // autoExposure;
-        0.5f,                // Ywhite;  // Burning white
-        0.5f,                // key;     // Log-average luminance
-    };
+  static GpuPushConstantPost default_tm{
+      1.0f,          // brightness;
+      1.0f,          // contrast;
+      1.0f,          // saturation;
+      0.0f,          // vignette;
+      1.0f,          // avgLum;
+      1.0f,          // zoom;
+      {1.0f, 1.0f},  // renderingRatio;
+      0,             // autoExposure;
+      0.5f,          // Ywhite;  // Burning white
+      0.5f,          // key;     // Log-average luminance
+  };
 
-    auto          &tm = m_pipelinePost.m_pcPost;
-    bool           changed{false};
-    std::bitset<8> b(tm.autoExposure);
+  auto&          tm = m_pipelinePost.getPushconstant();
+  bool           changed{false};
+  std::bitset<8> b(tm.autoExposure);
 
-    bool autoExposure = b.test(0);
+  bool autoExposure = b.test(0);
 
-    changed |= GuiH::Checkbox("Auto Exposure", "Adjust exposure", (bool *) &autoExposure);
-    changed |= GuiH::Slider("Exposure", "Scene Exposure", &tm.avgLum, &default_tm.avgLum,
-                            GuiH::Flags::Normal, 0.001f, 5.00f);
-    changed |= GuiH::Slider("Brightness", "", &tm.brightness, &default_tm.brightness,
-                            GuiH::Flags::Normal, 0.0f, 2.0f);
-    changed |= GuiH::Slider("Contrast", "", &tm.contrast, &default_tm.contrast,
-                            GuiH::Flags::Normal, 0.0f, 2.0f);
-    changed |= GuiH::Slider("Saturation", "", &tm.saturation, &default_tm.saturation,
-                            GuiH::Flags::Normal, 0.0f, 5.0f);
-    changed |= GuiH::Slider("Vignette", "", &tm.vignette, &default_tm.vignette,
-                            GuiH::Flags::Normal, 0.0f, 2.0f);
+  bool in_use = (tm.useTonemapping != 0);
+  changed |= ImGui::Checkbox("Use Tonemapping", (bool*)&in_use);
+  tm.useTonemapping = in_use ? 1 : 0;
+  if(in_use)
+  {
+    changed |= GuiH::Checkbox("Auto Exposure", "Adjust exposure", (bool*)&autoExposure);
+    changed |= GuiH::Slider("Exposure", "Scene Exposure", &tm.avgLum, &default_tm.avgLum, GuiH::Flags::Normal, 0.001f, 5.00f);
+    changed |= GuiH::Slider("Brightness", "", &tm.brightness, &default_tm.brightness, GuiH::Flags::Normal, 0.0f, 2.0f);
+    changed |= GuiH::Slider("Contrast", "", &tm.contrast, &default_tm.contrast, GuiH::Flags::Normal, 0.0f, 2.0f);
+    changed |= GuiH::Slider("Saturation", "", &tm.saturation, &default_tm.saturation, GuiH::Flags::Normal, 0.0f, 5.0f);
+    changed |= GuiH::Slider("Vignette", "", &tm.vignette, &default_tm.vignette, GuiH::Flags::Normal, 0.0f, 2.0f);
 
-    if (autoExposure)
+    if(autoExposure)
     {
-        bool localExposure = b.test(1);
-        GuiH::Group<bool>("Auto Settings", true, [&] {
-            changed |= GuiH::Checkbox("Local", "", &localExposure);
-            changed |= GuiH::Slider("Burning White", "", &tm.Ywhite, &default_tm.Ywhite,
-                                    GuiH::Flags::Normal, 0.0f, 1.0f);
-            changed |= GuiH::Slider("Brightness", "", &tm.key, &default_tm.key,
-                                    GuiH::Flags::Normal, 0.0f, 1.0f);
-            b.set(1, localExposure);
-            return changed;
-        });
+      bool localExposure = b.test(1);
+      GuiH::Group<bool>("Auto Settings", true, [&] {
+        changed |= GuiH::Checkbox("Local", "", &localExposure);
+        changed |= GuiH::Slider("Burning White", "", &tm.Ywhite, &default_tm.Ywhite, GuiH::Flags::Normal, 0.0f, 1.0f);
+        changed |= GuiH::Slider("Brightness", "", &tm.key, &default_tm.key, GuiH::Flags::Normal, 0.0f, 1.0f);
+        b.set(1, localExposure);
+        return changed;
+      });
     }
     b.set(0, autoExposure);
     tm.autoExposure = b.to_ulong();
+  }
 
-    return false;        // no need to restart the renderer
+
+  return false;  // no need to restart the renderer
 }

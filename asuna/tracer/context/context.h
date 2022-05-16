@@ -12,49 +12,57 @@
 #include <nvvk/structs_vk.hpp>
 
 #include <iostream>
-
-#define ASUNA_DEFAULT_WINDOW_WIDTH 1
-#define ASUNA_DEFAULT_WINDOW_HEIGHT 1
+#include <string>
+#include <vector>
+#include <array>
+#include <map>
 
 struct ContextInitState
 {
-    bool m_offline = false;
+  bool offline{false};
 };
+
+using std::string;
+using std::vector;
+using std::array;
 
 class ContextAware : public nvvk::AppBaseVk
 {
-  public:
-    ContextInitState m_cis;
-    // Allocator for buffer, images, acceleration structures
-    nvvk::ResourceAllocatorDedicated m_alloc;
-    // Debugger to name objects
-    nvvk::DebugUtil m_debug;
-    // Vulkan context
-    nvvk::Context m_vkcontext{};
-    VkExtent2D    m_size = {ASUNA_DEFAULT_WINDOW_WIDTH, ASUNA_DEFAULT_WINDOW_HEIGHT};
-    // Filesystem searching root
-    std::vector<std::string> m_root{};
+public:
+  void init(ContextInitState cis);
+  void deinit();
+  void setViewport(const VkCommandBuffer& cmdBuf);
+  void resizeGlfwWindow();
+  void createOfflineResources();
+  bool shouldGlfwCloseWindow();
 
-  public:
-    void          init(ContextInitState cis);
-    void          deinit();
-    VkExtent2D    getSize();
-    VkFramebuffer getFramebuffer(int onlineCurFrame = 0);
-    VkRenderPass  getRenderPass();
-    void          setViewport(const VkCommandBuffer &cmdBuf);
-    void          resizeGlfwWindow();
-    void          createOfflineResources();
-    bool          shouldGlfwCloseWindow();
-    nvvk::Texture getOfflineFramebufferTexture();
+public:
+  void                              setSize(VkExtent2D& size) { m_size = size; }
+  VkExtent2D&                       getSize() { return m_size; }
+  nvvk::ResourceAllocatorDedicated& getAlloc() { return m_alloc; }
+  nvvk::DebugUtil&                  getDebug() { return m_debug; }
+  vector<string>&                   getRoot() { return m_root; }
+  bool                              getOfflineMode() { return m_cis.offline; }
+  nvvk::Texture                     getOfflineColor() { return m_offlineColor; }
+  nvvk::Texture                     getOfflineDepth() { return m_offlineDepth; }
+  VkFramebuffer                     getFramebuffer(int curFrame = 0);
+  VkRenderPass                      getRenderPass();
 
-  private:
-    void createGlfwWindow();
-    void initializeVulkan();
-    void createAppContext();
+private:
+  void createGlfwWindow();
+  void initializeVulkan();
+  void createAppContext();
 
-  private:
-    VkRenderPass  m_offlineRenderPass{VK_NULL_HANDLE};
-    VkFramebuffer m_offlineFramebuffer{VK_NULL_HANDLE};
-    nvvk::Texture m_offlineColor;
-    nvvk::Texture m_offlineDepth;
+private:
+  VkRenderPass  m_offlineRenderPass{VK_NULL_HANDLE};
+  VkFramebuffer m_offlineFramebuffer{VK_NULL_HANDLE};
+  nvvk::Texture m_offlineColor;
+  nvvk::Texture m_offlineDepth;
+
+private:
+  ContextInitState                 m_cis;
+  nvvk::ResourceAllocatorDedicated m_alloc;        // Allocator for buffer, images, acceleration structures
+  nvvk::DebugUtil                  m_debug;        // Debugger to name objects
+  nvvk::Context                    m_vkcontext{};  // Vulkan context
+  std::vector<std::string>         m_root{};       // Filesystem searching root
 };
