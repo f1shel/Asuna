@@ -23,11 +23,12 @@ int main(int argc, char** argv)
     exit(0);
   }
 
-  TracerInitState tis;
+  TracerInitSettings tis;
   if(parser.exist("--offline"))
     tis.offline = true;
   tis.outputname = parser.getString("--out", "asuna_out.hdr");
   tis.scenefile  = parser.getString("--scene", "scenes/dragon/scene.json");
+  tis.sceneSpp   = parser.getInt("--spp");
 
   Tracer asuna;
   asuna.init(tis);

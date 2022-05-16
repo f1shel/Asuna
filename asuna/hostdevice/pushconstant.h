@@ -30,6 +30,7 @@ struct GpuPushConstantPost
   float Ywhite;  // Burning white
   float key;     // Log-average luminance
   uint  useTonemapping;
+  float invFrame;
 };
 
 #endif

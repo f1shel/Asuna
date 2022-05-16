@@ -5,7 +5,7 @@
 #include "math.glsl"
 #include "structs.glsl"
 
-void SampleSphereLight(inout uint seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
+void SampleSphereLight(inout uvec4 seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
 {
   vec3  sphereCentertoSurface = scatterPos - light.position;
   float distToSphereCenter    = length(sphereCentertoSurface);
@@ -33,7 +33,7 @@ void SampleSphereLight(inout uint seed, in GpuLight light, in vec3 scatterPos, i
   lightSample.shouldMis = 1.0;
 }
 
-void SampleRectLight(inout uint seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
+void SampleRectLight(inout uvec4 seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
 {
   float r1 = rand(seed);
   float r2 = rand(seed);
@@ -49,7 +49,7 @@ void SampleRectLight(inout uint seed, in GpuLight light, in vec3 scatterPos, ino
   lightSample.shouldMis = 1.0;
 }
 
-void SampleDistantLight(inout uint seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
+void SampleDistantLight(inout uvec4 seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
 {
   lightSample.normal    = vec3(0.0);
   lightSample.direction = normalize(light.direction);
@@ -59,7 +59,7 @@ void SampleDistantLight(inout uint seed, in GpuLight light, in vec3 scatterPos, 
   lightSample.shouldMis = 0.0;
 }
 
-void SampleOneLight(inout uint seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
+void SampleOneLight(inout uvec4 seed, in GpuLight light, in vec3 scatterPos, inout LightSample lightSample)
 {
   int type = int(light.type);
   if(type == LightTypeRect)

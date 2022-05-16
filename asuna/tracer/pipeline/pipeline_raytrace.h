@@ -32,6 +32,7 @@ public:
   void                     setSpp(int spp = 1);
   void                     resetFrame();
   void                     incrementFrame();
+  int                      getFrame() { return m_pushconstant.curFrame; }
 
 private:
   void initRayTracing();               // Request ray tracing pipeline properties

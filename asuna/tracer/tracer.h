@@ -6,28 +6,29 @@
 #include "pipeline/pipeline_raytrace.h"
 #include "scene/scene.h"
 
-struct TracerInitState
+struct TracerInitSettings
 {
   bool   offline    = false;
   string scenefile  = "";
   string outputname = "";
+  int    sceneSpp   = 0;
 };
 
 class Tracer
 {
 public:
-  void init(TracerInitState tis);
+  void init(TracerInitSettings tis);
   void run();
   void deinit();
   void resetFrame();
 
 private:
-  TracerInitState  m_tis;
-  ContextAware     m_context;           // context
-  Scene            m_scene;             // scene
-  PipelineGraphics m_pipelineGraphics;  // pipelines
-  PipelineRaytrace m_pipelineRaytrace;
-  PipelinePost     m_pipelinePost;
+  TracerInitSettings m_tis;
+  ContextAware       m_context;           // context
+  Scene              m_scene;             // scene
+  PipelineGraphics   m_pipelineGraphics;  // pipelines
+  PipelineRaytrace   m_pipelineRaytrace;
+  PipelinePost       m_pipelinePost;
 
 private:
   void runOnline();

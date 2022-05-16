@@ -21,6 +21,7 @@ public:
   virtual void         run(const VkCommandBuffer& cmdBuf);
   virtual void         deinit();
   GpuPushConstantPost& getPushconstant() { return m_pushconstant; }
+  void                 setFrame(int curFrame) { m_pushconstant.invFrame = double(1.0) / double(curFrame); }
 
 private:
   GpuPushConstantPost m_pushconstant = {
@@ -34,6 +35,7 @@ private:
       0,             // autoExposure;
       0.5f,          // Ywhite;  // Burning white
       0.5f,          // key;     // Log-average luminance
+      true,          // use tone mapping
   };
 
 private:

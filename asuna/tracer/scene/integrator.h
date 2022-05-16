@@ -16,6 +16,7 @@ public:
   }
   VkExtent2D getSize() { return m_size; }
   uint       getSpp() { return m_spp; }
+  void       setSpp(int spp) { m_spp = spp; }
   uint       getMaxPathDepth() { return m_maxPathDepth; }
 
 private:

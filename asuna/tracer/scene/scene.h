@@ -47,6 +47,7 @@ public:
   int                                   getMaterialsNum();
   int                                   getLightsNum();
   int                                   getSpp();
+  void                                  setSpp(int spp);
   int                                   getMaxPathDepth();
   Camera&                               getCamera();
   CameraType                            getCameraType();

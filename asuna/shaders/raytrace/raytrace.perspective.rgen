@@ -22,7 +22,10 @@ layout(location = 0) rayPayloadEXT RayPayload payload;
 
 void main()
 {
+  // payload.seed = xxhash32(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
+  initRNG(vec2(gl_LaunchIDEXT.xy), pc.curFrame + 1, payload.seed);
 
+//  debugPrintfEXT("random: %f\n", rand(payload.seed));
 
   vec4 fxfycxcy = cameraInfo.fxfycxcy;
   vec4 origin   = cameraInfo.viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
@@ -33,7 +36,6 @@ void main()
     pixelCenter.y = gl_LaunchSizeEXT.y - 1 - gl_LaunchIDEXT.y;
 
   // Initialize the seed for the random number
-  payload.seed  = xxhash32(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
   vec3 radiance = vec3(0);
 
   for(uint i = 0; i < pc.spp; ++i)
@@ -64,10 +66,8 @@ void main()
     payload.hitDis     = INFINITY;
     payload.stop       = 0;
 
-    for(uint j = 0; j < pc.maxPathDepth; ++j)
+    for(payload.depth=0;; ++payload.depth)
     {
-      payload.depth = j;
-
       traceRayEXT(tlas,                   // acceleration structure
                   rayFlags,               // rayFlags
                   0xFF,                   // cullMask

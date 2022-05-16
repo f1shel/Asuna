@@ -321,6 +321,11 @@ int Scene::getSpp()
   return m_integrator.getSpp();
 }
 
+void Scene::setSpp(int spp)
+{
+  m_integrator.setSpp(spp);
+}
+
 int Scene::getMaxPathDepth()
 {
   return m_integrator.getMaxPathDepth();

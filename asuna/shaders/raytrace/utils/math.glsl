@@ -10,6 +10,32 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+void initRNG(vec2 p, int frame, inout uvec4 seed)
+{
+  seed = uvec4(p, uint(frame), uint(p.x) + uint(p.y));
+}
+
+void pcg4d(inout uvec4 v)
+{
+  v = v * 1664525u + 1013904223u;
+  v.x += v.y * v.w;
+  v.y += v.z * v.x;
+  v.z += v.x * v.y;
+  v.w += v.y * v.z;
+  v = v ^ (v >> 16u);
+  v.x += v.y * v.w;
+  v.y += v.z * v.x;
+  v.z += v.x * v.y;
+  v.w += v.y * v.z;
+}
+
+float rand(inout uvec4 seed)
+{
+  pcg4d(seed);
+  return float(seed.x) / float(0xffffffffu);
+}
+
+
 /*
  * Generate a random seed for the random generator.
  *
@@ -50,11 +76,11 @@ uint pcg(inout uint state)
 /*
  * Generate a random float in [0, 1) given the previous RNG state
  */
-float rand(inout uint seed)
-{
-  uint r = pcg(seed);
-  return r * (1.0 / float(0xffffffffu));
-}
+// float rand(inout uint seed)
+// {
+//   uint r = pcg(seed);
+//   return r * (1.0 / float(0xffffffffu));
+// }
 
 /*
  * Uniformly sample vector on the unit sphere surface
@@ -68,7 +94,7 @@ float rand(inout uint seed)
  *      xyz: sampled vector
  *      w: sampled pdf
  */
-vec3 uniformSampleSphere(inout uint seed, inout float pdf)
+vec3 uniformSampleSphere(inout uvec4 seed, inout float pdf)
 {
   float r1 = rand(seed);
   float r2 = rand(seed);
@@ -97,7 +123,7 @@ vec3 uniformSampleSphere(inout uint seed, inout float pdf)
  *      xyz: sampled vector
  *      w: sampled pdf
  */
-vec4 uniformSampleHemisphere(inout uint seed)
+vec4 uniformSampleHemisphere(inout uvec4 seed)
 {
   float r1 = rand(seed);
   float r2 = rand(seed);
@@ -120,7 +146,7 @@ vec4 uniformSampleHemisphere(inout uint seed)
  *      xyz: sampled vector
  *      w: sampled pdf
  */
-vec3 cosineSampleHemisphere(inout uint seed, inout float pdf)
+vec3 cosineSampleHemisphere(inout uvec4 seed, inout float pdf)
 {
   float r1 = rand(seed);
   float r2 = rand(seed);

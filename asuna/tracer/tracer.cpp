@@ -19,7 +19,7 @@
 using GuiH = ImGuiH::Control;
 using std::filesystem::path;
 
-void Tracer::init(TracerInitState tis)
+void Tracer::init(TracerInitSettings tis)
 {
   m_tis = tis;
 
@@ -29,6 +29,8 @@ void Tracer::init(TracerInitState tis)
 
   Loader loader(&m_scene);
   loader.loadSceneFromJson(m_tis.scenefile, m_context.getRoot());
+  if(tis.sceneSpp != 0)
+    m_scene.setSpp(tis.sceneSpp);
 
   m_context.setSize(m_scene.getSize());
   if(!m_context.getOfflineMode())
@@ -70,6 +72,7 @@ void Tracer::runOnline()
   std::array<VkClearValue, 2> clearValues{};
   clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
   clearValues[1].depthStencil = {1.0f, 0};
+  m_pipelineRaytrace.setSpp(1);
   // Main loop
   while(!m_context.shouldGlfwCloseWindow())
   {
@@ -110,6 +113,7 @@ void Tracer::runOnline()
         // tonemapper
         vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        m_pipelinePost.setFrame(m_pipelineRaytrace.getFrame());
         m_pipelinePost.run(cmdBuf);
 
         // Rendering UI
@@ -130,8 +134,6 @@ void Tracer::runOnline()
 
 void Tracer::runOffline()
 {
-  return;
-
   std::array<VkClearValue, 2> clearValues{};
   clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
   clearValues[1].depthStencil = {1.0f, 0};
@@ -153,7 +155,7 @@ void Tracer::runOffline()
     {
       m_pipelineRaytrace.run(cmdBuf);
     }
-    if(spp == tot)
+    if(spp == tot - 1)
     {
       VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
       postRenderPassBeginInfo.clearValueCount = 2;
@@ -211,7 +213,7 @@ void Tracer::saveImageTest()
   nvvk::Buffer       pixelBuffer = m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
   saveImage(pixelBuffer, m_tis.outputname);
-  // saveImage(pixelBuffer, "channel0.hdr", 0);
+  //saveImage(pixelBuffer, "channel0.hdr", 0);
   // saveImage(pixelBuffer, "channel1.hdr", 1);
   // saveImage(pixelBuffer, "channel2.hdr", 2);
   // saveImage(pixelBuffer, "channel3.hdr", 3);
@@ -235,8 +237,8 @@ void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int cha
     imageToBuffer(m_pipelineGraphics.getColorTexture(channelId), pixelBuffer.buffer);
 
   // Write the buffer to disk
-  void* data = m_alloc.map(pixelBuffer);
-  stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4, reinterpret_cast<float*>(data));
+  void* data   = m_alloc.map(pixelBuffer);
+  int   result = stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4, reinterpret_cast<float*>(data));
   m_alloc.unmap(pixelBuffer);
 }
 
