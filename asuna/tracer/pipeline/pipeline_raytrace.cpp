@@ -173,7 +173,7 @@ void PipelineRaytrace::createRtPipeline()
   auto root    = m_pContext->getRoot();
   auto stage   = nvvk::make<VkPipelineShaderStageCreateInfo>();
   stage.pName  = "main";  // All the same entry point
-  stage.module = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.perspective.rgen.spv", true, root));
+  stage.module = nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.projective.rgen.spv", true, root));
   stage.stage  = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
   stages[RayGen] = stage;
   NAME2_VK(stage.module, "RayGen");

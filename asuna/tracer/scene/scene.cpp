@@ -77,7 +77,7 @@ void Scene::submit()
     computeSceneDimensions();
     fitCamera();
   }
-  m_camera.setToWorld(m_shots[0]);
+  m_pCamera->setToWorld(m_shots[0]);
 
   m_hasScene = true;
 }
@@ -97,22 +97,22 @@ void Scene::reset()
   m_pTextures[tn]              = std::make_pair(pTexture, m_pTextures.size());
   m_pMaterials[mn]             = std::make_pair(pMaterial, m_pMaterials.size());
   m_sunAndSky                  = {
-                       {1, 1, 1},            // rgb_unit_conversion;
-                       0.0000101320f,        // multiplier;
-                       0.0f,                 // haze;
-                       0.0f,                 // redblueshift;
-                       1.0f,                 // saturation;
-                       0.0f,                 // horizon_height;
-                       {0.4f, 0.4f, 0.4f},   // ground_color;
-                       0.1f,                 // horizon_blur;
-                       {0.0, 0.0, 0.01f},    // night_color;
-                       0.8f,                 // sun_disk_intensity;
-                       {0.00, 0.78, 0.62f},  // sun_direction;
-                       5.0f,                 // sun_disk_scale;
-                       1.0f,                 // sun_glow_intensity;
-                       1,                    // y_is_up;
-                       1,                    // physically_scaled_sun;
-                       0,                    // in_use;
+      {1, 1, 1},            // rgb_unit_conversion;
+      0.0000101320f,        // multiplier;
+      0.0f,                 // haze;
+      0.0f,                 // redblueshift;
+      1.0f,                 // saturation;
+      0.0f,                 // horizon_height;
+      {0.4f, 0.4f, 0.4f},   // ground_color;
+      0.1f,                 // horizon_blur;
+      {0.0, 0.0, 0.01f},    // night_color;
+      0.8f,                 // sun_disk_intensity;
+      {0.00, 0.78, 0.62f},  // sun_direction;
+      5.0f,                 // sun_disk_scale;
+      1.0f,                 // sun_glow_intensity;
+      1,                    // y_is_up;
+      1,                    // physically_scaled_sun;
+      0,                    // in_use;
   };
 }
 
@@ -152,7 +152,8 @@ void Scene::freeAllocData()
 void Scene::freeRawData()
 {
   m_integrator = {};
-  m_camera     = {};
+  delete m_pCamera;
+  m_pCamera = nullptr;
   m_lights.clear();
   m_shots.clear();
   m_instances.clear();
@@ -182,14 +183,23 @@ void Scene::freeRawData()
   m_pMaterials.clear();
 }
 
-void Scene::addIntegrator(VkExtent2D size, int spp, int maxRecur)
+void Scene::addIntegrator(int spp, int maxRecur)
 {
-  m_integrator = Integrator(size, spp, maxRecur);
+  m_integrator = Integrator(spp, maxRecur);
 }
 
-void Scene::addCamera(CameraType camType, nvmath::vec4f fxfycxcy, float fov)
+void Scene::addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture)
 {
-  m_camera = Camera(camType, fxfycxcy, fov);
+  if(m_pCamera)
+    delete m_pCamera;
+  m_pCamera = new CameraPerspective(filmResolution, fov, focalDist, aperture);
+}
+
+void Scene::addCamera(VkExtent2D filmResolution, vec4 fxfycxcy)
+{
+  if(m_pCamera)
+    delete m_pCamera;
+  m_pCamera = new CameraOpencv(filmResolution, fxfycxcy);
 }
 
 void Scene::addLight(const GpuLight& light)
@@ -333,12 +343,12 @@ int Scene::getMaxPathDepth()
 
 Camera& Scene::getCamera()
 {
-  return m_camera;
+  return *m_pCamera;
 }
 
 CameraType Scene::getCameraType()
 {
-  return m_camera.getType();
+  return m_pCamera->getType();
 }
 
 nvvk::RaytracingBuilderKHR::BlasInput Scene::getBlas(VkDevice device, int meshId)
@@ -353,7 +363,7 @@ vector<Instance>& Scene::getInstances()
 
 VkExtent2D Scene::getSize()
 {
-  return m_integrator.getSize();
+  return m_pCamera->getFilmSize();
 }
 
 VkBuffer Scene::getInstancesDescriptor()
@@ -461,7 +471,7 @@ void Scene::computeSceneDimensions()
 
 void Scene::fitCamera()
 {
-  auto m_size = m_integrator.getSize();
+  auto m_size = getSize();
   CameraManip.fit(m_dimensions.min, m_dimensions.max, true, false, m_size.width / static_cast<float>(m_size.height));
   auto cam = CameraManip.getCamera();
   m_shots.emplace_back(CameraShot{cam.ctr, cam.eye, cam.up, nvmath::mat4f_zero});

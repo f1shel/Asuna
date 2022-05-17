@@ -18,21 +18,21 @@ layout(location = 1) rayPayloadEXT bool isShadowed;
 
 void main()
 {
-  GpuInstance     inst      = instances.i[gl_InstanceID];
-  Indices         indices   = Indices(inst.indexAddress);
-  Vertices        vertices  = Vertices(inst.vertexAddress);
-  const ivec3     id        = indices.i[gl_PrimitiveID];
-  const GpuVertex v0        = vertices.v[id.x];
-  const GpuVertex v1        = vertices.v[id.y];
-  const GpuVertex v2        = vertices.v[id.z];
-  const vec3      bary      = vec3(1.0 - bary.x - bary.y, bary.x, bary.y);
-  const vec2      uv        = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
-  const vec3      pos       = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
-  const vec3      normal    = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
-  const vec3      hitPos    = gl_ObjectToWorldEXT * vec4(pos, 1.0);
-  const vec3      geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
-  vec3            ffnormal  = dot(geoNormal, gl_WorldRayDirectionEXT) <= 0.0 ? geoNormal : -geoNormal;
-  payload.hitPos            = hitPos;
+  GpuInstance inst      = instances.i[gl_InstanceID];
+  Indices     indices   = Indices(inst.indexAddress);
+  Vertices    vertices  = Vertices(inst.vertexAddress);
+  ivec3       id        = indices.i[gl_PrimitiveID];
+  GpuVertex   v0        = vertices.v[id.x];
+  GpuVertex   v1        = vertices.v[id.y];
+  GpuVertex   v2        = vertices.v[id.z];
+  vec3        bary      = vec3(1.0 - bary.x - bary.y, bary.x, bary.y);
+  vec2        uv        = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
+  vec3        pos       = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
+  vec3        normal    = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
+  vec3        hitPos    = gl_ObjectToWorldEXT * vec4(pos, 1.0);
+  vec3        geoNormal = normalize((normal * gl_WorldToObjectEXT).xyz);
+  vec3        ffnormal  = dot(geoNormal, gl_WorldRayDirectionEXT) <= 0.0 ? geoNormal : -geoNormal;
+  payload.hitPos        = hitPos;
 
   vec3 tangent, bitangent;
   basis(ffnormal, tangent, bitangent);
@@ -88,7 +88,7 @@ void main()
     // randomly select one of the lights
     int      lightIndex = int(min(rand(payload.seed) * pc.numLights, pc.numLights - 1));
     GpuLight light      = lights.l[lightIndex];
-    SampleOneLight(payload.seed, light, payload.hitPos, lightSample);
+    sampleOneLight(payload.seed, light, payload.hitPos, lightSample);
     lightSample.emittance *= pc.numLights;  // selection pdf
   }
 
@@ -119,7 +119,8 @@ void main()
 
   // Sample next ray
   BsdfSample bsdfSample;
-  bsdfSample.direction = normalize(local2global * cosineSampleHemisphere(payload.seed, bsdfSample.pdf));
+  bsdfSample.direction = normalize(local2global * cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed))));
+  bsdfSample.pdf       = cosineHemispherePdf(dot(bsdfSample.direction, ffnormal));
   vec3 bsdfSampleVal   = material.diffuse * INV_PI;
   // Set absorption only if the ray is currently inside the object.
   if(dot(ffnormal, bsdfSample.direction) < 0.0)

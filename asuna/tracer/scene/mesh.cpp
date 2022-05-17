@@ -46,62 +46,65 @@ Mesh::Mesh(const std::string& meshPath, bool recomputeNormal)
     LOGE("[x] %-20s: load mesh from %s ----> %s\n", "Scene Error", meshPath.c_str(), reader.Error().c_str());
     exit(1);
   }
-  if(reader.GetShapes().size() != 1)
+  //if(reader.GetShapes().size() != 1)
+  //{
+  //  LOGE(
+  //      "[x] %-20s: load mesh from %s ----> asuna tracer supports only one shape "
+  //      "per mesh\n",
+  //      "Scene Error", meshPath.c_str());
+  //  exit(1);
+  //}
+  m_vertices.clear();
+  m_indices.clear();
+  const auto& shapes = reader.GetShapes();
+  const auto& attrib = reader.GetAttrib();
+  for(const auto& shape : shapes)
   {
-    LOGE(
-        "[x] %-20s: load mesh from %s ----> asuna tracer supports only one shape "
-        "per mesh\n",
-        "Scene Error", meshPath.c_str());
-    exit(1);
-  }
-  const tinyobj::attrib_t& attrib = reader.GetAttrib();
-  const auto&              shape  = reader.GetShapes()[0];
-
-  m_vertices.reserve(shape.mesh.indices.size());
-  m_indices.reserve(shape.mesh.indices.size());
-
-  for(const auto& index : shape.mesh.indices)
-  {
-    GpuVertex    vertex = {};
-    const float* vp     = &attrib.vertices[3 * index.vertex_index];
-    vertex.pos          = {*(vp + 0), *(vp + 1), *(vp + 2)};
-
-    if(!attrib.normals.empty() && index.normal_index >= 0)
+    m_vertices.reserve(m_vertices.size() + shape.mesh.indices.size());
+    m_indices.reserve(m_indices.size() + shape.mesh.indices.size());
+    for(const auto& index : shape.mesh.indices)
     {
-      const float* np = &attrib.normals[3 * index.normal_index];
-      vertex.normal   = {*(np + 0), *(np + 1), *(np + 2)};
+      GpuVertex    vertex = {};
+      const float* vp     = &attrib.vertices[3 * index.vertex_index];
+      vertex.pos          = {*(vp + 0), *(vp + 1), *(vp + 2)};
+
+      if(!attrib.normals.empty() && index.normal_index >= 0)
+      {
+        const float* np = &attrib.normals[3 * index.normal_index];
+        vertex.normal   = {*(np + 0), *(np + 1), *(np + 2)};
+      }
+
+      if(!attrib.texcoords.empty() && index.texcoord_index >= 0)
+      {
+        const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
+        vertex.uv       = {*tp, 1.0f - *(tp + 1)};
+      }
+
+      m_vertices.push_back(vertex);
+      m_indices.push_back(static_cast<int>(m_indices.size()));
+
+      m_posMin.x = std::min(m_posMin.x, vertex.pos.x);
+      m_posMin.y = std::min(m_posMin.y, vertex.pos.y);
+      m_posMin.z = std::min(m_posMin.z, vertex.pos.z);
+      m_posMax.x = std::max(m_posMax.x, vertex.pos.x);
+      m_posMax.y = std::max(m_posMax.y, vertex.pos.y);
+      m_posMax.z = std::max(m_posMax.z, vertex.pos.z);
     }
 
-    if(!attrib.texcoords.empty() && index.texcoord_index >= 0)
+    // Compute normal when no normal were provided or recomputing is required.
+    if(attrib.normals.empty() || recomputeNormal)
     {
-      const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
-      vertex.uv       = {*tp, 1.0f - *(tp + 1)};
-    }
+      for(size_t i = 0; i < m_indices.size(); i += 3)
+      {
+        GpuVertex& v0 = m_vertices[m_indices[i + 0]];
+        GpuVertex& v1 = m_vertices[m_indices[i + 1]];
+        GpuVertex& v2 = m_vertices[m_indices[i + 2]];
 
-    m_vertices.push_back(vertex);
-    m_indices.push_back(static_cast<int>(m_indices.size()));
-
-    m_posMin.x = std::min(m_posMin.x, vertex.pos.x);
-    m_posMin.y = std::min(m_posMin.y, vertex.pos.y);
-    m_posMin.z = std::min(m_posMin.z, vertex.pos.z);
-    m_posMax.x = std::max(m_posMax.x, vertex.pos.x);
-    m_posMax.y = std::max(m_posMax.y, vertex.pos.y);
-    m_posMax.z = std::max(m_posMax.z, vertex.pos.z);
-  }
-
-  // Compute normal when no normal were provided or recomputing is required.
-  if(attrib.normals.empty() || recomputeNormal)
-  {
-    for(size_t i = 0; i < m_indices.size(); i += 3)
-    {
-      GpuVertex& v0 = m_vertices[m_indices[i + 0]];
-      GpuVertex& v1 = m_vertices[m_indices[i + 1]];
-      GpuVertex& v2 = m_vertices[m_indices[i + 2]];
-
-      nvmath::vec3f n = nvmath::normalize(nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
-      v0.normal       = n;
-      v1.normal       = n;
-      v2.normal       = n;
+        nvmath::vec3f n = nvmath::normalize(nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
+        v0.normal       = n;
+        v1.normal       = n;
+        v2.normal       = n;
+      }
     }
   }
 }

@@ -26,6 +26,6 @@ private:
   void addShot(const nlohmann::json& shotJson);
 
 private:
-  Scene*      m_pScene       = nullptr;
-  std::string m_sceneFileDir = "";
+  Scene* m_pScene       = nullptr;
+  string m_sceneFileDir = "";
 };

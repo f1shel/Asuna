@@ -27,8 +27,9 @@ public:
   void freeRawData();
 
 public:
-  void addIntegrator(VkExtent2D size, int spp, int maxRecur);
-  void addCamera(CameraType camType, nvmath::vec4f fxfycxcy, float fov);
+  void addIntegrator(int spp, int maxRecur);
+  void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
+  void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
   void addTexture(const std::string& textureName, const std::string& texturePath, float gamma);
   void addMaterial(const std::string& materialName, const GpuMaterial& material);
@@ -71,7 +72,7 @@ private:
   bool          m_hasScene     = false;
   // ---------------- CPU resources ----------------
   Integrator         m_integrator = {};
-  Camera             m_camera     = {};
+  Camera*            m_pCamera    = nullptr;
   vector<GpuLight>   m_lights     = {};
   TextureTable       m_pTextures  = {};
   MeshTable          m_pMeshes    = {};

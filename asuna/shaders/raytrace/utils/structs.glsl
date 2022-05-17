@@ -25,7 +25,7 @@ struct LightSample
 
 struct RayPayload
 {
-  uvec4      seed;
+  uint       seed;
   uint       depth;
   uint       stop;
   Ray        ray;

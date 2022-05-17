@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../../hostdevice/camera.h"
+#include <nvh/cameramanipulator.hpp>
+#include <vulkan/vulkan_core.h>
 
 typedef struct
 {
@@ -14,18 +16,54 @@ class Camera
 {
 public:
   Camera() {}
-  Camera(CameraType camType, vec4 fxfycxcy, float fov);
-  const vec4& getFxFyCxCy() { return m_fxfycxcy; }
-  CameraType  getType() { return m_type; }
-  void        setFov(float fov);
-  void        setToWorld(const vec3& lookat, const vec3& eye, const vec3& up = {0.0f, 1.0f, 0.0f});
-  void        setToWorld(CameraShot shot);
-  const mat4& getView();
-  mat4        getProj(float aspectRatio, float nearz = 0.1, float farz = 100);
-  void        adaptGuiSize(int w, int h);
+  Camera(CameraType camType, VkExtent2D filmSize)
+  {
+    m_type = camType;
+    m_size = filmSize;
+    adaptFilm();
+  }
+  CameraType        getType() { return m_type; }
+  mat4              getView() { return CameraManip.getMatrix(); }
+  VkExtent2D        getFilmSize() { return m_size; }
+  virtual GpuCamera toGpuStruct() = 0;
+  void              setToWorld(const vec3& lookat, const vec3& eye, const vec3& up = {0.0f, 1.0f, 0.0f});
+  void              setToWorld(CameraShot shot);
+  void              adaptFilm();  // adapt gui to film size
 
 private:
-  vec4       m_fxfycxcy{0.0f};  // fx fy cx cy
-  mat4       m_ext{0.0f};
   CameraType m_type{CameraTypeUndefined};
+  mat4       m_view{0.0f};  // world to camera space transformation
+  VkExtent2D m_size{0, 0};
+};
+
+class CameraOpencv : public Camera
+{
+public:
+  CameraOpencv(VkExtent2D filmSize, vec4 fxfycxcy)
+      : Camera(CameraTypeOpencv, filmSize)
+  {
+    m_fxfycxcy = fxfycxcy;
+  }
+  virtual GpuCamera toGpuStruct();
+
+private:
+  vec4 m_fxfycxcy{0.0f};  // fx fy cx cy
+};
+
+class CameraPerspective : public Camera
+{
+public:
+  CameraPerspective(VkExtent2D filmSize, float fov, float focalDist = 0.1f, float aperture = 0.0f)
+      : Camera(CameraTypePerspective, filmSize)
+      , m_focalDistance(focalDist)
+      , m_aperture(aperture)
+  {
+    CameraManip.setFov(fov);
+  }
+  virtual GpuCamera toGpuStruct();
+  float             getFov() { return CameraManip.getFov(); }
+
+private:
+  float m_focalDistance{0.1f};
+  float m_aperture{0.0f};
 };

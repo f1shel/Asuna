@@ -62,11 +62,8 @@ void PipelineGraphics::updateCameraBuffer(const VkCommandBuffer& cmdBuf)
   GpuCamera   hostCamera  = {};
   // proj[1][1] *= -1;  // Inverting Y for Vulkan (not needed with perspectiveVK).
 
-  auto& cam              = m_pScene->getCamera();
-  hostCamera.viewInverse = nvmath::invert(cam.getView());
-  hostCamera.projInverse = nvmath::invert(cam.getProj(aspectRatio));
-  hostCamera.fxfycxcy    = cam.getFxFyCxCy();
-  hostCamera.type        = cam.getType();
+  auto& cam  = m_pScene->getCamera();
+  hostCamera = cam.toGpuStruct();
 
   // UBO on the device, and what stages access it.
   VkBuffer deviceUBO      = m_bCamera.buffer;

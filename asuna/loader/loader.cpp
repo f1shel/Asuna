@@ -20,18 +20,20 @@ using std::filesystem::path;
 
 static json defaultSceneOptions = json::parse(R"(
 {
-	"integrator": {
-		"spp": 1,
-		"max_path_depth": 2
-	},
-	"camera": {
-		"fov": 45.0
-	},
-	"textures": {
-		"gamma": 1.0
-	},
-	"materials": {
-	}
+  "integrator": {
+    "spp": 1,
+    "max_path_depth": 2
+  },
+  "camera": {
+    "fov": 45.0,
+    "aperture": 0.0,
+    "focal_distance": 0.1
+  },
+  "textures": {
+    "gamma": 1.0
+  },
+  "materials": {
+  }
 }
 )");
 
@@ -125,13 +127,6 @@ void Loader::submit()
 
 void Loader::addIntegrator(const nlohmann::json& integratorJson)
 {
-  JsonCheckKeys(integratorJson, {"width", "height"});
-  VkExtent2D size = {integratorJson["width"], integratorJson["height"]};
-  if(!(size.width >= 1 && size.height >= 1))
-  {
-    // TODO
-    exit(1);
-  }
   int spp      = defaultSceneOptions["integrator"]["spp"];
   int maxDepth = defaultSceneOptions["integrator"]["max_path_depth"];
   if(integratorJson.contains("spp"))
@@ -139,34 +134,41 @@ void Loader::addIntegrator(const nlohmann::json& integratorJson)
   if(integratorJson.contains("max_path_depth"))
     maxDepth = integratorJson["max_path_depth"];
 
-  m_pScene->addIntegrator(size, spp, maxDepth);
+  m_pScene->addIntegrator(spp, maxDepth);
 }
 
 void Loader::addCamera(const nlohmann::json& cameraJson)
 {
-  JsonCheckKeys(cameraJson, {"type"});
-  nvmath::vec4f fxfycxcy = 0.0f;
-  float         fov      = defaultSceneOptions["camera"]["fov"];
-  CameraType    camType  = CameraTypeUndefined;
+  JsonCheckKeys(cameraJson, {"type", "film"});
+  auto& filmJson = cameraJson["film"];
+  JsonCheckKeys(filmJson, {"resolution"});
+  vec2          resolution     = Json2Vec2(filmJson["resolution"]);
+  VkExtent2D    filmResolution = {uint(resolution.x), uint(resolution.y)};
+  nvmath::vec4f fxfycxcy       = 0.0f;
+  float         fov            = defaultSceneOptions["camera"]["fov"];
+  float         aperture       = defaultSceneOptions["camera"]["aperture"];
+  float         focalDistance  = defaultSceneOptions["camera"]["focal_distance"];
   if(cameraJson["type"] == "perspective")
   {
     if(cameraJson.contains("fov"))
       fov = cameraJson["fov"];
-    camType = CameraTypePerspective;
+    if(cameraJson.contains("aperture"))
+      aperture = cameraJson["aperture"];
+    if(cameraJson.contains("focal_distance"))
+      focalDistance = cameraJson["focal_distance"];
+    m_pScene->addCamera(filmResolution, fov, focalDistance, aperture);
   }
   else if(cameraJson["type"] == "opencv")
   {
     JsonCheckKeys(cameraJson, {"fx", "fy", "cx", "cy"});
     fxfycxcy = {cameraJson["fx"], cameraJson["fy"], cameraJson["cx"], cameraJson["cy"]};
-    camType  = CameraTypeOpencv;
+    m_pScene->addCamera(filmResolution, fxfycxcy);
   }
   else
   {
     // TODO
     exit(1);
   }
-
-  m_pScene->addCamera(camType, fxfycxcy, fov);
 }
 
 void Loader::addLight(const nlohmann::json& lightJson)
@@ -349,10 +351,9 @@ void Loader::addShot(const nlohmann::json& shotJson)
   else if(shotJson["type"] == "opencv")
   {
     JsonCheckKeys(shotJson, {"matrix", "up"});
-    vec3 eye, lookat;
     mat4 ext = Json2Mat4(shotJson["matrix"]);
-    ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 = -ext.a03;
-    ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22, ext.a23 = -ext.a23;
+    //ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 = -ext.a03;
+    //ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22, ext.a23 = -ext.a23;
     m_pScene->addShot(ext);
   }
 }
