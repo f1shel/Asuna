@@ -23,7 +23,7 @@ public:
     adaptFilm();
   }
   CameraType        getType() { return m_type; }
-  mat4              getView() { return CameraManip.getMatrix(); }
+  mat4              getView() { return nvmath::scale_mat4(vec3(1.f,1.f,-1.f)) * CameraManip.getMatrix(); }
   VkExtent2D        getFilmSize() { return m_size; }
   virtual GpuCamera toGpuStruct() = 0;
   void              setToWorld(const vec3& lookat, const vec3& eye, const vec3& up = {0.0f, 1.0f, 0.0f});

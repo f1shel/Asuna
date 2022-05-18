@@ -48,7 +48,7 @@ void main()
       // Compute raster and camera sample positions
       vec3 pFilm = vec3(pixel, 0.f);
       vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
-      pCamera.z = -pCamera.z;
+//      pCamera.z = -pCamera.z;
       rayDir = transformDirection(cameraInfo.cameraToWorld, pCamera);
 //      debugPrintfEXT("nearP(%v3f)\n", nearP);
       // Sampled position on the focal plane

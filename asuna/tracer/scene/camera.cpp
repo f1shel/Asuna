@@ -61,8 +61,8 @@ mat4 cameraToRasterTransform(VkExtent2D filmSize, float fov, float near, float f
 void Camera::setToWorld(const vec3& lookat, const vec3& eye, const vec3& up)
 {
   CameraManip.setLookat(eye, lookat, up);
-  m_view = CameraManip.getMatrix();
-  std::cout << "test cameraToWorld: " << (nvmath::invert_rot_trans(m_view) * vec4(0.f, 0.f, 1.f, 0.f)).z << std::endl;
+  //m_view = CameraManip.getMatrix();
+  //std::cout << "test cameraToWorld: " << (nvmath::invert_rot_trans(m_view) * vec4(0.f, 0.f, 1.f, 0.f)).z << std::endl;
 }
 
 void Camera::setToWorld(CameraShot shot)
