@@ -14,6 +14,24 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+vec3 transformPoint(in mat4 transform, in vec3 point) {
+  vec4 homoPoint = vec4(point, 1.f);
+  vec4 tHomoPoint = transform * homoPoint;
+  return tHomoPoint.xyz / tHomoPoint.w;
+}
+
+vec3 transformVector(in mat4 transform, in vec3 vector) {
+  vec4 homoVector = vec4(vector, 0.f);
+  vec4 tHomoVector = transform * homoVector;
+  return tHomoVector.xyz;
+}
+
+vec3 transformDirection(in mat4 transform, in vec3 direction)
+{
+  vec3 tDir = transformVector(transform, direction);
+  return normalize(tDir);
+}
+
 /*
  * Generate a random seed for the random generator.
  *

@@ -14,6 +14,7 @@ END_ENUM();
 // Uniform buffer set at each frame
 struct GpuCamera
 {
+  mat4  projInv;
   mat4  rasterToCamera;
   mat4  cameraToWorld;
   vec4  fxfycxcy;       // [focal_xy, center_xy], for opencv model

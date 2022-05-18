@@ -1,4 +1,6 @@
 #include "camera.h"
+#include <nvmath/nvmath.h>
+#include <iostream>
 
 /**
  * Illustration of coordinate systems:
@@ -34,25 +36,25 @@ mat4 perspectiveTransform(float fov, float nearz, float farz)
   persp.a00  = ctot;
   persp.a11  = ctot;
   persp.a22  = farz * recip;
+  persp.a23  = -nearz * farz * recip;
   persp.a32  = 1;
-  persp.a33  = -nearz * farz * recip;
   return persp;
 }
 
 mat4 cameraToRasterTransform(VkExtent2D filmSize, float fov, float near, float far)
 {
-  float aspect    = filmSize.width / float(filmSize.height);
+  float aspect = filmSize.width / float(filmSize.height);
   float invAspect = 1.f / aspect;
-  // This gives a transformation from camera space to "screen" space.
+  // This gives a transformation from camera space to screen space.
   // In x this space ranges from -1 to 1 but y ranges from -invAspect
   // to invAspect, since aspect ratio is not taken into account.
   mat4 cameraToScreen = perspectiveTransform(fov, near, far);
-  // x and y ranges from (-1,-1) to (1,1)
-  cameraToScreen = nvmath::scale_mat4(vec3(1.f, aspect, 1.f)) * cameraToScreen;
-  // x and y ranges from (0,0) to (1,1)
-  mat4 cameraToNdc = nvmath::scale_mat4(vec3(-0.5f, -0.5f, 1.f)) * nvmath::translation_mat4(vec3(-1.f, -1.f, 0.f)) * cameraToScreen;
+  // x and y ranges from (0,2) x (-2 * invAspect,0)
+  cameraToScreen = nvmath::translation_mat4(vec3(1.f, -invAspect, 0.f)) * cameraToScreen;
+  // x and y ranges from (0,1) x (0,1)
+  mat4 cameraToNdc = nvmath::scale_mat4(vec3(0.5f, -0.5f * aspect, 1.f)) * cameraToScreen;
   // x and y ranges from (0,0) to (width,height)
-  mat4 cameraToRaster = nvmath::scale_mat4(vec3(1.f / filmSize.width, 1.f / filmSize.height, 1.f)) * cameraToNdc;
+  mat4 cameraToRaster = nvmath::scale_mat4(vec3(filmSize.width, filmSize.height, 1.f)) * cameraToNdc;
   return cameraToRaster;
 }
 
@@ -60,6 +62,7 @@ void Camera::setToWorld(const vec3& lookat, const vec3& eye, const vec3& up)
 {
   CameraManip.setLookat(eye, lookat, up);
   m_view = CameraManip.getMatrix();
+  std::cout << "test cameraToWorld: " << (nvmath::invert_rot_trans(m_view) * vec4(0.f, 0.f, 1.f, 0.f)).z << std::endl;
 }
 
 void Camera::setToWorld(CameraShot shot)
@@ -91,8 +94,11 @@ GpuCamera CameraPerspective::toGpuStruct()
 {
   static float     nearz = 0.1f, farz = 100.0f;
   static GpuCamera cam;
-  cam.type          = getType();
-  cam.cameraToWorld = nvmath::invert_rot_trans(getView());
-  cam.rasterToCamera = nvmath::invert(cameraToRasterTransform(getFilmSize(), getFov(), 0.1, 100.f));
+  auto             size = getFilmSize();
+  cam.type              = getType();
+  cam.cameraToWorld     = nvmath::invert_rot_trans(getView());
+  cam.rasterToCamera    = nvmath::invert(cameraToRasterTransform(getFilmSize(), getFov(), 0.1, 100.0));
+  cam.projInv = nvmath::perspectiveVK(CameraManip.getFov(), float(size.width) / float(size.height), 0.1f, 100.f);
+  cam.projInv = nvmath::invert(cam.projInv);
   return cam;
 }

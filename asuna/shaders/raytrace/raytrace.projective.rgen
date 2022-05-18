@@ -26,15 +26,16 @@ void main()
   // payload.seed = xxhash32(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
   payload.seed = xxhash32Seed(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
 
-  //  debugPrintfEXT("random: %f\n", rand(payload.seed));
 
   uint rayFlags = gl_RayFlagsCullBackFacingTrianglesEXT;
   vec4 fxfycxcy = cameraInfo.fxfycxcy;
-  vec4 origin   = cameraInfo.cameraToWorld * vec4(0, 0, 0, 1);
+  vec3 origin   = transformPoint(cameraInfo.cameraToWorld, vec3(0.f));
   vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy);
   vec3 rayOrigin, rayDir;
 
-  vec3 radiance = vec3(0);
+//    debugPrintfEXT("origin: %v3f\n", origin);
+
+  vec3 radiance = vec3(0.f);
   for(uint i = 0; i < pc.spp; ++i)
   {
     vec2 jitter = pc.curFrame == 0 ? vec2(0.5f, 0.5f) : vec2(rand(payload.seed), rand(payload.seed));
@@ -43,11 +44,21 @@ void main()
     vec4 target;
     if(cameraInfo.type == CameraTypePerspective)
     {
-      vec3 pFilm = vec3(pixel, 1.0f);
-      vec3 pCamera = normalize((cameraInfo.rasterToCamera * vec4(pFilm, 1.f)).xyz);
-      rayOrigin = origin.xyz;
-      rayDir = normalize((cameraInfo.cameraToWorld * vec4(pCamera, 1.f)).xyz);
-      debugPrintfEXT("ray(%v3f, %v3f)\n", rayOrigin, rayDir);
+      rayOrigin = origin;
+      // Compute raster and camera sample positions
+      vec3 pFilm = vec3(pixel, 0.f);
+      vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
+      pCamera.z = -pCamera.z;
+      rayDir = transformDirection(cameraInfo.cameraToWorld, pCamera);
+//      debugPrintfEXT("nearP(%v3f)\n", nearP);
+      // Sampled position on the focal plane
+//      vec3 focusP = nearP.xyz / nearP.z;
+//      focusP.yz = -focusP.yz;
+//      rayDir = transformDirection(cameraInfo.cameraToWorld, focusP);
+//      vec2 d = pixel / vec2(gl_LaunchSizeEXT.xy) * 2.0 - 1.0;
+//      vec3 target = transformPoint(cameraInfo.projInv, vec3(d, 0.f));
+//      rayDir = transformDirection(cameraInfo.cameraToWorld, target);
+//      debugPrintfEXT("ray(%v3f, %v3f)\n", rayOrigin, rayDir);
     }
 //    else if(cameraInfo.type == CameraTypeOpencv)
 //    {
