@@ -62,6 +62,8 @@ public:
   }
   virtual GpuCamera toGpuStruct();
   float             getFov() { return CameraManip.getFov(); }
+  float&            getFocalDistance() { return m_focalDistance; }
+  float&            getAperture() { return m_aperture; }
 
 private:
   float m_focalDistance{0.1f};

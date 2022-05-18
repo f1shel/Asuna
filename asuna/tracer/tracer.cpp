@@ -274,8 +274,27 @@ void Tracer::renderGUI()
 
 bool Tracer::guiCamera()
 {
+  static GpuCamera dc{
+      nvmath::mat4f_zero,        // rasterToCamera
+      nvmath::mat4f_zero,        // cameraToWorld
+      vec4(0.f, 0.f, 0.f, 0.f),  // fxfycxcy
+      CameraTypeUndefined,       // type
+      0.f,                       // aperture
+      0.1f,                      // focal distance
+  };
+
   bool changed{false};
   changed |= ImGuiH::CameraWidget();
+  auto camType = m_scene.getCameraType();
+  if(camType == CameraTypePerspective)
+  {
+    auto pCamera = static_cast<CameraPerspective*>(&m_scene.getCamera());
+    changed |= GuiH::Group<bool>("Perspective", true, [&] {
+      changed |= GuiH::Slider("Focal distance", "", &pCamera->getFocalDistance(), &dc.focalDistance, GuiH::Flags::Normal, 0.f, 100.f);
+      changed |= GuiH::Slider("Aperture", "", &pCamera->getAperture(), &dc.aperture, GuiH::Flags::Normal, 0.f, 1.f);
+      return changed;
+    });
+  }
   return changed;
 }
 

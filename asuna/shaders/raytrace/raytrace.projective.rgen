@@ -49,7 +49,21 @@ void main()
       vec3 pFilm = vec3(pixel, 0.f);
       vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
       // Treat point as direction since camera origin is at (0,0,0)
-      rayDir = transformDirection(cameraInfo.cameraToWorld, pCamera);
+      vec3 r = normalize(pCamera);
+      // Modify ray for depth of field
+      if (cameraInfo.aperture > 0.f) {
+        // Sample point on lens
+        vec2 uLens = vec2(rand(payload.seed), rand(payload.seed));
+        vec2 pLens = cameraInfo.aperture * concentricSampleDisk(uLens);
+        // Compute point on plane of focus
+        float ft = cameraInfo.focalDistance / r.z;
+        vec3 pFocus = ft * r;
+        // Update ray for effect of lens
+        vec3 o = vec3(pLens, 0.f);
+        rayOrigin = transformPoint(cameraInfo.cameraToWorld, o);
+        r = pFocus - o;
+      }
+      rayDir = transformDirection(cameraInfo.cameraToWorld, r);
     }
 //    else if(cameraInfo.type == CameraTypeOpencv)
 //    {

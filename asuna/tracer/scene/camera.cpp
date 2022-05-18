@@ -95,5 +95,7 @@ GpuCamera CameraPerspective::toGpuStruct()
   cam.type              = getType();
   cam.cameraToWorld     = nvmath::invert_rot_trans(getView());
   cam.rasterToCamera    = nvmath::invert(cameraToRasterTransform(getFilmSize(), getFov(), 0.1, 100.0));
+  cam.focalDistance     = m_focalDistance;
+  cam.aperture          = m_aperture;
   return cam;
 }
