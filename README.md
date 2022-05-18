@@ -3,7 +3,7 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 
 ## Gallery
 
-<img src="./demo/dragon.png">
+<img src="./demo/cbox.png">
 
 ## Dependencies
 
@@ -49,7 +49,7 @@ Note that `nvidia-container-toolkit` is required for accessing GPU in the docker
 ### Usage
 
 ```bash
-$ ./asuna.exe
+$ ./asuna.exe --scenes scenes/cornell_box/scene.json --offline --spp 1024
 ```
 
 ### Architecture

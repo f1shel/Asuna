@@ -12,8 +12,7 @@
  * from 0 to 1, corresponding to points at the near and far
  * clipping planes, respectively. Note that, although this is
  * called "screen" space, it is still a 3D coordinate system,
- * since z values are meaningful. In x and y, this space ranges
- * from (-1,-1) to (1,1).
+ * since z values are meaningful.
  * 
  * (2) Normalized device coordinate (NDC) space: This is the
  * coordinate system for the actual image being rendered. In x and
@@ -43,7 +42,7 @@ mat4 perspectiveTransform(float fov, float nearz, float farz)
 
 mat4 cameraToRasterTransform(VkExtent2D filmSize, float fov, float near, float far)
 {
-  float aspect = filmSize.width / float(filmSize.height);
+  float aspect    = filmSize.width / float(filmSize.height);
   float invAspect = 1.f / aspect;
   // This gives a transformation from camera space to screen space.
   // In x this space ranges from -1 to 1 but y ranges from -invAspect
@@ -61,8 +60,6 @@ mat4 cameraToRasterTransform(VkExtent2D filmSize, float fov, float near, float f
 void Camera::setToWorld(const vec3& lookat, const vec3& eye, const vec3& up)
 {
   CameraManip.setLookat(eye, lookat, up);
-  //m_view = CameraManip.getMatrix();
-  //std::cout << "test cameraToWorld: " << (nvmath::invert_rot_trans(m_view) * vec4(0.f, 0.f, 1.f, 0.f)).z << std::endl;
 }
 
 void Camera::setToWorld(CameraShot shot)
@@ -98,7 +95,5 @@ GpuCamera CameraPerspective::toGpuStruct()
   cam.type              = getType();
   cam.cameraToWorld     = nvmath::invert_rot_trans(getView());
   cam.rasterToCamera    = nvmath::invert(cameraToRasterTransform(getFilmSize(), getFov(), 0.1, 100.0));
-  cam.projInv = nvmath::perspectiveVK(CameraManip.getFov(), float(size.width) / float(size.height), 0.1f, 100.f);
-  cam.projInv = nvmath::invert(cam.projInv);
   return cam;
 }

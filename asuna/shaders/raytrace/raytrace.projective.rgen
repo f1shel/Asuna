@@ -48,17 +48,8 @@ void main()
       // Compute raster and camera sample positions
       vec3 pFilm = vec3(pixel, 0.f);
       vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
-//      pCamera.z = -pCamera.z;
+      // Treat point as direction since camera origin is at (0,0,0)
       rayDir = transformDirection(cameraInfo.cameraToWorld, pCamera);
-//      debugPrintfEXT("nearP(%v3f)\n", nearP);
-      // Sampled position on the focal plane
-//      vec3 focusP = nearP.xyz / nearP.z;
-//      focusP.yz = -focusP.yz;
-//      rayDir = transformDirection(cameraInfo.cameraToWorld, focusP);
-//      vec2 d = pixel / vec2(gl_LaunchSizeEXT.xy) * 2.0 - 1.0;
-//      vec3 target = transformPoint(cameraInfo.projInv, vec3(d, 0.f));
-//      rayDir = transformDirection(cameraInfo.cameraToWorld, target);
-//      debugPrintfEXT("ray(%v3f, %v3f)\n", rayOrigin, rayDir);
     }
 //    else if(cameraInfo.type == CameraTypeOpencv)
 //    {
