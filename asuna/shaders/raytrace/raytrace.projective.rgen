@@ -78,8 +78,6 @@ void main()
     payload.bsdf       = BsdfSample(vec3(0.0), 1.0);
     payload.radiance   = vec3(0.0);
     payload.throughput = vec3(1.0);
-    payload.absorption = vec3(0.0);
-    payload.hitDis     = INFINITY;
     payload.stop       = 0;
 
     for(payload.depth = 0;; ++payload.depth)

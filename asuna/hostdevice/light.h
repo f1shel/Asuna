@@ -21,6 +21,7 @@ struct GpuLight
   vec3  u, v;
   float radius;
   float area;
+  uint  doubleSide;
 };
 
 #endif

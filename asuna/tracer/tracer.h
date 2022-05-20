@@ -42,4 +42,5 @@ private:
   bool guiCamera();
   bool guiEnvironment();
   bool guiTonemapper();
+  bool guiPathTracer();
 };

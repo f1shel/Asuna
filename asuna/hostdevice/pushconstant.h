@@ -14,6 +14,7 @@ struct GpuPushConstantRaytrace
   int curFrame;
   int maxPathDepth;
   int numLights;
+  int useFaceNormal;
 };
 
 // Tonemapper used in post.frag

@@ -14,14 +14,16 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
-vec3 transformPoint(in mat4 transform, in vec3 point) {
-  vec4 homoPoint = vec4(point, 1.f);
+vec3 transformPoint(in mat4 transform, in vec3 point)
+{
+  vec4 homoPoint  = vec4(point, 1.f);
   vec4 tHomoPoint = transform * homoPoint;
   return tHomoPoint.xyz / tHomoPoint.w;
 }
 
-vec3 transformVector(in mat4 transform, in vec3 vector) {
-  vec4 homoVector = vec4(vector, 0.f);
+vec3 transformVector(in mat4 transform, in vec3 vector)
+{
+  vec4 homoVector  = vec4(vector, 0.f);
   vec4 tHomoVector = transform * homoVector;
   return tHomoVector.xyz;
 }
@@ -214,6 +216,31 @@ vec3 offsetPositionAlongNormal(vec3 worldPosition, vec3 normal)
       abs(worldPosition.x) < origin ? worldPosition.x + floatScale * normal.x : p_i.x,
       abs(worldPosition.y) < origin ? worldPosition.y + floatScale * normal.y : p_i.y,
       abs(worldPosition.z) < origin ? worldPosition.z + floatScale * normal.z : p_i.z);
+}
+
+#define CONSISTENTNORMALS
+vec3 consistentNormal(const vec3 D, const vec3 iN, const float alpha)
+{
+  // part of the implementation of "Consistent Normal Interpolation", Reshetov et al., 2010
+  // calculates a safe normal given an incoming direction, phong normal and alpha
+  // cos(alpha) = dot(shadingNormal, faceNormal)
+#ifndef CONSISTENTNORMALS
+  return iN;
+#else
+#if 1
+  // Eq. 1, exact
+  const float q   = (1 - sin(alpha)) / (1 + sin(alpha));
+#else
+  // Eq. 1 approximation, as in Figure 6 (not the wrong one in Table 8)
+  const float t = PI - 2 * alpha;
+  const float q = (t * t) / (PI * (PI + (2 * PI - 4) * alpha));
+#endif
+  const float b   = dot(D, iN);
+  const float g   = 1 + q * (b - 1);
+  const float rho = sqrt(q * (1 + g) / (1 + b));
+  const vec3  Rc  = (g + rho * b) * iN - (rho * D);
+  return normalize(D + Rc);
+#endif
 }
 
 #endif

@@ -97,10 +97,11 @@ void PipelineRaytrace::initRayTracing()
   m_sbt.setup(m_device, m_graphicsQueueIndex, &m_alloc, prop);
 
   // Update push constant from scene
-  m_pushconstant.curFrame     = -1;
-  m_pushconstant.spp          = m_pScene->getSpp();
-  m_pushconstant.maxPathDepth = m_pScene->getMaxPathDepth();
-  m_pushconstant.numLights    = m_pScene->getLightsNum();
+  m_pushconstant.curFrame      = -1;
+  m_pushconstant.spp           = m_pScene->getSpp();
+  m_pushconstant.maxPathDepth  = m_pScene->getMaxPathDepth();
+  m_pushconstant.numLights     = m_pScene->getLightsNum();
+  m_pushconstant.useFaceNormal = 0;
 }
 
 void PipelineRaytrace::createBottomLevelAS()

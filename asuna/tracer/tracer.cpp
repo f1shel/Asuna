@@ -261,6 +261,8 @@ void Tracer::renderGUI()
     changed |= guiCamera();
   if(ImGui::CollapsingHeader("Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
     changed |= guiEnvironment();
+  if(ImGui::CollapsingHeader("PathTracer" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiPathTracer();
   if(ImGui::CollapsingHeader("Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
     changed |= guiTonemapper();
 
@@ -290,7 +292,8 @@ bool Tracer::guiCamera()
   {
     auto pCamera = static_cast<CameraPerspective*>(&m_scene.getCamera());
     changed |= GuiH::Group<bool>("Perspective", true, [&] {
-      changed |= GuiH::Slider("Focal distance", "", &pCamera->getFocalDistance(), &dc.focalDistance, GuiH::Flags::Normal, 0.f, 100.f);
+      changed |= GuiH::Slider("Focal distance", "", &pCamera->getFocalDistance(), &dc.focalDistance,
+                              GuiH::Flags::Normal, 0.01f, 10.f);
       changed |= GuiH::Slider("Aperture", "", &pCamera->getAperture(), &dc.aperture, GuiH::Flags::Normal, 0.f, 1.f);
       return changed;
     });
@@ -426,4 +429,12 @@ bool Tracer::guiTonemapper()
 
 
   return false;  // no need to restart the renderer
+}
+
+bool Tracer::guiPathTracer()
+{
+  bool changed = false;
+  auto& pc = m_pipelineRaytrace.getPushconstant();
+  changed |= ImGui::Checkbox("Use Face Normal", (bool*)&pc.useFaceNormal);
+  return changed;
 }

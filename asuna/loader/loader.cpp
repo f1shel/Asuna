@@ -182,7 +182,8 @@ void Loader::addLight(const nlohmann::json& lightJson)
       vec3(0.0),           // u
       vec3(0.0),           // v
       0.0,                 // radius
-      0.0                  // area
+      0.0,                 // area
+      0,                   // double side
   };
   light.emittance = Json2Vec3(lightJson["emittance"]);
   if(lightJson["type"] == "rect")
@@ -195,6 +196,8 @@ void Loader::addLight(const nlohmann::json& lightJson)
     light.v        = v2 - light.position;
     light.area     = nvmath::length(nvmath::cross(light.u, light.v));
     light.type     = LightTypeRect;
+    if(lightJson.contains("double_side"))
+      light.doubleSide = lightJson["double_side"] ? 1 : 0;
   }
   //   else if(lightJson["type"] == "sphere")
   //   {
