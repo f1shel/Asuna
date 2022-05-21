@@ -2,38 +2,13 @@ cmake_minimum_required(VERSION 3.9.6)
 set_property(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     PROPERTY VS_STARTUP_PROJECT
-    asuna)
-project(asuna)
+    Asuna)
+project(AsunaProject)
 
 set(PROJNAME ${CMAKE_PROJECT_NAME})
 set(PROJ_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(THIRD_PARTY_DIR ${PROJ_ROOT_DIR}/${PROJNAME}/third_party)
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(ARCH "x64" CACHE STRING "CPU Architecture")
-else ()
-  set(ARCH "x86" CACHE STRING "CPU Architecture")
-endif()
-set(OUTPUT_PATH ${PROJ_ROOT_DIR}/bin_${ARCH})
 
-#--------------------------------------------------------------------------------------------------
-# Project setting
-project(${PROJNAME} LANGUAGES C CXX)
-message(STATUS "-------------------------------")
-message(STATUS "Processing Project ${PROJNAME}:")
-
-#--------------------------------------------------------------------------------------------------
-# C++ target and defines
-set(CMAKE_CXX_STANDARD 17)
-add_executable(${PROJNAME})
-
-if(MSVC)
-    add_definitions(/wd26812)  # 'enum class' over 'enum'
-    add_definitions(/wd26451)  # Arithmetic overflow, casting 4 byte value to 8 byte value
-endif()
-
-#--------------------------------------------------------------------------------------------------
-# look for nvpro_core 1) as a sub-folder 2) at some other locations
-# this cannot be put anywhere else since we still didn't find setup.cmake yet
 if(NOT BASE_DIRECTORY)
   find_path(BASE_DIRECTORY
     NAMES nvpro_core/cmake/setup.cmake
@@ -42,7 +17,6 @@ if(NOT BASE_DIRECTORY)
     DOC "Directory containing nvpro_core"
     )
 endif()
-## Various functions and macros REQUIRED
 if(EXISTS ${BASE_DIRECTORY}/nvpro_core/cmake/setup.cmake)
   include(${BASE_DIRECTORY}/nvpro_core/cmake/setup.cmake)
   include(${BASE_DIRECTORY}/nvpro_core/cmake/utilities.cmake)
@@ -50,27 +24,25 @@ else()
   message(FATAL_ERROR "could not find base directory, please set BASE_DIRECTORY to folder containing nvpro_core")
 endif()
 
-#--------------------------------------------------------------------------------------------------
-# Packages
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(ARCH "x64" CACHE STRING "CPU Architecture")
+else ()
+  set(ARCH "x86" CACHE STRING "CPU Architecture")
+endif()
+set(OUTPUT_PATH ${PROJ_ROOT_DIR}/bin_${ARCH})
+
 _add_package_VulkanSDK()
 _add_package_ImGUI()
 # _add_package_NVML()
 _add_nvpro_core_lib()
 
-#--------------------------------------------------------------------------------------------------
-# Memory Allocation
-#   Forcing to use our memory allocator DMA (similar to Vulkan Memory Allocator (VMA))
-# target_compile_definitions(${PROJNAME} PUBLIC ALLOC_VMA)
-# target_compile_definitions(${PROJNAME} PUBLIC ALLOC_DMA)
-# target_compile_definitions(${PROJNAME} PUBLIC ALLOC_DEDICATED)
+project(${PROJNAME} LANGUAGES C CXX)
+message(STATUS "-------------------------------")
+message(STATUS "Processing Project ${PROJNAME}:")
 
-#--------------------------------------------------------------------------------------------------
-# Default definitions: PROJECT_RELDIRECTORY, ... 
+set(CMAKE_CXX_STANDARD 17)
 _add_project_definitions(${PROJNAME})
 
-
-#--------------------------------------------------------------------------------------------------
-# Source files for this project
 file(GLOB ENTRY
     ${PROJNAME}/main.cpp)
 
@@ -119,9 +91,9 @@ file(GLOB SRC_SHADERS_GRAPHICS
     ${PROJNAME}/shaders/graphics/*.vert
 )
 
-file(GLOB SRC_SHADERS_POST_COMMON
-    ${PROJNAME}/shaders/post/utils/*.glsl
-)
+# file(GLOB SRC_SHADERS_POST_COMMON
+#     ${PROJNAME}/shaders/post/utils/*.glsl
+# )
 
 file(GLOB SRC_SHADERS_POST
     ${PROJNAME}/shaders/post/*.frag
@@ -136,16 +108,21 @@ file(GLOB SRC_3RDPARTY_TQDM
     ${PROJNAME}/third_party/tqdm/tqdm/tqdm.h
 )
 
-file(GLOB SRC_EXTRA
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinygltf/json.hpp
-    ${PROJNAME}/third_party/nvpro_core/third_party/NVTX/c/include/nvtx3/nvToolsExt.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinygltf/tiny_gltf.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinyobjloader/tiny_obj_loader.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/vma/include/vk_mem_alloc.h
-)
-set(SRC_AUTOGEN ${SRC_EXTRA} ${COMMON_SOURCE_FILES} ${PACKAGE_SOURCE_FILES})
+source_group("asuna" FILES ${ENTRY})
+source_group("asuna\\third_party\\json" FILES ${SRC_3RDPARTY_JSON})
+source_group("asuna\\third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
+source_group("asuna\\loader" FILES ${SRC_LOADER})
+source_group("asuna\\tracer" FILES ${SRC_TRACER})
+source_group("asuna\\tracer\\context" FILES ${SRC_TRACER_CONTEXT})
+source_group("asuna\\tracer\\scene" FILES ${SRC_TRACER_SCENE})
+source_group("asuna\\tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
+source_group("asuna\\hostdevice" FILES ${SRC_HOSTDEVICE})
+source_group("asuna\\shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
+source_group("asuna\\shaders\\raytrace\\utils" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
+source_group("asuna\\shaders\\graphics" FILES ${SRC_SHADERS_GRAPHICS})
+source_group("asuna\\shaders\\post" FILES ${SRC_SHADERS_POST})
+# source_group("asuna\\shaders\\post\\utils" FILES ${SRC_SHADERS_POST_COMMON})
 
-#--------------------------------------------------------------------------------------------------
 # GLSL to SPIR-V custom build
 set(SAMPLES_BASESAMPLE_DEPENDENCIES OFF CACHE BOOL "Create dependies on GLSL files")
 compile_glsl(
@@ -178,7 +155,7 @@ compile_glsl(
         ${SRC_SHADERS_POST}
     HEADER_FILES
         ${SRC_HOSTDEVICE}
-        ${SRC_SHADERS_POST_COMMON}
+        # ${SRC_SHADERS_POST_COMMON}
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
@@ -187,10 +164,7 @@ compile_glsl(
     DEPENDENCY ON
 )
 
-
-#--------------------------------------------------------------------------------------------------
-# Sources
-target_sources(${PROJNAME} PUBLIC
+add_executable(${PROJNAME}
     ${ENTRY}
     ${SRC_3RDPARTY_JSON}
     ${SRC_3RDPARTY_TQDM}
@@ -200,40 +174,24 @@ target_sources(${PROJNAME} PUBLIC
     ${SRC_TRACER_SCENE}
     ${SRC_TRACER_RESOURCE}
     ${SRC_TRACER_PIPELINE}
-    ${SRC_HOSTDEVICE}
+    ${SRC_HOSTDEVICE})
+
+target_sources(${PROJNAME} PUBLIC
     ${SRC_SHADERS_GRAPHICS}
     ${SRC_SHADERS_POST}
     ${SRC_SHADERS_RAYTRACE_COMMON}
-    ${SRC_SHADERS_POST_COMMON}
-    ${SRC_SHADERS_RAYTRACE}
-    ${SRC_AUTOGEN}
-)
-# include directory
-target_include_directories(${PROJNAME} PUBLIC
-    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/json
-    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/tqdm
-)
+    # ${SRC_SHADERS_POST_COMMON}
+    ${SRC_SHADERS_RAYTRACE})
 
-#--------------------------------------------------------------------------------------------------
-# Sub-folders in Visual Studio
-source_group("autogen" FILES ${SRC_AUTOGEN})
-source_group("" FILES ${ENTRY})
-source_group("third_party\\json" FILES ${SRC_3RDPARTY_JSON})
-source_group("third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
-source_group("loader" FILES ${SRC_LOADER})
-source_group("tracer" FILES ${SRC_TRACER})
-source_group("tracer\\context" FILES ${SRC_TRACER_CONTEXT})
-source_group("tracer\\scene" FILES ${SRC_TRACER_SCENE})
-source_group("tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
-source_group("hostdevice" FILES ${SRC_HOSTDEVICE})
-source_group("shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
-source_group("shaders\\raytrace\\utils" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
-source_group("shaders\\graphics" FILES ${SRC_SHADERS_GRAPHICS})
-source_group("shaders\\post" FILES ${SRC_SHADERS_POST})
-source_group("shaders\\post\\utils" FILES ${SRC_SHADERS_POST_COMMON})
+# target_include_directories(${PROJNAME} PUBLIC
+#     ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/json
+#     ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/tqdm
+# )
 
-#--------------------------------------------------------------------------------------------------
-# Linkage
+
+target_sources(${PROJNAME} PUBLIC ${COMMON_SOURCE_FILES})
+target_sources(${PROJNAME} PUBLIC ${PACKAGE_SOURCE_FILES})
+# source_group("Common Package" FILES ${COMMON_SOURCE_FILES} ${PACKAGE_SOURCE_FILES})
 target_link_libraries(${PROJNAME} ${PLATFORM_LIBRARIES} nvpro_core)
 
 foreach(DEBUGLIB ${LIBRARIES_DEBUG})

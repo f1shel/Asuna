@@ -1,0 +1,121 @@
+#version 460
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_debug_printf : enable
+
+#include "../../hostdevice/binding.h"
+#include "../../hostdevice/camera.h"
+#include "../../hostdevice/pushconstant.h"
+#include "utils/math.glsl"
+#include "utils/structs.glsl"
+
+// clang-format off
+layout(push_constant)                                 uniform _RtxState  { GpuPushConstantRaytrace pc; };
+layout(set = RtAccel, binding = AccelTlas)            uniform accelerationStructureEXT tlas;
+layout(set = RtOut,   binding = OutputStore, rgba32f) uniform image2D   images[NUM_OUTPUT_IMAGES];
+layout(set = RtScene, binding = SceneCamera)          uniform _Camera   { GpuCamera cameraInfo; };
+// clang-format on
+
+layout(location = 0) rayPayloadEXT RayPayload payload;
+
+void main()
+{
+  // Initialize the seed for the random number
+  // payload.seed = xxhash32(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
+  payload.seed = xxhash32Seed(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
+
+
+  uint rayFlags = gl_RayFlagsCullBackFacingTrianglesEXT;
+  vec4 fxfycxcy = cameraInfo.fxfycxcy;
+  vec3 origin   = transformPoint(cameraInfo.cameraToWorld, vec3(0.f));
+  vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy);
+  vec3 rayOrigin, rayDir;
+
+//    debugPrintfEXT("origin: %v3f\n", origin);
+
+  vec3 radiance = vec3(0.f);
+  for(uint i = 0; i < pc.spp; ++i)
+  {
+    vec2 jitter = pc.curFrame == 0 ? vec2(0.5f, 0.5f) : vec2(rand(payload.seed), rand(payload.seed));
+    vec2 pixel  = pixelCenter + jitter;
+
+    vec4 target;
+    if(cameraInfo.type == CameraTypePerspective)
+    {
+      rayOrigin = origin;
+      // Compute raster and camera sample positions
+      vec3 pFilm = vec3(pixel, 0.f);
+      vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
+      // Treat point as direction since camera origin is at (0,0,0)
+      vec3 r = normalize(pCamera);
+      // Modify ray for depth of field
+      if (cameraInfo.aperture > 0.f) {
+        // Sample point on lens
+        vec2 uLens = vec2(rand(payload.seed), rand(payload.seed));
+        vec2 pLens = cameraInfo.aperture * concentricSampleDisk(uLens);
+        // Compute point on plane of focus
+        float ft = cameraInfo.focalDistance / r.z;
+        vec3 pFocus = ft * r;
+        // Update ray for effect of lens
+        vec3 o = vec3(pLens, 0.f);
+        rayOrigin = transformPoint(cameraInfo.cameraToWorld, o);
+        r = pFocus - o;
+      }
+      rayDir = transformDirection(cameraInfo.cameraToWorld, r);
+    }
+//    else if(cameraInfo.type == CameraTypeOpencv)
+//    {
+//      vec2 pXy  = vec2((pixel.x - fxfycxcy.z) / fxfycxcy.x, (pixel.y - fxfycxcy.w) / fxfycxcy.y);
+//      target    = -vec4(pXy, 1.0, 1.0);
+//      rayOrigin = origin.xyz;
+//      rayDir    = normalize((cameraInfo.viewInverse * vec4(normalize(target.xyz), 0.0)).xyz);
+//    }
+
+    // Path trace
+    payload.ray        = Ray(rayOrigin, rayDir);
+    payload.bsdf       = BsdfSample(vec3(0.0), 1.0);
+    payload.radiance   = vec3(0.0);
+    payload.throughput = vec3(1.0);
+    payload.stop       = 0;
+
+    for(payload.depth = 0;; ++payload.depth)
+    {
+      traceRayEXT(tlas,                   // acceleration structure
+                  rayFlags,               // rayFlags
+                  0xFF,                   // cullMask
+                  0,                      // sbtRecordOffset
+                  0,                      // sbtRecordStride
+                  0,                      // missIndex
+                  payload.ray.origin,     // ray origin
+                  MINIMUM,                // ray min range
+                  payload.ray.direction,  // ray direction
+                  INFINITY,               // ray max range
+                  0                       // payload (location = 0)
+      );
+
+      if(payload.stop > 0)
+        break;
+    }
+
+    radiance += payload.radiance;
+    // debugPrintfEXT("%v3f", payload.radiance);
+  }
+
+  radiance /= float(pc.spp);
+
+  // Saving result
+  if(pc.curFrame == 0)
+  {
+    // First frame, replace the value in the buffer
+    imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(radiance, 1.f));
+  }
+  else
+  {
+    // Do accumulation over time
+    float a         = 1.0f / float(pc.curFrame + 1);
+    vec3  old_color = imageLoad(images[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
+    imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, radiance, a), 1.f));
+  }
+}
