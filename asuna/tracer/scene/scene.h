@@ -27,7 +27,7 @@ public:
   void freeRawData();
 
 public:
-  void addIntegrator(int spp, int maxRecur);
+  void addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive);
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
@@ -50,6 +50,9 @@ public:
   int                                   getSpp();
   void                                  setSpp(int spp);
   int                                   getMaxPathDepth();
+  uint                                  getUseFaceNormal();
+  uint                                  getUseToneMapping();
+  uint                                  getIgnoreEmissive();
   Camera&                               getCamera();
   CameraType                            getCameraType();
   nvvk::RaytracingBuilderKHR::BlasInput getBlas(VkDevice device, int meshId);

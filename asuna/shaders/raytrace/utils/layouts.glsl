@@ -12,7 +12,7 @@
 // clang-format off
 layout(buffer_reference, scalar) buffer Vertices  { GpuVertex v[];   };
 layout(buffer_reference, scalar) buffer Indices   { ivec3 i[];       };
-layout(buffer_reference, scalar) buffer Materials { GpuMaterial m[]; };
+layout(buffer_reference, scalar) buffer Materials { GpuMaterial m[1]; };
 //
 layout(set = RtAccel, binding = AccelTlas)              uniform accelerationStructureEXT tlas;
 layout(set = RtScene, binding = SceneTextures)          uniform sampler2D  textureSamplers[];
@@ -47,7 +47,19 @@ hitAttributeEXT vec2 _bary;
     shadingNormal         = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);                   \
     faceNormal            = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));                                        \
     if(lightId < 0)                                                                                                    \
+    {                                                                                                                  \
       material = Materials(_inst.materialAddress).m[0];                                                                \
+      if(material.diffuseTextureId >= 0)                                                                               \
+        material.diffuse = texture(textureSamplers[nonuniformEXT(material.diffuseTextureId)], uv).rgb;                 \
+      if(material.specularTextureId >= 0)                                                                              \
+        material.specular = texture(textureSamplers[nonuniformEXT(material.specularTextureId)], uv).rgb;               \
+      if(material.alphaTextureId >= 0)                                                                                 \
+        material.axay = texture(textureSamplers[nonuniformEXT(material.alphaTextureId)], uv).rg;                       \
+      if(material.roughnessTextureId >= 0)                                                                             \
+        material.roughness = texture(textureSamplers[nonuniformEXT(material.roughnessTextureId)], uv).rg;              \
+      if(material.emittanceTextureId >= 0)                                                                             \
+        material.emittance = texture(textureSamplers[nonuniformEXT(material.emittanceTextureId)], uv).rgb;             \
+    }                                                                                                                  \
   }
 
 #endif

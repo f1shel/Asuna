@@ -21,7 +21,6 @@ public:
   virtual void         run(const VkCommandBuffer& cmdBuf);
   virtual void         deinit();
   GpuPushConstantPost& getPushconstant() { return m_pushconstant; }
-  void                 setFrame(int curFrame) { m_pushconstant.invFrame = double(1.0) / double(curFrame); }
 
 private:
   GpuPushConstantPost m_pushconstant = {

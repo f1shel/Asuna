@@ -113,7 +113,6 @@ void Tracer::runOnline()
         // tonemapper
         vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        m_pipelinePost.setFrame(m_pipelineRaytrace.getFrame());
         m_pipelinePost.run(cmdBuf);
 
         // Rendering UI
@@ -433,8 +432,9 @@ bool Tracer::guiTonemapper()
 
 bool Tracer::guiPathTracer()
 {
-  bool changed = false;
-  auto& pc = m_pipelineRaytrace.getPushconstant();
+  bool  changed = false;
+  auto& pc      = m_pipelineRaytrace.getPushconstant();
   changed |= ImGui::Checkbox("Use Face Normal", (bool*)&pc.useFaceNormal);
+  changed |= ImGui::Checkbox("Ignore Emissive", (bool*)&pc.ignoreEmissive);
   return changed;
 }

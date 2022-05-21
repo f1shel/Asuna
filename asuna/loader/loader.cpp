@@ -22,7 +22,10 @@ static json defaultSceneOptions = json::parse(R"(
 {
   "integrator": {
     "spp": 1,
-    "max_path_depth": 2
+    "max_path_depth": 2,
+    "use_tone_mapping": true,
+    "use_face_normal": false,
+    "ignore_emissive": false
   },
   "camera": {
     "fov": 45.0,
@@ -127,14 +130,23 @@ void Loader::submit()
 
 void Loader::addIntegrator(const nlohmann::json& integratorJson)
 {
-  int spp      = defaultSceneOptions["integrator"]["spp"];
-  int maxDepth = defaultSceneOptions["integrator"]["max_path_depth"];
+  int  spp                = defaultSceneOptions["integrator"]["spp"];
+  int  maxDepth           = defaultSceneOptions["integrator"]["max_path_depth"];
+  bool boolUseFaceNormal  = defaultSceneOptions["integrator"]["use_face_normal"];
+  bool boolUseToneMapping = defaultSceneOptions["integrator"]["use_tone_mapping"];
+  bool boolIgnoreEmissive = defaultSceneOptions["integrator"]["ignore_emissive"];
   if(integratorJson.contains("spp"))
     spp = integratorJson["spp"];
   if(integratorJson.contains("max_path_depth"))
     maxDepth = integratorJson["max_path_depth"];
+  if(integratorJson.contains("use_face_normal"))
+    boolUseFaceNormal = integratorJson["use_face_normal"];
+  if(integratorJson.contains("use_tone_mapping"))
+    boolUseToneMapping = integratorJson["use_tone_mapping"];
+  if(integratorJson.contains("ignore_emissive"))
+    boolIgnoreEmissive = integratorJson["ignore_emissive"];
 
-  m_pScene->addIntegrator(spp, maxDepth);
+  m_pScene->addIntegrator(spp, maxDepth, boolUseFaceNormal, boolUseToneMapping, boolIgnoreEmissive);
 }
 
 void Loader::addCamera(const nlohmann::json& cameraJson)
@@ -250,8 +262,9 @@ void Loader::addTexture(const nlohmann::json& textureJson)
 void Loader::addMaterial(const nlohmann::json& materialJson)
 {
   JsonCheckKeys(materialJson, {"type", "name"});
-  std::string materialName = materialJson["name"];
-  GpuMaterial material;
+  std::string  materialName = materialJson["name"];
+  Material     mat;
+  GpuMaterial& material = mat.getMaterial();
   if(materialJson["type"] == "brdf_hongzhi")
   {
     JsonCheckKeys(materialJson, {"diffuse_texture", "specular_texture", "normal_texture", "tangent_texture", "alpha_texture"});
@@ -265,6 +278,10 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
   {
     JsonCheckKeys(materialJson, {"diffuse_reflectance"});
     material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+    if(materialJson.contains("emittance"))
+      material.emittance = Json2Vec3(materialJson["emittance"]);
+    if(materialJson.contains("emittance_texture"))
+      material.emittanceTextureId = m_pScene->getTextureId(materialJson["emittance_texture"]);
   }
   else
   {

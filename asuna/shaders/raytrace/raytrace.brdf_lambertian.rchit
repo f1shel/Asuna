@@ -99,6 +99,9 @@ void main()
     }
   }
 
+  if (pc.ignoreEmissive == 0 && length(material.emittance) > 0)
+    payload.radiance += material.emittance * payload.throughput;
+
   if(payload.depth >= pc.maxPathDepth)
   {
     payload.stop = 1;

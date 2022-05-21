@@ -10,11 +10,12 @@ struct GpuPushConstantGraphics
 
 struct GpuPushConstantRaytrace
 {
-  int spp;
-  int curFrame;
-  int maxPathDepth;
-  int numLights;
-  int useFaceNormal;
+  int  spp;
+  int  curFrame;
+  int  maxPathDepth;
+  int  numLights;
+  uint useFaceNormal;
+  uint ignoreEmissive;
 };
 
 // Tonemapper used in post.frag
@@ -31,7 +32,6 @@ struct GpuPushConstantPost
   float Ywhite;  // Burning white
   float key;     // Log-average luminance
   uint  useTonemapping;
-  float invFrame;
 };
 
 #endif

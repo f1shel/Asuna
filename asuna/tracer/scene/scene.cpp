@@ -97,22 +97,22 @@ void Scene::reset()
   m_pTextures[tn]              = std::make_pair(pTexture, m_pTextures.size());
   m_pMaterials[mn]             = std::make_pair(pMaterial, m_pMaterials.size());
   m_sunAndSky                  = {
-      {1, 1, 1},            // rgb_unit_conversion;
-      0.0000101320f,        // multiplier;
-      0.0f,                 // haze;
-      0.0f,                 // redblueshift;
-      1.0f,                 // saturation;
-      0.0f,                 // horizon_height;
-      {0.4f, 0.4f, 0.4f},   // ground_color;
-      0.1f,                 // horizon_blur;
-      {0.0, 0.0, 0.01f},    // night_color;
-      0.8f,                 // sun_disk_intensity;
-      {0.00, 0.78, 0.62f},  // sun_direction;
-      5.0f,                 // sun_disk_scale;
-      1.0f,                 // sun_glow_intensity;
-      1,                    // y_is_up;
-      1,                    // physically_scaled_sun;
-      0,                    // in_use;
+                       {1, 1, 1},            // rgb_unit_conversion;
+                       0.0000101320f,        // multiplier;
+                       0.0f,                 // haze;
+                       0.0f,                 // redblueshift;
+                       1.0f,                 // saturation;
+                       0.0f,                 // horizon_height;
+                       {0.4f, 0.4f, 0.4f},   // ground_color;
+                       0.1f,                 // horizon_blur;
+                       {0.0, 0.0, 0.01f},    // night_color;
+                       0.8f,                 // sun_disk_intensity;
+                       {0.00, 0.78, 0.62f},  // sun_direction;
+                       5.0f,                 // sun_disk_scale;
+                       1.0f,                 // sun_glow_intensity;
+                       1,                    // y_is_up;
+                       1,                    // physically_scaled_sun;
+                       0,                    // in_use;
   };
 }
 
@@ -183,9 +183,9 @@ void Scene::freeRawData()
   m_pMaterials.clear();
 }
 
-void Scene::addIntegrator(int spp, int maxRecur)
+void Scene::addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive)
 {
-  m_integrator = Integrator(spp, maxRecur);
+  m_integrator = Integrator(spp, maxRecur, useToneMapping, useFaceNormal, ignoreEmissive);
 }
 
 void Scene::addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture)
@@ -339,6 +339,19 @@ void Scene::setSpp(int spp)
 int Scene::getMaxPathDepth()
 {
   return m_integrator.getMaxPathDepth();
+}
+
+uint Scene::getUseFaceNormal()
+{
+  return m_integrator.getUseFaceNormal();
+}
+uint Scene::getUseToneMapping()
+{
+  return m_integrator.getUseToneMapping();
+}
+uint Scene::getIgnoreEmissive()
+{
+  return m_integrator.getIgnoreEmissive();
 }
 
 Camera& Scene::getCamera()
