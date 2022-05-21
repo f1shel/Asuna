@@ -15,6 +15,7 @@ void PipelinePost::init(ContextAware* pContext, Scene* pScene, const VkDescripto
   m_pScene   = pScene;
   // Ray tracing
   nvh::Stopwatch sw_;
+  m_pushconstant.useTonemapping = m_pScene->getUseToneMapping();
   createPostDescriptorSetLayout();
   bind(PostBindSet::PostInput, {&m_holdSetWrappers[uint(HoldSet::Input)]});
   createPostPipeline();

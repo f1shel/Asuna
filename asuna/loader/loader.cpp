@@ -132,21 +132,21 @@ void Loader::addIntegrator(const nlohmann::json& integratorJson)
 {
   int  spp                = defaultSceneOptions["integrator"]["spp"];
   int  maxDepth           = defaultSceneOptions["integrator"]["max_path_depth"];
-  bool boolUseFaceNormal  = defaultSceneOptions["integrator"]["use_face_normal"];
   bool boolUseToneMapping = defaultSceneOptions["integrator"]["use_tone_mapping"];
+  bool boolUseFaceNormal  = defaultSceneOptions["integrator"]["use_face_normal"];
   bool boolIgnoreEmissive = defaultSceneOptions["integrator"]["ignore_emissive"];
   if(integratorJson.contains("spp"))
     spp = integratorJson["spp"];
   if(integratorJson.contains("max_path_depth"))
     maxDepth = integratorJson["max_path_depth"];
-  if(integratorJson.contains("use_face_normal"))
-    boolUseFaceNormal = integratorJson["use_face_normal"];
   if(integratorJson.contains("use_tone_mapping"))
     boolUseToneMapping = integratorJson["use_tone_mapping"];
+  if(integratorJson.contains("use_face_normal"))
+    boolUseFaceNormal = integratorJson["use_face_normal"];
   if(integratorJson.contains("ignore_emissive"))
     boolIgnoreEmissive = integratorJson["ignore_emissive"];
 
-  m_pScene->addIntegrator(spp, maxDepth, boolUseFaceNormal, boolUseToneMapping, boolIgnoreEmissive);
+  m_pScene->addIntegrator(spp, maxDepth, boolUseToneMapping, boolUseFaceNormal, boolIgnoreEmissive);
 }
 
 void Loader::addCamera(const nlohmann::json& cameraJson)
