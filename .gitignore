@@ -3,7 +3,8 @@ bin_*/
 .idea/
 cmake-build-*/
 build/
-asuna/third_party/downloaded_resources/
+src/ext/downloaded_resources/
+src/ext/bin_*/
 scenes/
 log_asuna.txt
-.vscode
+.vscode/

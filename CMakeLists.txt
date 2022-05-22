@@ -7,7 +7,8 @@ project(asuna)
 
 set(PROJNAME ${CMAKE_PROJECT_NAME})
 set(PROJ_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(THIRD_PARTY_DIR ${PROJ_ROOT_DIR}/${PROJNAME}/third_party)
+set(SOURCE_DIR ${PROJ_ROOT_DIR}/src)
+set(THIRD_PARTY_DIR ${SOURCE_DIR}/ext)
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(ARCH "x64" CACHE STRING "CPU Architecture")
 else ()
@@ -72,76 +73,71 @@ _add_project_definitions(${PROJNAME})
 #--------------------------------------------------------------------------------------------------
 # Source files for this project
 file(GLOB ENTRY
-    ${PROJNAME}/main.cpp)
+    ${SOURCE_DIR}/main.cpp)
 
 file(GLOB SRC_LOADER
-    ${PROJNAME}/loader/*.h
-    ${PROJNAME}/loader/*.cpp)
+    ${SOURCE_DIR}/loader/*.h
+    ${SOURCE_DIR}/loader/*.cpp)
 
 file(GLOB SRC_TRACER
-    ${PROJNAME}/tracer/tracer.h
-    ${PROJNAME}/tracer/tracer.cpp)
+    ${SOURCE_DIR}/tracer/tracer.h
+    ${SOURCE_DIR}/tracer/tracer.cpp)
 
-file(GLOB SRC_TRACER_CONTEXT
-    ${PROJNAME}/tracer/context/*.h
-    ${PROJNAME}/tracer/context/*.cpp)
+file(GLOB SRC_CONTEXT
+    ${SOURCE_DIR}/context/*.h
+    ${SOURCE_DIR}/context/*.cpp)
 
-file(GLOB SRC_TRACER_SCENE
-    ${PROJNAME}/tracer/scene/*.h
-    ${PROJNAME}/tracer/scene/*.cpp)
+file(GLOB SRC_SCENE
+    ${SOURCE_DIR}/scene/*.h
+    ${SOURCE_DIR}/scene/*.cpp)
 
-file(GLOB SRC_TRACER_RESOURCE
-    ${PROJNAME}/tracer/allocres/*.h
-    ${PROJNAME}/tracer/allocres/*.cpp)
+file(GLOB SRC_CORE
+    ${SOURCE_DIR}/core/*.h
+    ${SOURCE_DIR}/core/*.cpp)
 
-file(GLOB SRC_TRACER_PIPELINE
-    ${PROJNAME}/tracer/pipeline/*.h
-    ${PROJNAME}/tracer/pipeline/*.cpp)
+file(GLOB SRC_PIPELINE
+    ${SOURCE_DIR}/pipeline/*.h
+    ${SOURCE_DIR}/pipeline/*.cpp)
 
 # Source files for this project
-file(GLOB SRC_HOSTDEVICE
-    ${PROJNAME}/hostdevice/*.h
+file(GLOB SRC_SHARED
+    ${SOURCE_DIR}/shared/*.h
 )
 
-file(GLOB SRC_SHADERS_RAYTRACE_COMMON
-    ${PROJNAME}/shaders/raytrace/utils/*.glsl
+file(GLOB SRC_SHADERS_UTILS
+    ${SOURCE_DIR}/shaders/utils/*.glsl
 )
 
 file(GLOB SRC_SHADERS_RAYTRACE
-    ${PROJNAME}/shaders/raytrace/*.rgen
-    ${PROJNAME}/shaders/raytrace/*.rahit
-    ${PROJNAME}/shaders/raytrace/*.rchit
-    ${PROJNAME}/shaders/raytrace/*.rmiss
+    ${SOURCE_DIR}/shaders/raytrace.*.rgen
+    ${SOURCE_DIR}/shaders/raytrace.*.rahit
+    ${SOURCE_DIR}/shaders/raytrace.*.rmiss
+)
+
+file(GLOB SRC_SHADERS_RAYTRACE_BXDF
+    ${SOURCE_DIR}/shaders/bxdf/raytrace.*.rchit
 )
 
 file(GLOB SRC_SHADERS_GRAPHICS
-    ${PROJNAME}/shaders/graphics/*.frag
-    ${PROJNAME}/shaders/graphics/*.vert
-)
-
-file(GLOB SRC_SHADERS_POST_COMMON
-    ${PROJNAME}/shaders/post/utils/*.glsl
+    ${SOURCE_DIR}/shaders/graphics.*.frag
+    ${SOURCE_DIR}/shaders/graphics.*.vert
 )
 
 file(GLOB SRC_SHADERS_POST
-    ${PROJNAME}/shaders/post/*.frag
-    ${PROJNAME}/shaders/post/*.vert
+    ${SOURCE_DIR}/shaders/post.*.frag
+    ${SOURCE_DIR}/shaders/post.*.vert
 )
 
-file(GLOB SRC_3RDPARTY_JSON
-    ${PROJNAME}/third_party/json/json/json.hpp
-)
-
-file(GLOB SRC_3RDPARTY_TQDM
-    ${PROJNAME}/third_party/tqdm/tqdm/tqdm.h
-)
+# file(GLOB SRC_3RDPARTY
+#     ${THIRD_PARTY_DIR}/*
+# )
 
 file(GLOB SRC_EXTRA
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinygltf/json.hpp
-    ${PROJNAME}/third_party/nvpro_core/third_party/NVTX/c/include/nvtx3/nvToolsExt.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinygltf/tiny_gltf.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/tinyobjloader/tiny_obj_loader.h
-    ${PROJNAME}/third_party/nvpro_core/third_party/vma/include/vk_mem_alloc.h
+    ${THIRD_PARTY_DIR}/nvpro_core/third_party/tinygltf/json.hpp
+    ${THIRD_PARTY_DIR}/nvpro_core/third_party/NVTX/c/include/nvtx3/nvToolsExt.h
+    ${THIRD_PARTY_DIR}/nvpro_core/third_party/tinygltf/tiny_gltf.h
+    ${THIRD_PARTY_DIR}/nvpro_core/third_party/tinyobjloader/tiny_obj_loader.h
+    ${THIRD_PARTY_DIR}/nvpro_core/third_party/vma/include/vk_mem_alloc.h
 )
 set(SRC_AUTOGEN ${SRC_EXTRA} ${COMMON_SOURCE_FILES} ${PACKAGE_SOURCE_FILES})
 
@@ -152,8 +148,21 @@ compile_glsl(
     SOURCE_FILES
         ${SRC_SHADERS_RAYTRACE}
     HEADER_FILES
-        ${SRC_HOSTDEVICE}
-        ${SRC_SHADERS_RAYTRACE_COMMON}
+        ${SRC_SHARED}
+        ${SRC_SHADERS_UTILS}
+    DST
+        "${OUTPUT_PATH}/shaders"
+    VULKAN_TARGET
+        "vulkan1.3"
+    HEADER OFF
+    DEPENDENCY ON
+)
+compile_glsl(
+    SOURCE_FILES
+        ${SRC_SHADERS_RAYTRACE_BXDF}
+    HEADER_FILES
+        ${SRC_SHARED}
+        ${SRC_SHADERS_UTILS}
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
@@ -165,7 +174,8 @@ compile_glsl(
     SOURCE_FILES
         ${SRC_SHADERS_GRAPHICS}
     HEADER_FILES
-        ${SRC_HOSTDEVICE}
+        ${SRC_SHARED}
+        ${SRC_SHADERS_UTILS}
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
@@ -177,8 +187,8 @@ compile_glsl(
     SOURCE_FILES
         ${SRC_SHADERS_POST}
     HEADER_FILES
-        ${SRC_HOSTDEVICE}
-        ${SRC_SHADERS_POST_COMMON}
+        ${SRC_SHARED}
+        ${SRC_SHADERS_UTILS}
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
@@ -192,45 +202,41 @@ compile_glsl(
 # Sources
 target_sources(${PROJNAME} PUBLIC
     ${ENTRY}
-    ${SRC_3RDPARTY_JSON}
-    ${SRC_3RDPARTY_TQDM}
     ${SRC_LOADER}
     ${SRC_TRACER}
-    ${SRC_TRACER_CONTEXT}
-    ${SRC_TRACER_SCENE}
-    ${SRC_TRACER_RESOURCE}
-    ${SRC_TRACER_PIPELINE}
-    ${SRC_HOSTDEVICE}
+    ${SRC_CONTEXT}
+    ${SRC_SCENE}
+    ${SRC_CORE}
+    ${SRC_PIPELINE}
+    ${SRC_SHARED}
+    ${SRC_SHADERS_UTILS}
     ${SRC_SHADERS_GRAPHICS}
     ${SRC_SHADERS_POST}
-    ${SRC_SHADERS_RAYTRACE_COMMON}
-    ${SRC_SHADERS_POST_COMMON}
     ${SRC_SHADERS_RAYTRACE}
+    ${SRC_SHADERS_RAYTRACE_BXDF}
     ${SRC_AUTOGEN}
 )
 # include directory
 target_include_directories(${PROJNAME} PUBLIC
-    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/json
-    ${PROJ_ROOT_DIR}/${PROJNAME}/third_party/tqdm
+    ${SOURCE_DIR}
 )
 
 #--------------------------------------------------------------------------------------------------
 # Sub-folders in Visual Studio
 source_group("autogen" FILES ${SRC_AUTOGEN})
 source_group("" FILES ${ENTRY})
-source_group("third_party\\json" FILES ${SRC_3RDPARTY_JSON})
-source_group("third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
+# source_group("third_party\\json" FILES ${SRC_3RDPARTY_JSON})
+# source_group("third_party\\tqdm" FILES ${SRC_3RDPARTY_TQDM})
 source_group("loader" FILES ${SRC_LOADER})
+source_group("core" FILES ${SRC_CORE})
 source_group("tracer" FILES ${SRC_TRACER})
-source_group("tracer\\context" FILES ${SRC_TRACER_CONTEXT})
-source_group("tracer\\scene" FILES ${SRC_TRACER_SCENE})
-source_group("tracer\\pipeline" FILES ${SRC_TRACER_PIPELINE})
-source_group("hostdevice" FILES ${SRC_HOSTDEVICE})
-source_group("shaders\\raytrace" FILES ${SRC_SHADERS_RAYTRACE})
-source_group("shaders\\raytrace\\utils" FILES ${SRC_SHADERS_RAYTRACE_COMMON})
-source_group("shaders\\graphics" FILES ${SRC_SHADERS_GRAPHICS})
-source_group("shaders\\post" FILES ${SRC_SHADERS_POST})
-source_group("shaders\\post\\utils" FILES ${SRC_SHADERS_POST_COMMON})
+source_group("context" FILES ${SRC_CONTEXT})
+source_group("scene" FILES ${SRC_SCENE})
+source_group("pipeline" FILES ${SRC_PIPELINE})
+source_group("shared" FILES ${SRC_SHARED})
+source_group("shaders" FILES ${SRC_SHADERS_RAYTRACE} ${SRC_SHADERS_GRAPHICS} ${SRC_SHADERS_POST})
+source_group("shaders\\utils" FILES ${SRC_SHADERS_UTILS})
+source_group("shaders\\bxdf" FILES ${SRC_SHADERS_RAYTRACE_BXDF})
 
 #--------------------------------------------------------------------------------------------------
 # Linkage
