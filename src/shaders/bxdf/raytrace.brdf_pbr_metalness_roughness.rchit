@@ -16,6 +16,47 @@
 layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
+vec3 fSchlick(float cosTheta, vec3 f0)
+{
+  return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+float dGGX(vec3 normal, vec3 hal, float roughness)
+{
+  float a      = roughness * roughness;
+  float a2     = a * a;
+  float nDotH  = max(dot(normal, hal), 0.0);
+  float nDotH2 = nDotH * nDotH;
+
+  float num   = a2;
+  float denom = (nDotH2 * (a2 - 1.0) + 1.0);
+  denom       = PI * denom * denom;
+
+  return num / (denom + EPS);
+}
+
+// https://github.com/QianMo/PBR-White-Paper/blob/master/content/part%205/README.md
+float g1SmithGGX(float nDotV, float roughness)
+{
+  float r = (roughness + 1.0);
+  float k = (r * r) / 8.0;
+
+  float num   = nDotV;
+  float denom = nDotV * (1.0 - k) + k;
+
+  return num / (denom + EPS);
+}
+
+float g2SmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness)
+{
+  float nDotV = max(dot(normal, viewDir), 0.0);
+  float nDotL = max(dot(normal, lightDir), 0.0);
+  float ggx2  = g1SmithGGX(nDotV, roughness);
+  float ggx1  = g1SmithGGX(nDotL, roughness);
+
+  return ggx1 * ggx2;
+}
+
 void main()
 {
   UNPACK_VERTEX_INFO(id, v0, v1, v2, bary, uv, hitPos, shadingNormal, faceNormal, lightId, material);
@@ -37,6 +78,10 @@ void main()
   if(material.emittanceTextureId >= 0)
     material.emittance =
         material.emittanceFactor * texture(textureSamplers[nonuniformEXT(material.emittanceTextureId)], uv).rgb;
+  if(material.metalnessTextureId >= 0)
+    material.metalness = texture(textureSamplers[nonuniformEXT(material.metalnessTextureId)], uv).r;
+  if(material.roughnessTextureId >= 0)
+    material.roughness = texture(textureSamplers[nonuniformEXT(material.roughnessTextureId)], uv).r;
 
   // Hit Light
   if(lightId > 0)
@@ -91,9 +136,19 @@ void main()
     {
       BsdfSample bsdfSample;
 
-      vec3 bsdfSampleVal = material.diffuse * INV_PI;
-      bsdfSample.pdf     = cosineHemispherePdf(dot(lightSample.direction, ffnormal));
-      float misWeight    = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
+      vec3 f0           = vec3(0.04);
+      f0                = mix(f0, material.diffuse, material.metalness);
+      vec3  hal         = normalize(lightSample.direction + viewDir);
+      vec3  brdfF       = fSchlick(max(dot(hal, viewDir), 0.0), f0);
+      float brdfD       = dGGX(ffnormal, hal, material.roughness);
+      float brdfG       = g2SmithGGX(ffnormal, viewDir, lightSample.direction, material.roughness);
+      float denominator = 4.0 * max(dot(ffnormal, viewDir), 0.0) * max(dot(ffnormal, lightSample.direction), 0.0) + EPS;
+      vec3  brdfDiffuse = material.diffuse * INV_PI;
+      vec3  brdfSpecular  = brdfF * brdfD * brdfG / denominator;
+      vec3  bsdfSampleVal = brdfDiffuse * (1 - material.metalness) * (1 - brdfF) + brdfSpecular;
+
+      bsdfSample.pdf  = cosineHemispherePdf(dot(lightSample.direction, ffnormal));
+      float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
 
       Li += misWeight * bsdfSampleVal * dot(lightSample.direction, ffnormal) * lightSample.emittance / (lightSample.pdf + EPS);
 
@@ -117,7 +172,17 @@ void main()
   BsdfSample bsdfSample;
   bsdfSample.direction = normalize(local2global * cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed))));
   bsdfSample.pdf       = cosineHemispherePdf(dot(bsdfSample.direction, ffnormal));
-  vec3 bsdfSampleVal   = material.diffuse * INV_PI;
+
+  vec3 f0             = vec3(0.04);
+  f0                  = mix(f0, material.diffuse, material.metalness);
+  vec3  hal           = normalize(bsdfSample.direction + viewDir);
+  vec3  brdfF         = fSchlick(max(dot(hal, viewDir), 0.0), f0);
+  float brdfD         = dGGX(ffnormal, hal, material.roughness);
+  float brdfG         = g2SmithGGX(ffnormal, viewDir, bsdfSample.direction, material.roughness);
+  float denominator   = 4.0 * max(dot(ffnormal, viewDir), 0.0) * max(dot(ffnormal, bsdfSample.direction), 0.0) + EPS;
+  vec3  brdfDiffuse   = material.diffuse * INV_PI;
+  vec3  brdfSpecular  = brdfF * brdfD * brdfG / denominator;
+  vec3  bsdfSampleVal = brdfDiffuse * (1 - material.metalness) * (1 - brdfF) + brdfSpecular;
 
   if(bsdfSample.pdf < 0.0)
   {

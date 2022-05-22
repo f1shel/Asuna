@@ -47,18 +47,7 @@ hitAttributeEXT vec2 _bary;
     shadingNormal         = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);                   \
     faceNormal            = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));                                        \
     if(lightId < 0)                                                                                                    \
-    {                                                                                                                  \
       material = Materials(_inst.materialAddress).m[0];                                                                \
-      if(material.diffuseTextureId >= 0)                                                                               \
-        material.diffuse = texture(textureSamplers[nonuniformEXT(material.diffuseTextureId)], uv).rgb;                 \
-      if(material.roughnessTextureId >= 0)                                                                             \
-        material.roughness = texture(textureSamplers[nonuniformEXT(material.roughnessTextureId)], uv).r;               \
-      if(material.metalnessTextureId >= 0)                                                                             \
-        material.metalness = texture(textureSamplers[nonuniformEXT(material.metalnessTextureId)], uv).r;               \
-      if(material.emittanceTextureId >= 0)                                                                             \
-        material.emittance =                                                                                           \
-            material.emittanceFactor * texture(textureSamplers[nonuniformEXT(material.emittanceTextureId)], uv).rgb;   \
-    }                                                                                                                  \
   }
 
 #endif

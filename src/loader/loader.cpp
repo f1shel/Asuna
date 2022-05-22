@@ -70,7 +70,6 @@ void Loader::parse(const nlohmann::json& sceneFileJson)
 
   auto& integratorJson = sceneFileJson["integrator"];
   auto& cameraJson     = sceneFileJson["camera"];
-  auto& lightsJson     = sceneFileJson["lights"];
   auto& meshesJson     = sceneFileJson["meshes"];
   auto& instancesJson  = sceneFileJson["instances"];
 
@@ -100,6 +99,7 @@ void Loader::parse(const nlohmann::json& sceneFileJson)
   // lights
   if(sceneFileJson.contains("lights"))
   {
+    auto& lightsJson = sceneFileJson["lights"];
     for(auto& lightJson : lightsJson)
     {
       addLight(lightJson);
@@ -270,13 +270,21 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
   GpuMaterial& material = mat.getMaterial();
   if(materialJson["type"] == "brdf_lambertian")
   {
+    material.type = MaterialTypeBrdfLambertian;
     if(materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
     if(materialJson.contains("diffuse_texture"))
       material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if(materialJson.contains("emittance"))
+      material.emittance = Json2Vec3(materialJson["emittance"]);
+    if(materialJson.contains("emittance_factor"))
+      material.emittanceFactor = Json2Vec3(materialJson["emittance_factor"]);
+    if(materialJson.contains("emittance_texture"))
+      material.emittanceTextureId = m_pScene->getTextureId(materialJson["emittance_texture"]);
   }
-  else if(materialJson["type"] == "brdf_pbr_metalnesss_roughness")
+  else if(materialJson["type"] == "brdf_pbr_metalness_roughness")
   {
+    material.type = MaterialTypeBrdfPbrMetalnessRoughness;
     if(materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
     if(materialJson.contains("diffuse_texture"))

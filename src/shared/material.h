@@ -3,6 +3,14 @@
 
 #include "binding.h"
 
+// clang-format off
+START_ENUM(MaterialType)
+  MaterialTypeBrdfLambertian            = 0,
+  MaterialTypeBrdfPbrMetalnessRoughness = 1,
+  MaterialTypeNum                       = 2
+END_ENUM();
+// clang-format on
+
 struct GpuMaterial
 {
   vec3  diffuse;             // diffuse albedo
@@ -14,6 +22,7 @@ struct GpuMaterial
   int   roughnessTextureId;  // roughness texture id
   int   metalnessTextureId;  // roughness texture id
   int   emittanceTextureId;  // emittance texture
+  uint  type;                // material type
 };
 
 #endif

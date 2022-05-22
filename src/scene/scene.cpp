@@ -376,6 +376,11 @@ CameraType Scene::getCameraType()
   return m_pCamera->getType();
 }
 
+MaterialType Scene::getMaterialType(uint matId)
+{
+  return m_pMaterialsAlloc[matId]->getType();
+}
+
 nvvk::RaytracingBuilderKHR::BlasInput Scene::getBlas(VkDevice device, int meshId)
 {
   return MeshBufferToBlas(device, *m_pMeshesAlloc[meshId]);

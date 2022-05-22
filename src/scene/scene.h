@@ -55,6 +55,7 @@ public:
   uint                                  getIgnoreEmissive();
   Camera&                               getCamera();
   CameraType                            getCameraType();
+  MaterialType                          getMaterialType(uint matId);
   nvvk::RaytracingBuilderKHR::BlasInput getBlas(VkDevice device, int meshId);
   vector<Instance>&                     getInstances();
   VkExtent2D                            getSize();
