@@ -66,7 +66,7 @@ void Loader::loadSceneFromJson(std::string sceneFilePath, const std::vector<std:
 
 void Loader::parse(const nlohmann::json& sceneFileJson)
 {
-  JsonCheckKeys(sceneFileJson, {"integrator", "camera", "lights", "meshes", "instances"});
+  JsonCheckKeys(sceneFileJson, {"integrator", "camera", "meshes", "instances"});
 
   auto& integratorJson = sceneFileJson["integrator"];
   auto& cameraJson     = sceneFileJson["camera"];
@@ -88,7 +88,6 @@ void Loader::parse(const nlohmann::json& sceneFileJson)
       addTexture(textureJson);
     }
   }
-
   // materials
   if(sceneFileJson.contains("materials"))
   {
@@ -98,9 +97,13 @@ void Loader::parse(const nlohmann::json& sceneFileJson)
       addMaterial(materialJson);
     }
   }
-  for(auto& lightJson : lightsJson)
+  // lights
+  if(sceneFileJson.contains("lights"))
   {
-    addLight(lightJson);
+    for(auto& lightJson : lightsJson)
+    {
+      addLight(lightJson);
+    }
   }
   // meshes
   for(auto& meshJson : meshesJson)

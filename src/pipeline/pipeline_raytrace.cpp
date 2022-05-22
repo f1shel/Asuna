@@ -100,7 +100,7 @@ void PipelineRaytrace::initRayTracing()
   m_pushconstant.curFrame       = -1;
   m_pushconstant.spp            = m_pScene->getSpp();
   m_pushconstant.maxPathDepth   = m_pScene->getMaxPathDepth();
-  m_pushconstant.numLights      = m_pScene->getLightsNum();
+  m_pushconstant.numLights      = m_pScene->getLightsNum() - 1; // the first light is added by default
   m_pushconstant.useFaceNormal  = m_pScene->getUseFaceNormal();
   m_pushconstant.ignoreEmissive = m_pScene->getIgnoreEmissive();
 }

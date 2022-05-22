@@ -88,7 +88,7 @@ void Scene::reset()
     freeAllocData();
   freeRawData();
   m_hasScene = false;
-  // Add dummy texture and material so that pipeline
+  // Add dummy texture, material and light so that pipeline
   // compilation will not complain
   const std::string& tn        = "add_by_default_dummy_texture";
   const std::string& mn        = "add_by_default_dummy_material";
@@ -96,23 +96,35 @@ void Scene::reset()
   Material*          pMaterial = new Material;
   m_pTextures[tn]              = std::make_pair(pTexture, m_pTextures.size());
   m_pMaterials[mn]             = std::make_pair(pMaterial, m_pMaterials.size());
-  m_sunAndSky                  = {
-                       {1, 1, 1},            // rgb_unit_conversion;
-                       0.0000101320f,        // multiplier;
-                       0.0f,                 // haze;
-                       0.0f,                 // redblueshift;
-                       1.0f,                 // saturation;
-                       0.0f,                 // horizon_height;
-                       {0.4f, 0.4f, 0.4f},   // ground_color;
-                       0.1f,                 // horizon_blur;
-                       {0.0, 0.0, 0.01f},    // night_color;
-                       0.8f,                 // sun_disk_intensity;
-                       {0.00, 0.78, 0.62f},  // sun_direction;
-                       5.0f,                 // sun_disk_scale;
-                       1.0f,                 // sun_glow_intensity;
-                       1,                    // y_is_up;
-                       1,                    // physically_scaled_sun;
-                       0,                    // in_use;
+  GpuLight defaultLight        = {
+      LightTypeDirectional,  // type
+      vec3(0.f),             // position
+      vec3(0.f),             // direction
+      vec3(0.f),             // emittance
+      vec3(0.f),             // u
+      vec3(0.f),             // v
+      0.f,                   // radius
+      0.f,                   // area
+      1,                     // double side
+  };
+  addLight(defaultLight);
+  m_sunAndSky = {
+      {1, 1, 1},            // rgb_unit_conversion;
+      0.0000101320f,        // multiplier;
+      0.0f,                 // haze;
+      0.0f,                 // redblueshift;
+      1.0f,                 // saturation;
+      0.0f,                 // horizon_height;
+      {0.4f, 0.4f, 0.4f},   // ground_color;
+      0.1f,                 // horizon_blur;
+      {0.0, 0.0, 0.01f},    // night_color;
+      0.8f,                 // sun_disk_intensity;
+      {0.00, 0.78, 0.62f},  // sun_direction;
+      5.0f,                 // sun_disk_scale;
+      1.0f,                 // sun_glow_intensity;
+      1,                    // y_is_up;
+      1,                    // physically_scaled_sun;
+      0,                    // in_use;
   };
 }
 

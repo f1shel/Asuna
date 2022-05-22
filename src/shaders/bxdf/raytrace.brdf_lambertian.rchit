@@ -33,7 +33,7 @@ void main()
   mat3 global2local = transpose(local2global);
 
   // Hit Light
-  if(lightId >= 0)
+  if(lightId > 0)
   {
     GpuLight light               = lights.l[lightId];
     vec3     lightDirection      = normalize(hitPos - payload.ray.origin);
@@ -74,8 +74,7 @@ void main()
     {
       if(pc.numLights == 0)
         break;
-      // randomly select one of the lights
-      int      lightIndex = int(min(rand(payload.seed) * pc.numLights, pc.numLights - 1));
+      int      lightIndex = min(1 + int(rand(payload.seed) * pc.numLights), pc.numLights);
       GpuLight light      = lights.l[lightIndex];
       sampleOneLight(payload.seed, light, hitPos, lightSample);
       lightSample.emittance *= pc.numLights;  // selection pdf
