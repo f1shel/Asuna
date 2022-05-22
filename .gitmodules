@@ -1,3 +1,0 @@
-[submodule "asuna/third_party/nvpro_core"]
-	path = asuna/third_party/nvpro_core
-	url = https://github.com/nvpro-samples/nvpro_core.git
