@@ -1,0 +1,3 @@
+[submodule "src/ext/nvpro_core"]
+	path = src/ext/nvpro_core
+	url = https://github.com/nvpro-samples/nvpro_core.git
