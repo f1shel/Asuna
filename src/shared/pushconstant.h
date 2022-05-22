@@ -14,6 +14,7 @@ struct GpuPushConstantRaytrace
   int  curFrame;
   int  maxPathDepth;
   int  numLights;
+  vec3 bgColor;
   uint useFaceNormal;
   uint ignoreEmissive;
 };

@@ -82,10 +82,10 @@ void main()
     fragColor = hdr;
     return;
   }
-  vec3 x = max(vec3(0.0f), hdr.xyz - 0.004f);
-  fragColor.xyz = (x*(6.2f*x + 0.5f))/(x*(6.2f*x + 1.7f) + 0.06f);
-  fragColor.a = hdr.a;
-  return ;
+//  vec3 x = max(vec3(0.0f), hdr.xyz - 0.004f);
+//  fragColor.xyz = (x*(6.2f*x + 0.5f))/(x*(6.2f*x + 1.7f) + 0.06f);
+//  fragColor.a = hdr.a;
+//  return ;
 
   if(((tm.autoExposure >> 0) & 1) == 1)
   {

@@ -8,13 +8,14 @@ class Integrator
 {
 public:
   Integrator() {}
-  Integrator(uint spp, uint maxPathDepth, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive)
+  Integrator(uint spp, uint maxPathDepth, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
   {
-    m_spp            = spp;
-    m_maxPathDepth   = maxPathDepth;
-    m_useFaceNormal  = useFaceNormal;
-    m_useToneMapping = useToneMapping;
-    m_ignoreEmissive = ignoreEmissive;
+    m_spp             = spp;
+    m_maxPathDepth    = maxPathDepth;
+    m_useFaceNormal   = useFaceNormal;
+    m_useToneMapping  = useToneMapping;
+    m_ignoreEmissive  = ignoreEmissive;
+    m_backgroundColor = bgColor;
   }
   uint getSpp() { return m_spp; }
   void setSpp(int spp) { m_spp = spp; }
@@ -22,6 +23,7 @@ public:
   uint getUseToneMapping() { return m_useToneMapping; }
   uint getUseFaceNormal() { return m_useFaceNormal; }
   uint getIgnoreEmissive() { return m_ignoreEmissive; }
+  vec3 getBackgroundColor() { return m_backgroundColor; }
 
 private:
   uint m_spp{1};
@@ -29,4 +31,5 @@ private:
   uint m_useFaceNormal{0};
   uint m_useToneMapping{1};
   uint m_ignoreEmissive{0};
+  vec3 m_backgroundColor{0.f, 0.f, 0.f};
 };

@@ -103,6 +103,7 @@ void PipelineRaytrace::initRayTracing()
   m_pushconstant.numLights      = m_pScene->getLightsNum() - 1;  // the first light is added by default
   m_pushconstant.useFaceNormal  = m_pScene->getUseFaceNormal();
   m_pushconstant.ignoreEmissive = m_pScene->getIgnoreEmissive();
+  m_pushconstant.bgColor        = m_pScene->getBackGroundColor();
 }
 
 void PipelineRaytrace::createBottomLevelAS()

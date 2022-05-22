@@ -25,7 +25,12 @@ static json defaultSceneOptions = json::parse(R"(
     "max_path_depth": 2,
     "use_tone_mapping": true,
     "use_face_normal": false,
-    "ignore_emissive": false
+    "ignore_emissive": false,
+    "background_color": [
+      0.2313725490196078,
+      0.3607843137254902,
+      0.4313725490196078
+    ]
   },
   "camera": {
     "fov": 45.0,
@@ -138,6 +143,7 @@ void Loader::addIntegrator(const nlohmann::json& integratorJson)
   bool boolUseToneMapping = defaultSceneOptions["integrator"]["use_tone_mapping"];
   bool boolUseFaceNormal  = defaultSceneOptions["integrator"]["use_face_normal"];
   bool boolIgnoreEmissive = defaultSceneOptions["integrator"]["ignore_emissive"];
+  vec3 bgColor            = Json2Vec3(defaultSceneOptions["integrator"]["background_color"]);
   if(integratorJson.contains("spp"))
     spp = integratorJson["spp"];
   if(integratorJson.contains("max_path_depth"))
@@ -148,8 +154,10 @@ void Loader::addIntegrator(const nlohmann::json& integratorJson)
     boolUseFaceNormal = integratorJson["use_face_normal"];
   if(integratorJson.contains("ignore_emissive"))
     boolIgnoreEmissive = integratorJson["ignore_emissive"];
+  if(integratorJson.contains("background_color"))
+    bgColor = Json2Vec3(integratorJson["background_color"]);
 
-  m_pScene->addIntegrator(spp, maxDepth, boolUseToneMapping, boolUseFaceNormal, boolIgnoreEmissive);
+  m_pScene->addIntegrator(spp, maxDepth, boolUseToneMapping, boolUseFaceNormal, boolIgnoreEmissive, bgColor);
 }
 
 void Loader::addCamera(const nlohmann::json& cameraJson)

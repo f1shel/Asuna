@@ -27,7 +27,7 @@ public:
   void freeRawData();
 
 public:
-  void addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive);
+  void addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor);
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
@@ -53,6 +53,7 @@ public:
   uint                                  getUseFaceNormal();
   uint                                  getUseToneMapping();
   uint                                  getIgnoreEmissive();
+  vec3                                  getBackGroundColor();
   Camera&                               getCamera();
   CameraType                            getCameraType();
   MaterialType                          getMaterialType(uint matId);

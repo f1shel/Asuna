@@ -121,16 +121,30 @@ void main()
     vec3 Li              = vec3(0);
     bool allowDoubleSide = false;
 
-    do
+    float envOrAnalyticPdf = 0.5;
+    if(pc.numLights == 0)
+      envOrAnalyticPdf = 1.0;
+    if(rand(payload.seed) < envOrAnalyticPdf)
     {
-      if(pc.numLights == 0)
-        break;
+      // sample environment light
+      lightSample.normal    = -ffnormal;
+      lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed),rand(payload.seed)));
+      lightSample.pdf = uniformSpherePdf();
+      lightSample.shouldMis = 1.0;
+      lightSample.dist = INFINITY;
+      lightSample.emittance = pc.bgColor;
+      lightSample.emittance /= envOrAnalyticPdf;
+    }
+    else
+    {
+      // sample analytic light
       int      lightIndex = min(1 + int(rand(payload.seed) * pc.numLights), pc.numLights);
       GpuLight light      = lights.l[lightIndex];
       sampleOneLight(payload.seed, light, hitPos, lightSample);
       lightSample.emittance *= pc.numLights;  // selection pdf
+      lightSample.emittance /= 1.0 - envOrAnalyticPdf;
       allowDoubleSide = (light.doubleSide == 1);
-    } while(false);
+    }
 
     if(dot(lightSample.direction, ffnormal) > 0.0 && (dot(lightSample.normal, lightSample.direction) < 0 || allowDoubleSide))
     {
@@ -160,7 +174,11 @@ void main()
   }
 
   if(pc.ignoreEmissive == 0 && length(material.emittance) > 0)
+  {
     payload.radiance += material.emittance * payload.throughput;
+    payload.stop = 1;
+    return;
+  }
 
   if(payload.depth >= pc.maxPathDepth)
   {
