@@ -26,11 +26,7 @@ static json defaultSceneOptions = json::parse(R"(
     "use_tone_mapping": true,
     "use_face_normal": false,
     "ignore_emissive": false,
-    "background_color": [
-      0.2313725490196078,
-      0.3607843137254902,
-      0.4313725490196078
-    ]
+    "background_color": [0,0,0]
   },
   "camera": {
     "fov": 45.0,

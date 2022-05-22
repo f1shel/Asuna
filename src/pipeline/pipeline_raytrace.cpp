@@ -60,7 +60,16 @@ void PipelineRaytrace::run(const VkCommandBuffer& cmdBuf)
 
   const auto& regions = m_sbt.getRegions();
   auto        size    = m_pContext->getSize();
-  vkCmdTraceRaysKHR(cmdBuf, &regions[0], &regions[1], &regions[2], &regions[3], size.width, size.height, 1);
+
+  // Run the ray tracing pipeline and trace rays
+  vkCmdTraceRaysKHR(cmdBuf,       // Command buffer
+                    &regions[0],  // Region of memory with ray generation groups
+                    &regions[1],  // Region of memory with miss groups
+                    &regions[2],  // Region of memory with hit groups
+                    &regions[3],  // Region of memory with callable groups
+                    size.width,   // Width of dispatch
+                    size.height,  // Height of dispatch
+                    1);           // Depth of dispatch
 }
 
 void PipelineRaytrace::setSpp(int spp)
@@ -126,15 +135,19 @@ void PipelineRaytrace::createTopLevelAS()
   auto& instances = m_pScene->getInstances();
   for(uint32_t instId = 0; instId < m_pScene->getInstancesNum(); instId++)
   {
-    auto&                              inst  = instances[instId];
-    uint                               matId = inst.getMaterialIndex();
+    auto&                              inst    = instances[instId];
+    uint                               matId   = inst.getMaterialIndex();
+    bool                               isLight = (inst.getLightIndex() >= 0);
     VkAccelerationStructureInstanceKHR rayInst{};
     rayInst.transform                      = nvvk::toTransformMatrixKHR(inst.getTransform());
     rayInst.instanceCustomIndex            = 0;  // gl_InstanceCustomIndexEXT
     rayInst.accelerationStructureReference = m_rtBuilder.getBlasDeviceAddress(inst.getMeshIndex());
     rayInst.flags                          = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     rayInst.mask                           = 0xFF;  // Only be hit if rayMask & instance.mask != 0
-    rayInst.instanceShaderBindingTableRecordOffset = m_pScene->getMaterialType(matId);  // material type determines closet hit shader
+    if(!isLight)
+      rayInst.instanceShaderBindingTableRecordOffset = m_pScene->getMaterialType(matId);  // material type determines closet hit shader
+    else
+      rayInst.instanceShaderBindingTableRecordOffset = MaterialTypeBrdfLambertian;
     m_tlas.emplace_back(rayInst);
   }
 
@@ -160,6 +173,7 @@ void PipelineRaytrace::createRtDescriptorSetLayout()
 
 void PipelineRaytrace::createRtPipeline()
 {
+  auto& m_alloc  = m_pContext->getAlloc();
   auto& m_debug  = m_pContext->getDebug();
   auto  m_device = m_pContext->getDevice();
 

@@ -25,7 +25,6 @@ void main()
   vec3 env = pc.bgColor;
   float pdf = uniformSpherePdf();
   float misWeight = powerHeuristic(payload.bsdf.pdf, pdf);
-  // TODO: add pdf
   if(sunAndSky.in_use == 1)
     env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
   // Done sampling return

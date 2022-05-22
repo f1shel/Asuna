@@ -39,7 +39,7 @@ void main()
         material.emittanceFactor * texture(textureSamplers[nonuniformEXT(material.emittanceTextureId)], uv).rgb;
 
   // Hit Light
-  if(lightId > 0)
+  if(lightId >= 0)
   {
     GpuLight light               = lights.l[lightId];
     vec3     lightDirection      = normalize(hitPos - payload.ray.origin);
@@ -87,7 +87,10 @@ void main()
       lightSample.pdf = uniformSpherePdf();
       lightSample.shouldMis = 1.0;
       lightSample.dist = INFINITY;
-      lightSample.emittance = pc.bgColor;
+      if(sunAndSky.in_use == 1)
+        lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
+      else
+        lightSample.emittance = pc.bgColor;
       lightSample.emittance /= envOrAnalyticPdf;
     }
     else
@@ -118,11 +121,8 @@ void main()
     }
   }
 
-  if(pc.ignoreEmissive == 0 && length(material.emittance) > 0) {
+  if(pc.ignoreEmissive == 0 && length(material.emittance) > 0)
     payload.radiance += material.emittance * payload.throughput;
-    payload.stop = 1;
-    return;
-  }
 
   if(payload.depth >= pc.maxPathDepth)
   {

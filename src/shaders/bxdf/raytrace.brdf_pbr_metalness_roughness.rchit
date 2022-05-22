@@ -132,7 +132,10 @@ void main()
       lightSample.pdf = uniformSpherePdf();
       lightSample.shouldMis = 1.0;
       lightSample.dist = INFINITY;
-      lightSample.emittance = pc.bgColor;
+      if(sunAndSky.in_use == 1)
+        lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
+      else
+        lightSample.emittance = pc.bgColor;
       lightSample.emittance /= envOrAnalyticPdf;
     }
     else
@@ -223,18 +226,19 @@ void main()
     uint  rayFlags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
     float maxDist   = contrib.lightDist - EPS;
     isShadowed      = true;
-    traceRayEXT(tlas,                 // acceleration structure
-                rayFlags,             // rayFlags
-                0xFF,                 // cullMask
-                0,                    // sbtRecordOffset
-                0,                    // sbtRecordStride
-                1,                    // missIndex
-                shadowRay.origin,     // ray origin
-                0.0,                  // ray min range
-                shadowRay.direction,  // ray direction
-                maxDist,              // ray max range
-                1                     // payload layout(location = 1)
-    );
+    // FIXME: this segment will cause bug
+//    traceRayEXT(tlas,                 // acceleration structure
+//                rayFlags,             // rayFlags
+//                0xFF,                 // cullMask
+//                0,                    // sbtRecordOffset
+//                0,                    // sbtRecordStride
+//                1,                    // missIndex
+//                shadowRay.origin,     // ray origin
+//                0.0,                  // ray min range
+//                shadowRay.direction,  // ray direction
+//                maxDist,              // ray max range
+//                1                     // payload layout(location = 1)
+//    );
     if(!isShadowed)
       payload.radiance += contrib.radiance;
     // debugPrintfEXT("shadow ray: dir = %v3f, distance = %f\n", shadowRay.direction, maxDist);
