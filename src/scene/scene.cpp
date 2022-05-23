@@ -195,9 +195,9 @@ void Scene::freeRawData()
   m_pMaterials.clear();
 }
 
-void Scene::addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
+void Scene::addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
 {
-  m_integrator = Integrator(spp, maxRecur, useToneMapping, useFaceNormal, ignoreEmissive, bgColor);
+  m_integrator = Integrator(spp, maxRecur, tmType, useFaceNormal, ignoreEmissive, bgColor);
 }
 
 void Scene::addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture)
@@ -357,9 +357,9 @@ uint Scene::getUseFaceNormal()
 {
   return m_integrator.getUseFaceNormal();
 }
-uint Scene::getUseToneMapping()
+uint Scene::getToneMappingType()
 {
-  return m_integrator.getUseToneMapping();
+  return m_integrator.getToneMappingType();
 }
 uint Scene::getIgnoreEmissive()
 {

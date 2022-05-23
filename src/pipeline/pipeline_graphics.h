@@ -31,6 +31,9 @@ public:
   GpuPushConstantGraphics& getPushconstant() { return m_pushconstant; }
   nvvk::Texture&           getColorTexture(uint textureId) { return m_tColors[textureId]; }
 
+protected:
+  virtual void initPushconstant();
+
 private:
   vector<nvvk::Texture>   m_tColors{};  // Canvas we draw things on
   nvvk::Texture           m_tDepth;     // Depth buffer

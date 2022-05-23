@@ -3,6 +3,7 @@
 #include <shared/light.h>
 #include <shared/instance.h>
 #include <shared/sun_and_sky.h>
+#include <shared/pushconstant.h>
 #include <context/context.h>
 #include <core/light.h>
 #include <core/instance.h>
@@ -27,7 +28,7 @@ public:
   void freeRawData();
 
 public:
-  void addIntegrator(int spp, int maxRecur, uint useToneMapping, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor);
+  void addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor);
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
@@ -51,7 +52,7 @@ public:
   void                                  setSpp(int spp);
   int                                   getMaxPathDepth();
   uint                                  getUseFaceNormal();
-  uint                                  getUseToneMapping();
+  uint                                  getToneMappingType();
   uint                                  getIgnoreEmissive();
   vec3                                  getBackGroundColor();
   Camera&                               getCamera();

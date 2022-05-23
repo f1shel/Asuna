@@ -15,11 +15,11 @@ void PipelinePost::init(ContextAware* pContext, Scene* pScene, const VkDescripto
   m_pScene   = pScene;
   // Ray tracing
   nvh::Stopwatch sw_;
-  m_pushconstant.useTonemapping = m_pScene->getUseToneMapping();
   createPostDescriptorSetLayout();
   bind(PostBindSet::PostInput, {&m_holdSetWrappers[uint(HoldSet::Input)]});
   createPostPipeline();
   updatePostDescriptorSet(pImageInfo);
+  initPushconstant();
   LOGI("[ ] %-20s: %6.2fms Post pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
@@ -39,6 +39,21 @@ void PipelinePost::run(const VkCommandBuffer& cmdBuf)
 void PipelinePost::deinit()
 {
   PipelineAware::deinit();
+}
+
+void PipelinePost::initPushconstant()
+{
+  m_pushconstant.brightness     = 1.f;
+  m_pushconstant.contrast       = 1.f;
+  m_pushconstant.saturation     = 1.f;
+  m_pushconstant.vignette       = 0.f;
+  m_pushconstant.avgLum         = 1.f;
+  m_pushconstant.zoom           = 1.f;
+  m_pushconstant.renderingRatio = {1.f, 1.f};
+  m_pushconstant.autoExposure   = 0;
+  m_pushconstant.Ywhite         = 0.5f;
+  m_pushconstant.key            = 0.5f;
+  m_pushconstant.tmType         = m_pScene->getToneMappingType();
 }
 
 void PipelinePost::createPostDescriptorSetLayout()

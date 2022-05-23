@@ -24,6 +24,7 @@ void PipelineGraphics::init(ContextAware* pContext, Scene* pScene)
   createGraphicsDescriptorSetLayout();
   createCameraBuffer();
   updateGraphicsDescriptorSet();
+  initPushconstant();
   LOGI("[ ] %-20s: %6.2fms Graphic pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
@@ -104,6 +105,8 @@ void PipelineGraphics::updateSunAndSky(const VkCommandBuffer& cmdBuf)
 {
   vkCmdUpdateBuffer(cmdBuf, m_pScene->getSunskyDescriptor(), 0, sizeof(GpuSunAndSky), &m_pScene->getSunsky());
 }
+
+void PipelineGraphics::initPushconstant() {}
 
 void PipelineGraphics::createOffscreenResources()
 {

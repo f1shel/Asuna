@@ -28,8 +28,11 @@ class PipelineAware
 {
 public:
   PipelineAware(uint numHoldSets, uint numBindSets);
-  void deinit();
-  void bind(uint bindPoint, DescriptorSetWrapper* bindSet);
+  void         deinit();
+  void         bind(uint bindPoint, DescriptorSetWrapper* bindSet);
+
+protected:
+  virtual void initPushconstant() {}
 
 protected:
   ContextAware*                 m_pContext = nullptr;

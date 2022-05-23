@@ -19,6 +19,19 @@ struct GpuPushConstantRaytrace
   uint ignoreEmissive;
 };
 
+// clang-format off
+START_ENUM(ToneMappingType)
+  ToneMappingTypeNone     = 0,
+  ToneMappingTypeGamma    = 1,
+  ToneMappingTypeReinhard = 2,
+  ToneMappingTypeAces     = 3,
+  ToneMappingTypeFilmic   = 4,
+  ToneMappingTypePbrt     = 5,
+  ToneMappingTypeCustom   = 6,
+  ToneMappingTypeNum      = 7
+END_ENUM();
+// clang-format on
+
 // Tonemapper used in post.frag
 struct GpuPushConstantPost
 {
@@ -32,7 +45,7 @@ struct GpuPushConstantPost
   int   autoExposure;
   float Ywhite;  // Burning white
   float key;     // Log-average luminance
-  uint  useTonemapping;
+  uint  tmType;
 };
 
 #endif

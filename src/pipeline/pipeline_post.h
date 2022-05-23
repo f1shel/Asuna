@@ -22,20 +22,11 @@ public:
   virtual void         deinit();
   GpuPushConstantPost& getPushconstant() { return m_pushconstant; }
 
+  protected:
+  virtual void initPushconstant();
+
 private:
-  GpuPushConstantPost m_pushconstant = {
-      1.0f,          // brightness;
-      1.0f,          // contrast;
-      1.0f,          // saturation;
-      0.0f,          // vignette;
-      1.0f,          // avgLum;
-      1.0f,          // zoom;
-      {1.0f, 1.0f},  // renderingRatio;
-      0,             // autoExposure;
-      0.5f,          // Ywhite;  // Burning white
-      0.5f,          // key;     // Log-average luminance
-      true,          // use tone mapping
-  };
+  GpuPushConstantPost m_pushconstant = {};
 
 private:
   void createPostDescriptorSetLayout();

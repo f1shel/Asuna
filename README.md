@@ -4,8 +4,16 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 ## Gallery
 
 <div>
+<center>
 <img src="./demo/cbox.png" width="48%">
 <img src="./demo/honkai.png" width="48%">
+</center>
+</div>
+
+<div>
+<center>
+<img src="./demo/panther.png" width="96%">
+</center>
 </div>
 
 ## Dependencies

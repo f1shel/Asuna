@@ -75,47 +75,69 @@ vec3 toneLocalExposure(vec3 RGB, float logAvgLum)
 void main()
 {
   // Raw result of ray tracing
-  vec4 hdr = texture(inImage, uvCoords * tm.zoom).rgba;
+  vec4 hdr    = texture(inImage, uvCoords * tm.zoom).rgba;
+  fragColor.a = hdr.a;
 
-  if(tm.useTonemapping == 0)
+  if(tm.tmType == ToneMappingTypeNone)
+    fragColor.rgb = hdr.rgb;
+  else if(tm.tmType == ToneMappingTypeGamma)
+    fragColor.rgb = linearTosRGB(hdr.rgb);
+  else if(tm.tmType == ToneMappingTypeReinhard)
+    fragColor.rgb = toneMapHejlRichard(hdr.rgb);
+  else if(tm.tmType == ToneMappingTypeAces)
+    fragColor.rgb = toneMapACES(hdr.rgb);
+  else if(tm.tmType == ToneMappingTypeFilmic)
   {
-    fragColor = hdr;
-    return;
+    vec3 x        = max(vec3(0.0f), hdr.rgb - 0.004f);
+    fragColor.rgb = (x * (6.2f * x + 0.5f)) / (x * (6.2f * x + 1.7f) + 0.06f);
   }
-//  vec3 x = max(vec3(0.0f), hdr.xyz - 0.004f);
-//  fragColor.xyz = (x*(6.2f*x + 0.5f))/(x*(6.2f*x + 1.7f) + 0.06f);
-//  fragColor.a = hdr.a;
-//  return ;
-
-  if(((tm.autoExposure >> 0) & 1) == 1)
+  else if(tm.tmType == ToneMappingTypePbrt)
   {
-    vec4  avg     = textureLod(inImage, vec2(0.5), 20);  // Get the average value of the image
-    float avgLum2 = luminance(avg.rgb);                  // Find the luminance
-    if(((tm.autoExposure >> 1) & 1) == 1)
-      hdr.rgb = toneLocalExposure(hdr.rgb, avgLum2);  // Adjust exposure
+    if(hdr.r < 0.0031308f)
+      fragColor.r = 12.92f * hdr.r;
     else
-      hdr.rgb = toneExposure(hdr.rgb, avgLum2);  // Adjust exposure
+      fragColor.r = 1.055f * pow(hdr.r, 1.0f / 2.4f) - 0.055f;
+    if(hdr.g < 0.0031308f)
+      fragColor.g = 12.92f * hdr.g;
+    else
+      fragColor.g = 1.055f * pow(hdr.g, 1.0f / 2.4f) - 0.055f;
+    if(hdr.b < 0.0031308f)
+      fragColor.b = 12.92f * hdr.b;
+    else
+      fragColor.b = 1.055f * pow(hdr.b, 1.0f / 2.4f) - 0.055f;
   }
+  else if(tm.tmType == ToneMappingTypeCustom)
+  {
+    vec3 _hdr = hdr.rgb;
+    if(((tm.autoExposure >> 0) & 1) == 1)
+    {
+      vec4  avg     = textureLod(inImage, vec2(0.5), 20);  // Get the average value of the image
+      float avgLum2 = luminance(avg.rgb);                  // Find the luminance
+      if(((tm.autoExposure >> 1) & 1) == 1)
+        _hdr = toneLocalExposure(_hdr, avgLum2);  // Adjust exposure
+      else
+        _hdr = toneExposure(_hdr, avgLum2);  // Adjust exposure
+    }
 
-  // Tonemap + Linear to sRgb
-  vec3 color = toneMap(hdr.rgb, tm.avgLum);
+    // Tonemap + Linear to sRgb
+    vec3 color = toneMap(_hdr, tm.avgLum);
 
-  // Remove banding
-  uvec3 r     = pcg3d(uvec3(gl_FragCoord.xy, 0));
-  vec3  noise = uintBitsToFloat(0x3f800000 | (r >> 9)) - 1.0f;
-  color       = dither(sRGBToLinear(color), noise, 1. / 255.);
+    // Remove banding
+    uvec3 r     = pcg3d(uvec3(gl_FragCoord.xy, 0));
+    vec3  noise = uintBitsToFloat(0x3f800000 | (r >> 9)) - 1.0f;
+    color       = dither(sRGBToLinear(color), noise, 1. / 255.);
 
-  // contrast
-  color = clamp(mix(vec3(0.5), color, tm.contrast), 0, 1);
-  // brighness
-  color = pow(color, vec3(1.0 / tm.brightness));
-  // saturation
-  vec3 i = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
-  color  = mix(i, color, tm.saturation);
-  // vignette
-  vec2 uv = ((uvCoords * tm.renderingRatio) - 0.5) * 2.0;
-  color *= 1.0 - dot(uv, uv) * tm.vignette;
+    // contrast
+    color = clamp(mix(vec3(0.5), color, tm.contrast), 0, 1);
+    // brighness
+    color = pow(color, vec3(1.0 / tm.brightness));
+    // saturation
+    vec3 i = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
+    color  = mix(i, color, tm.saturation);
+    // vignette
+    vec2 uv = ((uvCoords * tm.renderingRatio) - 0.5) * 2.0;
+    color *= 1.0 - dot(uv, uv) * tm.vignette;
 
-  fragColor.xyz = color;
-  fragColor.a   = hdr.a;
+    fragColor.rgb = color.rgb;
+  }
 }

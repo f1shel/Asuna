@@ -391,19 +391,19 @@ bool Tracer::guiTonemapper()
       0,             // autoExposure;
       0.5f,          // Ywhite;  // Burning white
       0.5f,          // key;     // Log-average luminance
+      0,             // toneMappingType
   };
+  static vector<const char*> ToneMappingTypeList = {"None", "Gamma", "Reinhard", "Aces", "Filmic", "Pbrt", "Custom"};
 
-  auto&          tm = m_pipelinePost.getPushconstant();
-  bool           changed{false};
-  std::bitset<8> b(tm.autoExposure);
+  auto& tm = m_pipelinePost.getPushconstant();
+  bool  changed{false};
 
-  bool autoExposure = b.test(0);
+  changed |= ImGui::Combo("EnvMaps", (int*)&tm.tmType, ToneMappingTypeList.data(), ToneMappingTypeList.size());
 
-  bool in_use = (tm.useTonemapping != 0);
-  changed |= ImGui::Checkbox("Use Tonemapping", (bool*)&in_use);
-  tm.useTonemapping = in_use ? 1 : 0;
-  if(in_use)
+  if(tm.tmType == ToneMappingTypeCustom)
   {
+    std::bitset<8> b(tm.autoExposure);
+    bool           autoExposure = b.test(0);
     changed |= GuiH::Checkbox("Auto Exposure", "Adjust exposure", (bool*)&autoExposure);
     changed |= GuiH::Slider("Exposure", "Scene Exposure", &tm.avgLum, &default_tm.avgLum, GuiH::Flags::Normal, 0.001f, 5.00f);
     changed |= GuiH::Slider("Brightness", "", &tm.brightness, &default_tm.brightness, GuiH::Flags::Normal, 0.0f, 2.0f);
