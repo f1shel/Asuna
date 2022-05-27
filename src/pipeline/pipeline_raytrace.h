@@ -28,11 +28,11 @@ public:
   virtual void             init(ContextAware* pContext, Scene* pScene, PipelineRaytraceInitState& pis);
   virtual void             deinit();
   virtual void             run(const VkCommandBuffer& cmdBuf);
-  GpuPushConstantRaytrace& getPushconstant() { return m_pushconstant; }
+  GpuPushConstantRaytrace& getPushconstant() { return m_pScene->getPipelineState().rtxState; }
   void                     setSpp(int spp = 1);
   void                     resetFrame();
   void                     incrementFrame();
-  int                      getFrame() { return m_pushconstant.curFrame; }
+  int                      getFrame() { return getPushconstant().curFrame; }
 
 private:
   void initRayTracing();               // Request ray tracing pipeline properties
@@ -47,5 +47,5 @@ private:
   nvvk::RaytracingBuilderKHR                    m_rtBuilder;        // Pipeline builder
   vector<VkAccelerationStructureInstanceKHR>    m_tlas{};           // Top level acceleration structures
   vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};           // Bottom level acceleration structures
-  GpuPushConstantRaytrace                       m_pushconstant{0};  // Push constant
+  //GpuPushConstantRaytrace                       m_pushconstant{0};  // Push constant
 };

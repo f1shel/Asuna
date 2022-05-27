@@ -65,9 +65,6 @@ void main()
   // Fetch textures
   if(state.mat.diffuseTextureId >= 0)
     state.mat.diffuse = texture(textureSamplers[nonuniformEXT(state.mat.diffuseTextureId)], state.uv).rgb;
-  if(state.mat.emittanceTextureId >= 0)
-    state.mat.emittance =
-        state.mat.emittanceFactor * texture(textureSamplers[nonuniformEXT(state.mat.emittanceTextureId)], state.uv).rgb;
   if(state.mat.metalnessTextureId >= 0)
     state.mat.metalness = texture(textureSamplers[nonuniformEXT(state.mat.metalnessTextureId)], state.uv).r;
   if(state.mat.roughnessTextureId >= 0)
@@ -91,16 +88,8 @@ void main()
       envOrAnalyticPdf = 1.0;
     if(rand(payload.seed) < envOrAnalyticPdf)
     {
-      // sample environment light
-      lightSample.normal    = -state.ffnormal;
-      lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
-      lightSample.pdf       = uniformSpherePdf();
-      lightSample.shouldMis = 1.0;
-      lightSample.dist      = INFINITY;
-      if(sunAndSky.in_use == 1)
-        lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
-      else
-        lightSample.emittance = pc.bgColor;
+      sampleEnvironmentLight(lightSample);
+      lightSample.normal = -state.ffnormal;
       lightSample.emittance /= envOrAnalyticPdf;
     }
     else
@@ -142,13 +131,6 @@ void main()
       payload.lightDist     = lightSample.dist;
       payload.lightRadiance = Li * payload.throughput;
     }
-  }
-
-  if(pc.ignoreEmissive == 0 && length(state.mat.emittance) > 0)
-  {
-    payload.radiance += state.mat.emittance * payload.throughput;
-    payload.stop = 1;
-    return;
   }
 
   if(payload.depth >= pc.maxPathDepth)

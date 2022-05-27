@@ -30,7 +30,7 @@ void PipelinePost::run(const VkCommandBuffer& cmdBuf)
   LABEL_SCOPE_VK(cmdBuf);
 
   m_pContext->setViewport(cmdBuf);
-  vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(GpuPushConstantPost), &m_pushconstant);
+  vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(GpuPushConstantPost), &(m_pScene->getPipelineState().postState));
   vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
   vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, m_bindSets.data(), 0, nullptr);
   vkCmdDraw(cmdBuf, 3, 1, 0, 0);
@@ -41,6 +41,7 @@ void PipelinePost::deinit()
   PipelineAware::deinit();
 }
 
+/*
 void PipelinePost::initPushconstant()
 {
   m_pushconstant.brightness     = 1.f;
@@ -53,8 +54,9 @@ void PipelinePost::initPushconstant()
   m_pushconstant.autoExposure   = 0;
   m_pushconstant.Ywhite         = 0.5f;
   m_pushconstant.key            = 0.5f;
-  m_pushconstant.tmType         = m_pScene->getToneMappingType();
+  m_pushconstant.tmType         = m_pScene->getPipelineState().postState.tmType;
 }
+*/
 
 void PipelinePost::createPostDescriptorSetLayout()
 {

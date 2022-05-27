@@ -28,7 +28,8 @@ public:
   DescriptorSetWrapper&    getOutDescriptorSet() { return m_holdSetWrappers[uint(HoldSet::Out)]; }
   DescriptorSetWrapper&    getSceneDescriptorSet() { return m_holdSetWrappers[uint(HoldSet::Scene)]; }
   DescriptorSetWrapper&    getEnvDescriptorSet() { return m_holdSetWrappers[uint(HoldSet::Env)]; }
-  GpuPushConstantGraphics& getPushconstant() { return m_pushconstant; }
+  //GpuPushConstantGraphics& getPushconstant() { return m_pushconstant; }
+  GpuPushConstantGraphics& getPushconstant() { return m_pScene->getPipelineState().graphicsState; }
   nvvk::Texture&           getColorTexture(uint textureId) { return m_tColors[textureId]; }
 
 protected:
@@ -40,7 +41,6 @@ private:
   VkRenderPass            m_offscreenRenderPass{VK_NULL_HANDLE};
   VkFramebuffer           m_offscreenFramebuffer{VK_NULL_HANDLE};
   nvvk::Buffer            m_bCamera;
-  GpuPushConstantGraphics m_pushconstant{0};
 
 private:
   void createOffscreenResources();           // Creating an offscreen frame buffer and the associated render pass

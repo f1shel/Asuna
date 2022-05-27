@@ -16,7 +16,8 @@ private:
   void submit();
 
 private:
-  void addIntegrator(const nlohmann::json& integratorJson);
+  void addState(const nlohmann::json& stateJson);
+  //void addIntegrator(const nlohmann::json& integratorJson);
   void addCamera(const nlohmann::json& cameraJson);
   void addLight(const nlohmann::json& lightJson);
   void addTexture(const nlohmann::json& textureJson);

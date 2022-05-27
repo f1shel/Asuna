@@ -27,7 +27,7 @@ void PipelineRaytrace::deinit()
 {
   m_blas.clear();
   m_tlas.clear();
-  m_pushconstant = {0};
+  //m_pushconstant = {0};
 
   m_rtBuilder.destroy();
   m_sbt.destroy();
@@ -56,7 +56,7 @@ void PipelineRaytrace::run(const VkCommandBuffer& cmdBuf)
   vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipeline);
   vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipelineLayout, 0,
                           (uint32_t)m_bindSets.size(), m_bindSets.data(), 0, nullptr);
-  vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(GpuPushConstantRaytrace), &m_pushconstant);
+  vkCmdPushConstants(cmdBuf, m_pipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(GpuPushConstantRaytrace), &(m_pScene->getPipelineState().rtxState));
 
   const auto& regions = m_sbt.getRegions();
   auto        size    = m_pContext->getSize();
@@ -74,17 +74,17 @@ void PipelineRaytrace::run(const VkCommandBuffer& cmdBuf)
 
 void PipelineRaytrace::setSpp(int spp)
 {
-  m_pushconstant.spp = spp;
+  m_pScene->getPipelineState().rtxState.spp = spp;
 }
 
 void PipelineRaytrace::resetFrame()
 {
-  m_pushconstant.curFrame = -1;
+  m_pScene->getPipelineState().rtxState.curFrame = -1;
 }
 
 void PipelineRaytrace::incrementFrame()
 {
-  m_pushconstant.curFrame++;
+  m_pScene->getPipelineState().rtxState.curFrame++;
 }
 
 void PipelineRaytrace::initRayTracing()
@@ -104,15 +104,6 @@ void PipelineRaytrace::initRayTracing()
 
   m_rtBuilder.setup(m_device, &m_alloc, m_graphicsQueueIndex);
   m_sbt.setup(m_device, m_graphicsQueueIndex, &m_alloc, prop);
-
-  // Update push constant from scene
-  m_pushconstant.curFrame       = -1;
-  m_pushconstant.spp            = m_pScene->getSpp();
-  m_pushconstant.maxPathDepth   = m_pScene->getMaxPathDepth();
-  m_pushconstant.numLights      = m_pScene->getLightsNum() - 1;  // the first light is added by default
-  m_pushconstant.useFaceNormal  = m_pScene->getUseFaceNormal();
-  m_pushconstant.ignoreEmissive = m_pScene->getIgnoreEmissive();
-  m_pushconstant.bgColor        = m_pScene->getBackGroundColor();
 }
 
 void PipelineRaytrace::createBottomLevelAS()
@@ -215,6 +206,12 @@ void PipelineRaytrace::createRtPipeline()
   stage.stage                                               = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfPbrMetalnessRoughness] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfPbrMetalnessRoughness");
+  // ClosetHit:BrdfEmissive
+  stage.module =
+      nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.brdf_emissive.rchit.spv", true, root));
+  stage.stage                                               = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBrdfEmissive] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfEmissive");
   // Shader groups
   VkRayTracingShaderGroupCreateInfoKHR              group = nvvk::make<VkRayTracingShaderGroupCreateInfoKHR>();
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};

@@ -28,6 +28,9 @@ void Scene::deinit()
 
 void Scene::submit()
 {
+// configure pipeline state
+  m_piplineState.rtxState.numLights = getLightsNum() - 1;
+
   nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), m_pContext->getQueueFamily());
   VkCommandBuffer   cmdBuf = cmdBufGet.createCommandBuffer();
 
@@ -163,7 +166,8 @@ void Scene::freeAllocData()
 
 void Scene::freeRawData()
 {
-  m_integrator = {};
+  //m_integrator = {};
+  m_piplineState = {};
   delete m_pCamera;
   m_pCamera = nullptr;
   m_lights.clear();
@@ -195,10 +199,15 @@ void Scene::freeRawData()
   m_pMaterials.clear();
 }
 
-void Scene::addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
+void Scene::addState(const State& piplineState)
 {
-  m_integrator = Integrator(spp, maxRecur, tmType, useFaceNormal, ignoreEmissive, bgColor);
+  m_piplineState = piplineState;
 }
+
+//void Scene::addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
+//{
+//  m_integrator = Integrator(spp, maxRecur, tmType, useFaceNormal, ignoreEmissive, bgColor);
+//}
 
 void Scene::addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture)
 {
@@ -338,16 +347,24 @@ int Scene::getLightsNum()
   return m_lights.size();
 }
 
+State& Scene::getPipelineState()
+{
+  return m_piplineState;
+}
+
+/*
 int Scene::getSpp()
 {
   return m_integrator.getSpp();
 }
+*/
 
 void Scene::setSpp(int spp)
 {
-  m_integrator.setSpp(spp);
+  m_piplineState.rtxState.spp = 1;
 }
 
+/*
 int Scene::getMaxPathDepth()
 {
   return m_integrator.getMaxPathDepth();
@@ -370,6 +387,7 @@ vec3 Scene::getBackGroundColor()
 {
   return m_integrator.getBackgroundColor();
 }
+*/
 
 Camera& Scene::getCamera()
 {

@@ -20,13 +20,7 @@ public:
   virtual void         init(ContextAware* pContext, Scene* pScene, const VkDescriptorImageInfo* pImageInfo);
   virtual void         run(const VkCommandBuffer& cmdBuf);
   virtual void         deinit();
-  GpuPushConstantPost& getPushconstant() { return m_pushconstant; }
-
-  protected:
-  virtual void initPushconstant();
-
-private:
-  GpuPushConstantPost m_pushconstant = {};
+  GpuPushConstantPost& getPushconstant() { return m_pScene->getPipelineState().postState; }
 
 private:
   void createPostDescriptorSetLayout();

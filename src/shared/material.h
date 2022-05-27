@@ -7,7 +7,8 @@
 START_ENUM(MaterialType)
   MaterialTypeBrdfLambertian            = 0,
   MaterialTypeBrdfPbrMetalnessRoughness = 1,
-  MaterialTypeNum                       = 2
+  MaterialTypeBrdfEmissive              = 2,
+  MaterialTypeNum                       = 3
 END_ENUM();
 // clang-format on
 

@@ -141,7 +141,7 @@ void Tracer::runOffline()
 
   // Main loop
   tqdm bar;
-  int  tot         = m_scene.getSpp();
+  int  tot         = m_scene.getPipelineState().rtxState.spp;
   int  sppPerRound = 1;
   m_pipelineRaytrace.setSpp(sppPerRound);
   for(int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))

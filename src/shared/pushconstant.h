@@ -17,6 +17,7 @@ struct GpuPushConstantRaytrace
   vec3 bgColor;
   uint useFaceNormal;
   uint ignoreEmissive;
+  uint hasEnvMap;
 };
 
 // clang-format off

@@ -48,9 +48,7 @@ void PipelineGraphics::deinit()
   vkDestroyFramebuffer(m_device, m_offscreenFramebuffer, nullptr);
   m_offscreenRenderPass  = VK_NULL_HANDLE;
   m_offscreenFramebuffer = VK_NULL_HANDLE;
-
-  m_pushconstant = {0};
-
+  
   PipelineAware::deinit();
 }
 

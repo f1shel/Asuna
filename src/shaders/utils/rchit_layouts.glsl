@@ -100,4 +100,28 @@ void hitLight(in int lightId, in vec3 hitPos)
   return;
 }
 
+void sampleEnvironmentLight(inout LightSample lightSample)
+{
+  // sample environment light
+  lightSample.shouldMis = 1.0;
+  lightSample.dist      = INFINITY;
+  if(sunAndSky.in_use == 1)
+  {
+    lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
+    lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
+    lightSample.pdf       = uniformSpherePdf();
+  }
+  else if(pc.hasEnvMap == 1)
+  {
+  }
+  else
+  {
+    lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
+    lightSample.emittance = pc.bgColor;
+    lightSample.pdf       = uniformSpherePdf();
+  }
+}
+
+void evalEnvironmentLight() {}
+
 #endif

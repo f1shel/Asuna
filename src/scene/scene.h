@@ -8,6 +8,7 @@
 #include <core/light.h>
 #include <core/instance.h>
 #include <core/integrator.h>
+#include <core/state.h>
 #include <core/material.h>
 #include <core/mesh.h>
 #include <core/texture.h>
@@ -28,7 +29,8 @@ public:
   void freeRawData();
 
 public:
-  void addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor);
+  void addState(const State& piplineState);
+  //void addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor);
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
@@ -48,13 +50,14 @@ public:
   int                                   getTexturesNum();
   int                                   getMaterialsNum();
   int                                   getLightsNum();
-  int                                   getSpp();
+  State&                                getPipelineState();
+  //int                                   getSpp();
   void                                  setSpp(int spp);
-  int                                   getMaxPathDepth();
-  uint                                  getUseFaceNormal();
-  uint                                  getToneMappingType();
-  uint                                  getIgnoreEmissive();
-  vec3                                  getBackGroundColor();
+  //int                                   getMaxPathDepth();
+  //uint                                  getUseFaceNormal();
+  //uint                                  getToneMappingType();
+  //uint                                  getIgnoreEmissive();
+  //vec3                                  getBackGroundColor();
   Camera&                               getCamera();
   CameraType                            getCameraType();
   MaterialType                          getMaterialType(uint matId);
@@ -77,16 +80,17 @@ private:
   ContextAware* m_pContext     = nullptr;
   bool          m_hasScene     = false;
   // ---------------- CPU resources ----------------
-  Integrator         m_integrator = {};
-  Camera*            m_pCamera    = nullptr;
-  vector<GpuLight>   m_lights     = {};
-  TextureTable       m_pTextures  = {};
-  MeshTable          m_pMeshes    = {};
-  MaterialTable      m_pMaterials = {};
-  vector<Instance>   m_instances  = {};
-  vector<CameraShot> m_shots      = {};
-  GpuSunAndSky       m_sunAndSky  = {};
-  MeshPropTable      m_mesh2light = {};
+  //Integrator         m_integrator   = {};
+  State              m_piplineState = {};
+  Camera*            m_pCamera      = nullptr;
+  vector<GpuLight>   m_lights       = {};
+  TextureTable       m_pTextures    = {};
+  MeshTable          m_pMeshes      = {};
+  MaterialTable      m_pMaterials   = {};
+  vector<Instance>   m_instances    = {};
+  vector<CameraShot> m_shots        = {};
+  GpuSunAndSky       m_sunAndSky    = {};
+  MeshPropTable      m_mesh2light   = {};
   // ---------------- GPU resources ----------------
   LightsAlloc*           m_pLightsAlloc    = nullptr;
   vector<TextureAlloc*>  m_pTexturesAlloc  = {};
