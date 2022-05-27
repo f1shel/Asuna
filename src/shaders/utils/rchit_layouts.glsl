@@ -24,6 +24,7 @@ layout(set = RtScene, binding = SceneTextures)          uniform sampler2D  textu
 layout(set = RtScene, binding = SceneInstances, scalar) buffer  _Instances { GpuInstance i[];        } instances;
 layout(set = RtScene, binding = SceneLights, scalar)    buffer  _Lights    { GpuLight l[];           } lights;
 layout(set = RtEnv,   binding = EnvSunsky, scalar)      uniform _SunAndSky { GpuSunAndSky sunAndSky; };
+layout(set = RtEnv,   binding = EnvAccelMap)            uniform sampler2D  envmapSamplers[3];
 //
 layout(push_constant)                                   uniform _RtxState  { GpuPushConstantRaytrace pc; };
 //
@@ -113,6 +114,8 @@ void sampleEnvironmentLight(inout LightSample lightSample)
   }
   else if(pc.hasEnvMap == 1)
   {
+    lightSample.direction = sampleEnvmap(payload.seed, envmapSamplers, pc.envMapResolution, lightSample.pdf);
+    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction, pc.envMapIntensity);
   }
   else
   {

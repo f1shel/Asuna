@@ -34,6 +34,7 @@ public:
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist, float aperture);  // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);                               // opencv
   void addLight(const GpuLight& light);
+  void addEnvMap(const std::string& envmapPath);
   void addTexture(const std::string& textureName, const std::string& texturePath, float gamma);
   void addMaterial(const std::string& materialName, const GpuMaterial& material);
   void addMesh(const std::string& meshName, const std::string& meshPath, bool recomputeNormal);
@@ -66,6 +67,7 @@ public:
   VkExtent2D                            getSize();
   VkBuffer                              getInstancesDescriptor();
   VkDescriptorImageInfo                 getTextureDescriptor(int textureId);
+  vector<VkDescriptorImageInfo>         getEnvMapDescriptor();
   VkBuffer                              getLightsDescriptor();
   VkBuffer                              getSunskyDescriptor();
   GpuSunAndSky&                         getSunsky();
@@ -83,6 +85,7 @@ private:
   //Integrator         m_integrator   = {};
   State              m_piplineState = {};
   Camera*            m_pCamera      = nullptr;
+  EnvMap*            m_pEnvMap      = nullptr;
   vector<GpuLight>   m_lights       = {};
   TextureTable       m_pTextures    = {};
   MeshTable          m_pMeshes      = {};
@@ -92,6 +95,7 @@ private:
   GpuSunAndSky       m_sunAndSky    = {};
   MeshPropTable      m_mesh2light   = {};
   // ---------------- GPU resources ----------------
+  EnvMapAlloc*           m_pEnvMapAlloc    = nullptr;
   LightsAlloc*           m_pLightsAlloc    = nullptr;
   vector<TextureAlloc*>  m_pTexturesAlloc  = {};
   vector<MaterialAlloc*> m_pMaterialsAlloc = {};
@@ -107,6 +111,7 @@ private:
   void allocMaterial(ContextAware* pContext, uint32_t materialId, const std::string& materialName, Material* pMaterial, const VkCommandBuffer& cmdBuf);
   void allocMesh(ContextAware* pContext, uint32_t meshId, const std::string& meshName, Mesh* pMesh, const VkCommandBuffer& cmdBuf);
   void allocInstances(ContextAware* pContext, const VkCommandBuffer& cmdBuf);
+  void allocEnvMap(ContextAware* pContext, const VkCommandBuffer& cmdBuf);
   void allocSunAndSky(ContextAware* pContext, const VkCommandBuffer& cmdBuf);
   void computeSceneDimensions();
   void fitCamera();

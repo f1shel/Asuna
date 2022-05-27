@@ -43,8 +43,10 @@ struct RayPayload
   uint  seed;
   uint  stop;
   // for direct light
+  uint  shouldDirectLight;
   uint  lightVisible;
   float lightDist;
+  vec3  lightHitPos;
   vec3  lightDir;
   vec3  lightRadiance;
 };

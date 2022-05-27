@@ -61,7 +61,8 @@ END_ENUM();
 
 // Environment - Set 3
 START_ENUM(EnvBindings)
-  EnvSunsky = 0
+  EnvSunsky = 0,
+  EnvAccelMap = 1
 END_ENUM();
 
 START_ENUM(InputBindings)

@@ -24,7 +24,6 @@ void PipelineGraphics::init(ContextAware* pContext, Scene* pScene)
   createGraphicsDescriptorSetLayout();
   createCameraBuffer();
   updateGraphicsDescriptorSet();
-  initPushconstant();
   LOGI("[ ] %-20s: %6.2fms Graphic pipeline creation\n", "Pipeline", sw_.elapsed());
 }
 
@@ -103,8 +102,6 @@ void PipelineGraphics::updateSunAndSky(const VkCommandBuffer& cmdBuf)
 {
   vkCmdUpdateBuffer(cmdBuf, m_pScene->getSunskyDescriptor(), 0, sizeof(GpuSunAndSky), &m_pScene->getSunsky());
 }
-
-void PipelineGraphics::initPushconstant() {}
 
 void PipelineGraphics::createOffscreenResources()
 {
@@ -237,6 +234,9 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout()
   // SunAndSky
   envBind.addBinding(EnvBindings::EnvSunsky, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
                      VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR);
+  // Envmap Acceleration
+  envBind.addBinding(EnvBindings::EnvAccelMap, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3,
+                     VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR);
   // Creation
   envLayout = envBind.createLayout(m_device);
   envPool   = envBind.createPool(m_device, 1);
@@ -292,6 +292,8 @@ void PipelineGraphics::updateGraphicsDescriptorSet()
   vector<VkWriteDescriptorSet> writesEnv;
   VkDescriptorBufferInfo       dbiSunAndSky{m_pScene->getSunskyDescriptor(), 0, VK_WHOLE_SIZE};
   writesEnv.emplace_back(envBind.makeWrite(envSet, EnvBindings::EnvSunsky, &dbiSunAndSky));
+  auto envmapDescInfos = m_pScene->getEnvMapDescriptor();
+  writesEnv.emplace_back(envBind.makeWriteArray(envSet, EnvBindings::EnvAccelMap, envmapDescInfos.data()));
   vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(writesEnv.size()), writesEnv.data(), 0, nullptr);
 
   // Out Set: S_Out

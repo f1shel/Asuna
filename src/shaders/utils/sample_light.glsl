@@ -40,4 +40,40 @@ void sampleOneLight(inout uint seed, in GpuLight light, in vec3 scatterPos, inou
     sampleDistantLight(seed, light, scatterPos, lightSample);
 }
 
+float pdfEnvmap(in sampler2D envmapSamplers[3], in vec3 direction, in vec2 hdrResolution)
+{
+  float theta = acos(clamp(direction.y, -1.0, 1.0));
+  vec2  uv    = vec2((PI + atan(direction.z, direction.x)) * INV_2PI, theta * INV_PI);
+  float pdf   = texture(envmapSamplers[2], uv).y * texture(envmapSamplers[1], vec2(0., uv.y)).y;
+  return (pdf * hdrResolution.x * hdrResolution.y) / (TWO_PI * PI * sin(theta));
+}
+
+vec3 evalEnvmap(in sampler2D envmapSamplers[3], in vec3 evalDir, in float intensity)
+{
+  evalDir     = normalize(evalDir);
+  float theta = acos(clamp(evalDir.y, -1.0, 1.0));
+  vec2  uv    = vec2((PI + atan(evalDir.z, evalDir.x)) * INV_2PI, theta * INV_PI);
+  return intensity * texture(envmapSamplers[0], uv).rgb;
+}
+
+vec3 sampleEnvmap(in uint seed, in sampler2D envmapSamplers[3], in vec2 hdrResolution, inout float pdf)
+{
+  float r1 = rand(seed);
+  float r2 = rand(seed);
+
+  float v = texture(envmapSamplers[1], vec2(0., r1)).x;  // marginal
+  float u = texture(envmapSamplers[2], vec2(r2, v)).x;   // conditional
+
+  pdf = texture(envmapSamplers[2], vec2(u, v)).y * texture(envmapSamplers[1], vec2(0., v)).y;
+
+  float phi   = u * TWO_PI;
+  float theta = v * PI;
+
+  if(sin(theta) == 0.0)
+    pdf = 0.0;
+
+  pdf = (pdf * hdrResolution.x * hdrResolution.y) / (TWO_PI * PI * sin(theta));
+  return vec3(-sin(theta) * cos(phi), cos(theta), -sin(theta) * sin(phi));
+}
+
 #endif

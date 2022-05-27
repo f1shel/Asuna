@@ -28,7 +28,7 @@ void Scene::deinit()
 
 void Scene::submit()
 {
-// configure pipeline state
+  // configure pipeline state
   m_piplineState.rtxState.numLights = getLightsNum() - 1;
 
   nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), m_pContext->getQueueFamily());
@@ -66,6 +66,8 @@ void Scene::submit()
     allocMesh(m_pContext, meshId, meshName, pMesh, cmdBuf);
   }
 
+  allocEnvMap(m_pContext, cmdBuf);
+
   // Keeping the mesh description at host and device
   allocInstances(m_pContext, cmdBuf);
 
@@ -91,7 +93,7 @@ void Scene::reset()
     freeAllocData();
   freeRawData();
   m_hasScene = false;
-  // Add dummy texture, material and light so that pipeline
+  // Add dummy envmap, texture, material and light so that pipeline
   // compilation will not complain
   const std::string& tn        = "add_by_default_dummy_texture";
   const std::string& mn        = "add_by_default_dummy_material";
@@ -99,6 +101,7 @@ void Scene::reset()
   Material*          pMaterial = new Material;
   m_pTextures[tn]              = std::make_pair(pTexture, m_pTextures.size());
   m_pMaterials[mn]             = std::make_pair(pMaterial, m_pMaterials.size());
+  m_pEnvMap                    = new EnvMap;
   GpuLight defaultLight        = {
       LightTypeDirectional,  // type
       vec3(0.f),             // position
@@ -137,6 +140,10 @@ void Scene::freeAllocData()
   delete m_pLightsAlloc;
   m_pLightsAlloc = nullptr;
 
+  m_pEnvMapAlloc->deinit(m_pContext);
+  delete m_pEnvMapAlloc;
+  m_pEnvMapAlloc = nullptr;
+
   // free textures alloc data
   for(auto& pTextureAlloc : m_pTexturesAlloc)
   {
@@ -170,6 +177,8 @@ void Scene::freeRawData()
   m_piplineState = {};
   delete m_pCamera;
   m_pCamera = nullptr;
+  delete m_pEnvMap;
+  m_pEnvMap = nullptr;
   m_lights.clear();
   m_shots.clear();
   m_instances.clear();
@@ -250,6 +259,16 @@ void Scene::addLight(const GpuLight& light)
   }
   // add light
   m_lights.emplace_back(light);
+}
+
+void Scene::addEnvMap(const std::string& envmapPath)
+{
+  if(m_pEnvMap)
+    delete m_pEnvMap;
+  m_pEnvMap                                = new EnvMap(envmapPath);
+  auto size                                = m_pEnvMap->getSize();
+  m_piplineState.rtxState.hasEnvMap        = 1;
+  m_piplineState.rtxState.envMapResolution = vec2(size.width, size.height);
 }
 
 void Scene::addTexture(const std::string& textureName, const std::string& texturePath, float gamma)
@@ -429,6 +448,11 @@ VkDescriptorImageInfo Scene::getTextureDescriptor(int textureId)
   return m_pTexturesAlloc[textureId]->getTexture();
 }
 
+vector<VkDescriptorImageInfo> Scene::getEnvMapDescriptor()
+{
+  return {m_pEnvMapAlloc->getEnvMap(), m_pEnvMapAlloc->getMarginal(), m_pEnvMapAlloc->getConditional()};
+}
+
 VkBuffer Scene::getLightsDescriptor()
 {
   return m_pLightsAlloc->getBuffer();
@@ -485,6 +509,11 @@ void Scene::allocInstances(ContextAware* pContext, const VkCommandBuffer& cmdBuf
 {
   // Keeping the obj host model and device description
   m_pInstancesAlloc = new InstancesAlloc(pContext, m_instances, m_pMeshesAlloc, m_pMaterialsAlloc, cmdBuf);
+}
+
+void Scene::allocEnvMap(ContextAware* pContext, const VkCommandBuffer& cmdBuf)
+{
+  m_pEnvMapAlloc = new EnvMapAlloc(pContext, m_pEnvMap, cmdBuf);
 }
 
 void Scene::allocSunAndSky(ContextAware* pContext, const VkCommandBuffer& cmdBuf)

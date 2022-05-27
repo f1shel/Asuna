@@ -131,6 +131,9 @@ void main()
       payload.lightDist     = lightSample.dist;
       payload.lightRadiance = Li * payload.throughput;
     }
+
+    payload.shouldDirectLight = 1;
+    payload.lightHitPos = offsetPositionAlongNormal(state.hitPos, state.ffnormal);
   }
 
   if(payload.depth >= pc.maxPathDepth)
@@ -165,5 +168,5 @@ void main()
   payload.bsdfPdf       = bsdfSample.pdf;
   payload.ray.direction = bsdfSample.direction;
   payload.throughput *= bsdfSampleVal * abs(dot(state.ffnormal, bsdfSample.direction)) / (bsdfSample.pdf + EPS);
-  payload.ray.origin = offsetPositionAlongNormal(state.hitPos, state.ffnormal);
+  payload.ray.origin = payload.lightHitPos;
 }

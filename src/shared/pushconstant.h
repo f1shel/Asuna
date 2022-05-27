@@ -18,6 +18,8 @@ struct GpuPushConstantRaytrace
   uint useFaceNormal;
   uint ignoreEmissive;
   uint hasEnvMap;
+  vec2 envMapResolution;
+  float envMapIntensity;
 };
 
 // clang-format off

@@ -16,6 +16,9 @@ private:
   void submit();
 
 private:
+  /*
+   * addState `must` be called first
+   */
   void addState(const nlohmann::json& stateJson);
   //void addIntegrator(const nlohmann::json& integratorJson);
   void addCamera(const nlohmann::json& cameraJson);
@@ -25,6 +28,7 @@ private:
   void addMesh(const nlohmann::json& meshJson);
   void addInstance(const nlohmann::json& instanceJson);
   void addShot(const nlohmann::json& shotJson);
+  void addEnvMap(const nlohmann::json& envmapJson);
 
 private:
   Scene* m_pScene       = nullptr;

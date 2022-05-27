@@ -436,5 +436,6 @@ bool Tracer::guiPathTracer()
   auto& pc      = m_pipelineRaytrace.getPushconstant();
   changed |= ImGui::Checkbox("Use Face Normal", (bool*)&pc.useFaceNormal);
   changed |= ImGui::Checkbox("Ignore Emissive", (bool*)&pc.ignoreEmissive);
+  changed |= GuiH::Slider("Envmap Intensity", "", &pc.envMapIntensity, nullptr, GuiH::Flags::Normal, 0.0f, 5.0f);
   return changed;
 }

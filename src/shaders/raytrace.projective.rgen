@@ -74,6 +74,8 @@ void main()
 
     for(payload.depth = 0;;)
     {
+      payload.shouldDirectLight = 0;
+
       traceRayEXT(tlas,                   // acceleration structure
                   rayFlags,               // rayFlags
                   0xFF,                   // cullMask
@@ -87,37 +89,34 @@ void main()
                   0                       // payload (location = 0)
       );
 
-      if(payload.stop > 0)
-        break;
-      else
+      if(payload.shouldDirectLight == 1 && payload.lightVisible == 1)
       {
         // We are adding the contribution to the radiance only if the ray is not
         // occluded by an object. This is done here to minimize live state across
         // ray-trace calls.
         // Shoot shadow ray up to the light(INFINITY == environement)
-        if(payload.lightVisible == 1)
-        {
-          Ray   shadowRay = Ray(payload.ray.origin, payload.lightDir);
-          uint  rayFlags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-          float maxDist   = payload.lightDist - EPS;
-          isShadowed      = true;
-          traceRayEXT(tlas,                 // acceleration structure
-                      rayFlags,             // rayFlags
-                      0xFF,                 // cullMask
-                      0,                    // sbtRecordOffset
-                      0,                    // sbtRecordStride
-                      1,                    // missIndex
-                      shadowRay.origin,     // ray origin
-                      0.0,                  // ray min range
-                      shadowRay.direction,  // ray direction
-                      maxDist,              // ray max range
-                      1                     // payload layout(location = 1)
-          );
-          if(!isShadowed)
-            payload.radiance += payload.lightRadiance;
-        }
+        Ray   shadowRay = Ray(payload.lightHitPos, payload.lightDir);
+        uint  rayFlags  = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        float maxDist   = payload.lightDist - EPS;
+        isShadowed      = true;
+        traceRayEXT(tlas,                 // acceleration structure
+                    rayFlags,             // rayFlags
+                    0xFF,                 // cullMask
+                    0,                    // sbtRecordOffset
+                    0,                    // sbtRecordStride
+                    1,                    // missIndex
+                    shadowRay.origin,     // ray origin
+                    0.0,                  // ray min range
+                    shadowRay.direction,  // ray direction
+                    maxDist,              // ray max range
+                    1                     // payload layout(location = 1)
+        );
+        if(!isShadowed)
+          payload.radiance += payload.lightRadiance;
       }
 
+      if(payload.stop > 0)
+        break;
       // next ray, increment path depth
       if(payload.depth >= pc.maxPathDepth)
         break;
