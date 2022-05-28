@@ -20,6 +20,7 @@ struct GpuPushConstantRaytrace
   uint hasEnvMap;
   vec2 envMapResolution;
   float envMapIntensity;
+  float envRotateAngle;
 };
 
 // clang-format off

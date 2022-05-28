@@ -85,8 +85,10 @@ void main()
   }
   else if(tm.tmType == ToneMappingTypeReinhard)
     fragColor.rgb = toneMapHejlRichard(hdr.rgb);
-  else if(tm.tmType == ToneMappingTypeAces)
+  else if(tm.tmType == ToneMappingTypeAces) {
     fragColor.rgb = toneMapACES(hdr.rgb);
+    fragColor.rgb = hdr.rgb / (1 + hdr.rgb);
+    }
   else if(tm.tmType == ToneMappingTypeFilmic)
   {
     vec3 x        = max(vec3(0.0f), hdr.rgb - 0.004f);

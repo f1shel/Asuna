@@ -62,7 +62,7 @@ void Camera::setToWorld(const vec3& lookat, const vec3& eye, const vec3& up)
   CameraManip.setLookat(eye, lookat, up);
 }
 
-void Camera::setToWorld(CameraShot shot)
+void Camera::setToWorld(CameraShot& shot)
 {
   if(shot.ext.a33 == 1.f)
   {

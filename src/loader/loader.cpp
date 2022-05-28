@@ -137,10 +137,8 @@ void Loader::submit()
   m_pScene->submit();
 }
 
-void Loader::addState(const nlohmann::json& stateJson)
+static void parseState(const nlohmann::json& stateJson, State& pipelineState)
 {
-  State pipelineState;
-
   if(stateJson.contains("path_tracing"))
   {
     const auto& ptJson   = stateJson["path_tracing"];
@@ -157,6 +155,8 @@ void Loader::addState(const nlohmann::json& stateJson)
       rtxState.bgColor = Json2Vec3(ptJson["background_color"]);
     if(ptJson.contains("envmap_intensity"))
       rtxState.envMapIntensity = ptJson["envmap_intensity"];
+    if(ptJson.contains("envmap_rotate"))
+      rtxState.envRotateAngle = ptJson["envmap_rotate"];
   }
 
   if(stateJson.contains("post_processing"))
@@ -185,6 +185,12 @@ void Loader::addState(const nlohmann::json& stateJson)
 
     postState.tmType = tmType;
   }
+}
+
+void Loader::addState(const nlohmann::json& stateJson)
+{
+  State pipelineState;
+  parseState(stateJson, pipelineState);
   m_pScene->addState(pipelineState);
 }
 
@@ -481,19 +487,37 @@ void Loader::addInstance(const nlohmann::json& instanceJson)
 void Loader::addShot(const nlohmann::json& shotJson)
 {
   JsonCheckKeys(shotJson, {"type"});
+  vec3 eye, lookat, up;
+  mat4 ext = nvmath::mat4f_zero;
   if(shotJson["type"] == "lookat")
   {
     JsonCheckKeys(shotJson, {"eye", "lookat", "up"});
-    m_pScene->addShot(Json2Vec3(shotJson["eye"]), Json2Vec3(shotJson["lookat"]), Json2Vec3(shotJson["up"]));
+    eye    = Json2Vec3(shotJson["eye"]);
+    lookat = Json2Vec3(shotJson["lookat"]);
+    up     = Json2Vec3(shotJson["up"]);
   }
   else if(shotJson["type"] == "opencv")
   {
     JsonCheckKeys(shotJson, {"matrix", "up"});
-    mat4 ext = Json2Mat4(shotJson["matrix"]);
+    ext = Json2Mat4(shotJson["matrix"]);
     //ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 = -ext.a03;
     //ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22, ext.a23 = -ext.a23;
-    m_pScene->addShot(ext);
   }
+  CameraShot shot;
+  shot.ext    = ext;
+  shot.eye    = eye;
+  shot.up     = up;
+  shot.lookat = lookat;
+  shot.state  = m_pScene->getPipelineState();  // default state
+
+  if(shotJson.contains("state"))
+  {
+    const auto& stateJson     = shotJson["state"];
+    State&      pipelineState = shot.state;
+    parseState(stateJson, pipelineState);
+  }
+
+  m_pScene->addShot(shot);
 }
 
 void Loader::addEnvMap(const nlohmann::json& envmapJson)

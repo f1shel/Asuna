@@ -137,43 +137,63 @@ void Tracer::runOffline()
   clearValues[0].color        = {0.0f, 0.0f, 0.0f, 0.0f};
   clearValues[1].depthStencil = {1.0f, 0};
 
+  auto& m_alloc = m_context.getAlloc();
+  auto  m_size  = m_context.getSize();
+  // Create a temporary buffer to hold the pixels of the image
+  VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+  VkDeviceSize       bufferSize  = 4 * sizeof(float) * m_size.width * m_size.height;
+  nvvk::Buffer       pixelBuffer = m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+
   nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
 
-  // Main loop
-  tqdm bar;
-  int  tot         = m_scene.getPipelineState().rtxState.spp;
-  int  sppPerRound = 1;
-  m_pipelineRaytrace.setSpp(sppPerRound);
-  for(int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))
+  int shotsNum = m_scene.getShotsNum();
+  for(int shotId = 0; shotId < shotsNum; shotId++)
   {
-    bar.progress(spp, tot);
-    const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
+    m_scene.setShot(shotId);
+    // Main loop
+    tqdm bar;
+    int  tot         = m_scene.getPipelineState().rtxState.spp;
+    int  sppPerRound = 1;
+    m_pipelineRaytrace.setSpp(sppPerRound);
+    m_pipelineRaytrace.resetFrame();
+    for(int spp = 0; spp < tot; spp += std::min(sppPerRound, tot - spp))
     {
-      m_pipelineGraphics.run(cmdBuf);
-    }
-    {
-      m_pipelineRaytrace.run(cmdBuf);
-    }
-    if(spp == tot - 1)
-    {
-      VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-      postRenderPassBeginInfo.clearValueCount = 2;
-      postRenderPassBeginInfo.pClearValues    = clearValues.data();
-      postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
-      postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer();
-      postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
+      bar.progress(spp, tot);
+      const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
+      {
+        m_pipelineGraphics.run(cmdBuf);
+      }
+      {
+        m_pipelineRaytrace.run(cmdBuf);
+      }
+      if(spp == tot - 1)
+      {
+        VkRenderPassBeginInfo postRenderPassBeginInfo{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        postRenderPassBeginInfo.clearValueCount = 2;
+        postRenderPassBeginInfo.pClearValues    = clearValues.data();
+        postRenderPassBeginInfo.renderPass      = m_context.getRenderPass();
+        postRenderPassBeginInfo.framebuffer     = m_context.getFramebuffer();
+        postRenderPassBeginInfo.renderArea      = {{0, 0}, m_context.getSize()};
 
-      vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-      m_pipelinePost.run(cmdBuf);
+        m_pipelinePost.run(cmdBuf);
 
-      vkCmdEndRenderPass(cmdBuf);
+        vkCmdEndRenderPass(cmdBuf);
+      }
+      genCmdBuf.submitAndWait(cmdBuf);
     }
-    genCmdBuf.submitAndWait(cmdBuf);
+    bar.finish();
+    vkDeviceWaitIdle(m_context.getDevice());
+
+    // save image
+    static char outputName[50];
+    sprintf(outputName, "%s_shot_%04d.hdr", m_tis.outputname.c_str(), shotId);
+    saveImage(pixelBuffer, outputName);
   }
-  bar.finish();
-  vkDeviceWaitIdle(m_context.getDevice());
-  saveImageTest();
+  // Destroy temporary buffer
+  m_alloc.destroy(pixelBuffer);
 }
 
 void Tracer::imageToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut)
@@ -323,7 +343,10 @@ bool Tracer::guiEnvironment()
 
   bool  changed{false};
   auto& sunAndSky(m_scene.getSunsky());
+  auto& rtxState = m_pipelineRaytrace.getPushconstant();
 
+  changed |= GuiH::Slider("Rotate Envmap", "", &rtxState.envRotateAngle, nullptr, GuiH::Flags::Normal, 0.f, 360.f);
+  changed |= GuiH::Slider("Envmap Intensity", "", &rtxState.envMapIntensity, nullptr, GuiH::Flags::Normal, 0.f, 20.f);
   changed |= ImGui::Checkbox("Use Sun & Sky", (bool*)&sunAndSky.in_use);
 
   // Adjusting the up with the camera
@@ -398,7 +421,7 @@ bool Tracer::guiTonemapper()
   auto& tm = m_pipelinePost.getPushconstant();
   bool  changed{false};
 
-  changed |= ImGui::Combo("EnvMaps", (int*)&tm.tmType, ToneMappingTypeList.data(), ToneMappingTypeList.size());
+  changed |= ImGui::Combo("Tone Mapping", (int*)&tm.tmType, ToneMappingTypeList.data(), ToneMappingTypeList.size());
 
   if(tm.tmType == ToneMappingTypeCustom)
   {

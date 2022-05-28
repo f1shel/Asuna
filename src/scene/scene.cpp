@@ -29,7 +29,7 @@ void Scene::deinit()
 void Scene::submit()
 {
   // configure pipeline state
-  m_piplineState.rtxState.numLights = getLightsNum() - 1;
+  m_pipelineState.rtxState.numLights = getLightsNum() - 1;
 
   nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), m_pContext->getQueueFamily());
   VkCommandBuffer   cmdBuf = cmdBufGet.createCommandBuffer();
@@ -82,7 +82,7 @@ void Scene::submit()
     computeSceneDimensions();
     fitCamera();
   }
-  m_pCamera->setToWorld(m_shots[0]);
+  setShot(0);
 
   m_hasScene = true;
 }
@@ -174,7 +174,7 @@ void Scene::freeAllocData()
 void Scene::freeRawData()
 {
   //m_integrator = {};
-  m_piplineState = {};
+  m_pipelineState = {};
   delete m_pCamera;
   m_pCamera = nullptr;
   delete m_pEnvMap;
@@ -210,7 +210,7 @@ void Scene::freeRawData()
 
 void Scene::addState(const State& piplineState)
 {
-  m_piplineState = piplineState;
+  m_pipelineState = piplineState;
 }
 
 //void Scene::addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
@@ -265,10 +265,10 @@ void Scene::addEnvMap(const std::string& envmapPath)
 {
   if(m_pEnvMap)
     delete m_pEnvMap;
-  m_pEnvMap                                = new EnvMap(envmapPath);
-  auto size                                = m_pEnvMap->getSize();
-  m_piplineState.rtxState.hasEnvMap        = 1;
-  m_piplineState.rtxState.envMapResolution = vec2(size.width, size.height);
+  m_pEnvMap                                 = new EnvMap(envmapPath);
+  auto size                                 = m_pEnvMap->getSize();
+  m_pipelineState.rtxState.hasEnvMap        = 1;
+  m_pipelineState.rtxState.envMapResolution = vec2(size.width, size.height);
 }
 
 void Scene::addTexture(const std::string& textureName, const std::string& texturePath, float gamma)
@@ -294,16 +294,21 @@ void Scene::addInstance(const nvmath::mat4f& transform, const std::string& meshN
   m_instances.emplace_back(Instance(transform, getMeshId(meshName), getMaterialId(materialName)));
 }
 
-void Scene::addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat, const nvmath::vec3f& up)
+void Scene::addShot(const CameraShot& shot)
 {
-  m_shots.emplace_back(CameraShot{lookat, eye, up, nvmath::mat4f_zero});
+  m_shots.emplace_back(shot);
 }
 
-void Scene::addShot(const mat4& ext)
-{
-  vec3 zero{0.f};
-  m_shots.emplace_back(CameraShot{zero, zero, zero, ext});
-}
+//void Scene::addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat, const nvmath::vec3f& up)
+//{
+//  m_shots.emplace_back(CameraShot{lookat, eye, up, nvmath::mat4f_zero});
+//}
+//
+//void Scene::addShot(const mat4& ext)
+//{
+//  vec3 zero{0.f};
+//  m_shots.emplace_back(CameraShot{zero, zero, zero, ext});
+//}
 
 int Scene::getMeshId(const std::string& meshName)
 {
@@ -366,9 +371,19 @@ int Scene::getLightsNum()
   return m_lights.size();
 }
 
+int Scene::getShotsNum()
+{
+  return m_shots.size();
+}
+
+CameraShot& Scene::getShot(int shotId)
+{
+  return m_shots[shotId];
+}
+
 State& Scene::getPipelineState()
 {
-  return m_piplineState;
+  return m_pipelineState;
 }
 
 /*
@@ -380,7 +395,7 @@ int Scene::getSpp()
 
 void Scene::setSpp(int spp)
 {
-  m_piplineState.rtxState.spp = 1;
+  m_pipelineState.rtxState.spp = 1;
 }
 
 /*
@@ -466,6 +481,23 @@ VkBuffer Scene::getSunskyDescriptor()
 GpuSunAndSky& Scene::getSunsky()
 {
   return m_sunAndSky;
+}
+
+void Scene::setShot(int shotId)
+{
+  m_pCamera->setToWorld(m_shots[shotId]);
+  auto& state = m_shots[shotId].state;
+  //m_pipelineState.rtxState.curFrame         = state.rtxState.curFrame;
+  m_pipelineState.rtxState.spp          = state.rtxState.spp;
+  m_pipelineState.rtxState.maxPathDepth = state.rtxState.maxPathDepth;
+  //m_pipelineState.rtxState.numLights        = state.rtxState.numLights;
+  m_pipelineState.rtxState.useFaceNormal  = state.rtxState.useFaceNormal;
+  m_pipelineState.rtxState.ignoreEmissive = state.rtxState.ignoreEmissive;
+  //m_pipelineState.rtxState.hasEnvMap        = state.rtxState.hasEnvMap;
+  m_pipelineState.rtxState.envMapIntensity = state.rtxState.envMapIntensity;
+  //m_pipelineState.rtxState.envMapResolution = state.rtxState.envMapResolution;
+  m_pipelineState.rtxState.bgColor        = state.rtxState.bgColor;
+  m_pipelineState.rtxState.envRotateAngle = state.rtxState.envRotateAngle;
 }
 
 void Scene::allocLights(ContextAware* pContext, const VkCommandBuffer& cmdBuf)
@@ -556,5 +588,5 @@ void Scene::fitCamera()
   auto m_size = getSize();
   CameraManip.fit(m_dimensions.min, m_dimensions.max, true, false, m_size.width / static_cast<float>(m_size.height));
   auto cam = CameraManip.getCamera();
-  m_shots.emplace_back(CameraShot{cam.ctr, cam.eye, cam.up, nvmath::mat4f_zero});
+  m_shots.emplace_back(CameraShot{cam.ctr, cam.eye, cam.up, nvmath::mat4f_zero, getPipelineState()});
 }

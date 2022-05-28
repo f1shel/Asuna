@@ -3,6 +3,7 @@
 #include <shared/camera.h>
 #include <nvh/cameramanipulator.hpp>
 #include <vulkan/vulkan_core.h>
+#include "state.h"
 
 typedef struct
 {
@@ -10,6 +11,7 @@ typedef struct
   vec3 eye{0.0};
   vec3 up{0.0};
   mat4 ext{0.0};
+  State state;
 } CameraShot;
 
 class Camera
@@ -27,7 +29,7 @@ public:
   VkExtent2D        getFilmSize() { return m_size; }
   virtual GpuCamera toGpuStruct() = 0;
   void              setToWorld(const vec3& lookat, const vec3& eye, const vec3& up = {0.0f, 1.0f, 0.0f});
-  void              setToWorld(CameraShot shot);
+  void              setToWorld(CameraShot& shot);
   void              adaptFilm();  // adapt gui to film size
 
 private:

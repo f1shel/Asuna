@@ -114,8 +114,8 @@ void sampleEnvironmentLight(inout LightSample lightSample)
   }
   else if(pc.hasEnvMap == 1)
   {
-    lightSample.direction = sampleEnvmap(payload.seed, envmapSamplers, pc.envMapResolution, lightSample.pdf);
-    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction, pc.envMapIntensity);
+    lightSample.direction = sampleEnvmap(payload.seed, envmapSamplers, pc.envRotateAngle, pc.envMapResolution, lightSample.pdf);
+    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction, pc.envRotateAngle, pc.envMapIntensity);
   }
   else
   {

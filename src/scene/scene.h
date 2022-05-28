@@ -39,8 +39,9 @@ public:
   void addMaterial(const std::string& materialName, const GpuMaterial& material);
   void addMesh(const std::string& meshName, const std::string& meshPath, bool recomputeNormal);
   void addInstance(const nvmath::mat4f& transform, const std::string& meshName, const std::string& materialName);
-  void addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat, const nvmath::vec3f& up);
-  void addShot(const mat4& ext);
+  void addShot(const CameraShot& shot);
+  //void addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat, const nvmath::vec3f& up);
+  //void addShot(const mat4& ext);
 
 public:
   int                                   getMeshId(const std::string& meshName);
@@ -51,6 +52,8 @@ public:
   int                                   getTexturesNum();
   int                                   getMaterialsNum();
   int                                   getLightsNum();
+  int                                   getShotsNum();
+  CameraShot&                           getShot(int shotId);
   State&                                getPipelineState();
   //int                                   getSpp();
   void                                  setSpp(int spp);
@@ -71,6 +74,7 @@ public:
   VkBuffer                              getLightsDescriptor();
   VkBuffer                              getSunskyDescriptor();
   GpuSunAndSky&                         getSunsky();
+  void                                  setShot(int shotId);
 
 private:
   using TextureTable  = std::map<string, std::pair<Texture*, uint>>;
@@ -83,7 +87,7 @@ private:
   bool          m_hasScene     = false;
   // ---------------- CPU resources ----------------
   //Integrator         m_integrator   = {};
-  State              m_piplineState = {};
+  State              m_pipelineState = {};
   Camera*            m_pCamera      = nullptr;
   EnvMap*            m_pEnvMap      = nullptr;
   vector<GpuLight>   m_lights       = {};

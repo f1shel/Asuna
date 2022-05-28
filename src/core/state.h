@@ -23,6 +23,7 @@ public:
     rtxState.envMapIntensity  = 1.f;        // rewrite by Loader::parse()
     rtxState.envMapResolution = vec2(0.f);  // rewrite by Loader::submit()
     rtxState.bgColor          = vec3(0.f);  // rewrite by Loader::parse()
+    rtxState.envRotateAngle   = 0.f;        // rewrite by Loader::parse()
 
     postState.brightness     = 1.f;                    // rewrite by gui
     postState.contrast       = 1.f;                    // rewrite by gui

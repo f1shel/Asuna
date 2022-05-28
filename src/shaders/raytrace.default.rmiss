@@ -23,6 +23,7 @@ void main()
 {
   // Stop path tracing loop from rgen shader
   payload.stop = 1;
+  if(payload.depth == 0) return;
   // eval environment light
   vec3  env;
   float pdf;
@@ -33,8 +34,8 @@ void main()
   }
   else if(pc.hasEnvMap == 1)
   {
-    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envMapIntensity);
-    pdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envMapResolution);
+    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle, pc.envMapIntensity);
+    pdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle, pc.envMapResolution);
   }
   else
   {
