@@ -161,7 +161,7 @@ void Loader::addState(const nlohmann::json& stateJson)
 
   if(stateJson.contains("post_processing"))
   {
-    const auto& postJson       = stateJson["post_processsing"];
+    const auto& postJson       = stateJson["post_processing"];
     auto&       postState      = pipelineState.postState;
     string      strToneMapping = "";
     if(postJson.contains("tone_mapping"))

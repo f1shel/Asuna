@@ -70,7 +70,7 @@ HitState getHitState()
     state.ffnormal = dot(state.faceNormal, state.viewDir) > 0.0 ? state.faceNormal : -state.faceNormal;
   else
     state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0.0 ? state.shadingNormal : -state.shadingNormal;
-  basis(state.ffnormal, state.tangent, state.bitangent);
+  Onb(state.ffnormal, state.tangent, state.bitangent);
 
   return state;
 }

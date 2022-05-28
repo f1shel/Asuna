@@ -111,8 +111,10 @@ void main()
                     maxDist,              // ray max range
                     1                     // payload layout(location = 1)
         );
-        if(!isShadowed)
+        if(!isShadowed) {
           payload.radiance += payload.lightRadiance;
+          DEBUG_INF_NAN(payload.radiance, "error when updating radiance\n");
+        }
       }
 
       if(payload.stop > 0)

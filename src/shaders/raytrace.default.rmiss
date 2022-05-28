@@ -45,5 +45,13 @@ void main()
   if(payload.depth > 0)
     misWeight = powerHeuristic(payload.bsdfPdf, pdf);
   // Done sampling return
-  payload.radiance += misWeight * env * payload.throughput;
+  vec3 radiance = misWeight * env * payload.throughput;
+  payload.radiance += radiance;
+  /*
+  DEBUG_INF_NAN(radiance, "error when ray missing\n");
+  if (checkInfNan(radiance))
+  {
+    debugPrintfEXT("mis: %f, env: %v3f, throughput: %v3f\n", misWeight, env, payload.throughput);
+  }
+  */
 }

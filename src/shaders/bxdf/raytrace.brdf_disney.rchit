@@ -28,7 +28,7 @@ float GTR1(float NdotH, float a)
     return 1 / PI;
   float a2 = a * a;
   float t  = 1 + (a2 - 1) * NdotH * NdotH;
-  return (a2 - 1) / (PI * log(a2) * t);
+  return (a2 - 1) / max(EPS, PI * log(a2) * t);
 }
 
 vec3 SampleGTR1(float rgh, float r1, float r2)
@@ -38,7 +38,7 @@ vec3 SampleGTR1(float rgh, float r1, float r2)
 
   float phi = r1 * TWO_PI;
 
-  float cosTheta = sqrt((1.0 - pow(a2, 1.0 - r1)) / (1.0 - a2));
+  float cosTheta = sqrt((1.0 - pow(a2, 1.0 - r1)) / max(EPS, 1.0 - a2));
   float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
   float sinPhi   = sin(phi);
   float cosPhi   = cos(phi);
@@ -50,14 +50,14 @@ float GTR2(float NdotH, float a)
 {
   float a2 = a * a;
   float t  = 1 + (a2 - 1) * NdotH * NdotH;
-  return a2 / (PI * t * t);
+  return a2 / max(EPS, PI * t * t);
 }
 
 float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay)
 {
   if(NdotH <= 0)
     return 0.0;
-  float result = 1 / (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + NdotH * NdotH));
+  float result = 1 / max(EPS, PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + NdotH * NdotH));
   if(result * NdotH < 1e-20)
     result = 0;
   return result;
@@ -67,12 +67,12 @@ float smithG_GGX(float NdotV, float alphaG)
 {
   float a = alphaG * alphaG;
   float b = NdotV * NdotV;
-  return 1 / (NdotV + sqrt(a + b - a * b));
+  return 1 / max(EPS, NdotV + sqrt(a + b - a * b));
 }
 
 float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay)
 {
-  return 1 / (NdotV + sqrt(sqr(VdotX * ax) + sqr(VdotY * ay) + sqr(NdotV)));
+  return 1 / max(EPS, NdotV + sqrt(sqr(VdotX * ax) + sqr(VdotY * ay) + sqr(NdotV)));
 }
 
 float smithG1(vec3 v, vec3 m, in float ax, in float ay)
@@ -87,14 +87,14 @@ float smithG1(vec3 v, vec3 m, in float ax, in float ay)
   if(tanTheta == 0.0f)
     return 1.0f;
 
-  float invSinTheta2 = 1 / (1 - v.z * v.z);
+  float invSinTheta2 = 1 / max(EPS, 1 - v.z * v.z);
   float cosPhi2      = v.x * v.x * invSinTheta2;
   float sinPhi2      = v.y * v.y * invSinTheta2;
 
   float alpha = sqrt(cosPhi2 * ax * ax + sinPhi2 * ay * ay);
 
   float root = alpha * tanTheta;
-  return 2.0 / (1.0 + hypot2(1.0f, root));
+  return 2.0 / max(EPS, 1.0 + hypot2(1.0f, root));
 }
 
 vec3 evalDisneyBrdf(in HitState state, in vec3 L)
@@ -283,7 +283,9 @@ vec3 sampleGGXAniso(float ax, float ay, vec2 p)
 
   float sinThetaM = sqrt(max(0, 1 - cosThetaM * cosThetaM));
 
-  return vec3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
+  vec3 M = vec3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
+
+  return M;
 }
 
 vec3 sampleSpecular(in float clearcoat, in vec3 wo, in float clearcoatRoughness, in float ax, in float ay)
@@ -319,7 +321,17 @@ float specularPdf(in vec3 wm, in vec3 wo, in float clearcoat, in float clearcoat
   // float D  = mix(Dw, GTR1(wm.z, clearcoatRoughness) * abs(wm.z) / IdotM, clearcoatWeight);
   float D = smithG1(wo, wm, ax, ay) * IdotM * GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) / abs(wi.z);
   // return D * 0.25f;
-  return GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) * wm.z / (4*abs(dot(wo, wm)));
+  float pdf = GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) * wm.z / max(EPS, 4 * abs(dot(wo, wm)));
+
+  /*
+  DEBUG_INF_NAN(vec3(pdf), "pdf error here\n");
+  if(checkInfNan(vec3(pdf)))
+  {
+    debugPrintfEXT("NDF: %f, half: %v3f\n", GTR2_aniso(wm.z, wm.x, wm.y, ax, ay), wm);
+  }
+  */
+
+  return pdf;
 }
 
 void main()
@@ -348,12 +360,13 @@ void main()
   if(state.mat.normalTextureId >= 0)
   {
     vec3 c         = texture(textureSamplers[nonuniformEXT(state.mat.normalTextureId)], state.uv).rgb;
+    c.y = 1 - c.y;
     vec3 n         = 2 * c - 1;
     state.ffnormal = normalize(local2global * n);
     if(dot(state.ffnormal, state.viewDir) < 0)
       state.ffnormal = -state.ffnormal;
     // Rebuild frame
-    basis(state.ffnormal, state.tangent, state.bitangent);
+    Onb(state.ffnormal, state.tangent, state.bitangent);
     local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
     global2local = transpose(local2global);
   }
@@ -402,6 +415,7 @@ void main()
       vec3 wi        = normalize(global2local * lightSample.direction);
       vec3 wh        = normalize(wi + wo);
       bsdfSample.pdf = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+
       // bsdfSample.pdf = cosineHemispherePdf(wi.z);
 
       float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
@@ -427,16 +441,28 @@ void main()
 
   // Sample next ray
   BsdfSample bsdfSample;
-  vec3       wo        = normalize(global2local * state.viewDir);
-  vec3       wi        = sampleSpecular(state.mat.clearcoat, wo, state.mat.roughness, ax, ay);
+  vec3       wo = normalize(global2local * state.viewDir);
+  vec3       wi = sampleSpecular(state.mat.clearcoat, wo, clearcoatRoughness, ax, ay);
   // vec3       wi        = cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed)));
-  vec3       wh        = normalize(wi + wo);
-  bsdfSample.direction = normalize(local2global * wi);
-  bsdfSample.pdf       = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
-  // bsdfSample.pdf       = cosineHemispherePdf(wi.z);
-  vec3 bsdfSampleVal   = evalDisneyBrdf(state, bsdfSample.direction);
+  if(wi.z <= 0.0)
+    bsdfSample.pdf = 0.0;
+  else
+  {
+    vec3 wh = normalize(wi + wo);
+    DEBUG_INF_NAN(wh, "indirect light sample error here\n");
+    if(checkInfNan(wh))
+    {
+      debugPrintfEXT("half: %v3f, incident: %v3f, outgoing: %v3f\n", wh, wi, wo);
+    }
+    bsdfSample.direction = normalize(local2global * wi);
+    bsdfSample.pdf       = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+    // bsdfSample.pdf       = cosineHemispherePdf(wi.z);
+  }
 
-  if(bsdfSample.pdf < 0.0)
+  vec3 bsdfSampleVal = evalDisneyBrdf(state, bsdfSample.direction);
+  vec3 throughput    = bsdfSampleVal * abs(dot(state.ffnormal, bsdfSample.direction)) / (bsdfSample.pdf + EPS);
+
+  if(bsdfSample.pdf <= 0.0)
   {
     payload.stop = 1;
     return;
@@ -444,6 +470,13 @@ void main()
   // Next ray
   payload.bsdfPdf       = bsdfSample.pdf;
   payload.ray.direction = bsdfSample.direction;
-  payload.throughput *= bsdfSampleVal * abs(dot(state.ffnormal, bsdfSample.direction)) / (bsdfSample.pdf + EPS);
+  payload.throughput *= throughput;
   payload.ray.origin = payload.lightHitPos;
+  /*
+  DEBUG_INF_NAN(throughput, "error when updating throughput\n");
+  if(checkInfNan(throughput))
+  {
+    debugPrintfEXT("val: %v3f, pdf: %f\n", bsdfSampleVal, bsdfSample.pdf);
+  }
+  */
 }

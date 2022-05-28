@@ -14,6 +14,17 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+bool checkInfNan(in vec3 M)
+{
+  return isnan((M).x) || isnan((M).y) || isnan((M).z) || isinf((M).x) || isinf((M).y) || isinf((M).z);
+}
+
+#define DEBUG_INF_NAN(M, str)                                                                                          \
+  if(checkInfNan(M))                                                                                                   \
+  {                                                                                                                    \
+    debugPrintfEXT(str);                                                                                               \
+  }
+
 float hypot2(float a, float b)
 {
   float r;
@@ -213,6 +224,13 @@ void basis(in vec3 n, out vec3 f, out vec3 r)
   f       = vec3(1. - n.x * n.x * a, b, -n.x);
   r       = vec3(b, 1. - n.y * n.y * a, -n.y);
 #endif
+}
+
+void Onb(in vec3 N, inout vec3 T, inout vec3 B)
+{
+  vec3 up = abs(N.z) < 0.999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+  T       = normalize(cross(up, N));
+  B       = cross(N, T);
 }
 
 /*
