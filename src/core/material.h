@@ -15,13 +15,13 @@ public:
     m_material.metalness          = 0.f;
     m_material.roughness          = 0.5f;
     m_material.subsurface         = 0.f;
-    m_material.specular           = 0.5f;
+    m_material.specular           = 0.f;
     m_material.specularTint       = 0.f;
     m_material.anisotropic        = 0.f;
     m_material.sheen              = 0.f;
-    m_material.sheenTint          = 0.5f;
+    m_material.sheenTint          = 0.f;
     m_material.clearcoat          = 0.f;
-    m_material.clearcoatGloss     = 1.f;
+    m_material.clearcoatGloss     = 0.f;
     m_material.emittanceFactor    = 1.f;
     m_material.diffuseTextureId   = -1;
     m_material.emittanceTextureId = -1;
