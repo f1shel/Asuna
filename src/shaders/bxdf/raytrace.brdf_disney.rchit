@@ -151,8 +151,8 @@ vec3 evalDisneyBrdf(in HitState state, in vec3 L)
 
   // The denominator for specular reflection (4 * LdotN * VdotN) has been already
   // separated into smithG_GGX. We don't have to divide it again.
-  return ((1 / PI) * mix(Fd, ss, state.mat.subsurface) * Cdlin + Fsheen) * (1 - state.mat.metalness) + Gs * Fs * Ds
-         + .25 * state.mat.clearcoat * Gr * Fr * Dr;
+  return (INV_PI * mix(Fd, ss, state.mat.subsurface) * Cdlin + Fsheen) * (1 - state.mat.metalness) + Gs * Fs * Ds;
+//         + .25 * state.mat.clearcoat * Gr * Fr * Dr;
 }
 
 
@@ -360,13 +360,12 @@ void main()
   if(state.mat.normalTextureId >= 0)
   {
     vec3 c         = texture(textureSamplers[nonuniformEXT(state.mat.normalTextureId)], state.uv).rgb;
-    c.y = 1 - c.y;
     vec3 n         = 2 * c - 1;
     state.ffnormal = normalize(local2global * n);
     if(dot(state.ffnormal, state.viewDir) < 0)
       state.ffnormal = -state.ffnormal;
     // Rebuild frame
-    Onb(state.ffnormal, state.tangent, state.bitangent);
+    basis(state.ffnormal, state.tangent, state.bitangent);
     local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
     global2local = transpose(local2global);
   }
@@ -414,9 +413,9 @@ void main()
       vec3 wo        = normalize(global2local * state.viewDir);
       vec3 wi        = normalize(global2local * lightSample.direction);
       vec3 wh        = normalize(wi + wo);
-      bsdfSample.pdf = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+      // bsdfSample.pdf = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
 
-      // bsdfSample.pdf = cosineHemispherePdf(wi.z);
+      bsdfSample.pdf = cosineHemispherePdf(wi.z);
 
       float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
 
@@ -442,8 +441,8 @@ void main()
   // Sample next ray
   BsdfSample bsdfSample;
   vec3       wo = normalize(global2local * state.viewDir);
-  vec3       wi = sampleSpecular(state.mat.clearcoat, wo, clearcoatRoughness, ax, ay);
-  // vec3       wi        = cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed)));
+  // vec3       wi = sampleSpecular(state.mat.clearcoat, wo, clearcoatRoughness, ax, ay);
+  vec3       wi        = cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed)));
   if(wi.z <= 0.0)
     bsdfSample.pdf = 0.0;
   else
@@ -455,8 +454,8 @@ void main()
       debugPrintfEXT("half: %v3f, incident: %v3f, outgoing: %v3f\n", wh, wi, wo);
     }
     bsdfSample.direction = normalize(local2global * wi);
-    bsdfSample.pdf       = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
-    // bsdfSample.pdf       = cosineHemispherePdf(wi.z);
+    // bsdfSample.pdf       = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+    bsdfSample.pdf       = cosineHemispherePdf(wi.z);
   }
 
   vec3 bsdfSampleVal = evalDisneyBrdf(state, bsdfSample.direction);

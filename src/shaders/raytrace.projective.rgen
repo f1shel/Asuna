@@ -35,7 +35,8 @@ void main()
   vec3 radiance = vec3(0.f);
   for(uint i = 0; i < pc.spp; ++i)
   {
-    vec2 jitter = pc.curFrame == 0 ? vec2(0.5f, 0.5f) : vec2(rand(payload.seed), rand(payload.seed));
+//    vec2 jitter = pc.curFrame == 0 ? vec2(0.5f, 0.5f) : vec2(rand(payload.seed), rand(payload.seed));
+    vec2 jitter = vec2(0.0);
     vec2 pixel  = pixelCenter + jitter;
 
     vec4 target;
