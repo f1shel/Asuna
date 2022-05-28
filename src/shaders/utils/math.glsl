@@ -165,6 +165,8 @@ vec3 cosineSampleHemisphere(in vec2 u)
 
 float cosineHemispherePdf(in float cosTheta)
 {
+  if(cosTheta <= 0)
+    return 0;
   return cosTheta * INV_PI;
 }
 

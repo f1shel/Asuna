@@ -55,7 +55,12 @@ float GTR2(float NdotH, float a)
 
 float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay)
 {
-  return 1 / (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + NdotH * NdotH));
+  if(NdotH <= 0)
+    return 0.0;
+  float result = 1 / (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + NdotH * NdotH));
+  if(result * NdotH < 1e-20)
+    result = 0;
+  return result;
 }
 
 float smithG_GGX(float NdotV, float alphaG)
@@ -97,7 +102,7 @@ vec3 evalDisneyBrdf(in HitState state, in vec3 L)
   vec3  N = state.ffnormal, V = state.viewDir, X = state.tangent, Y = state.bitangent;
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);
-  if(NdotL < 0 || NdotV < 0)
+  if(NdotL <= 0 || NdotV <= 0)
     return vec3(0);
 
   vec3  H     = normalize(L + V);
@@ -256,6 +261,31 @@ vec3 SampleGGXVNDF(vec3 wo, float rgh, float r1, float r2)
   return normalize(vec3(rgh * nh.x, rgh * nh.y, max(0.0, nh.z)));
 }
 
+vec3 sampleGGXAniso(float ax, float ay, vec2 p)
+{
+  /* Sample phi component (anisotropic case) */
+  float phiM    = atan(ay / ax * tan(PI + TWO_PI * p.y)) + PI * floor(2 * p.y + 0.5f);
+  float sinPhiM = sin(phiM), cosPhiM = cos(phiM);
+  float cosSc = cosPhiM / ax, sinSc = sinPhiM / ay;
+  float alphaSqr = 1.0f / (cosSc * cosSc + sinSc * sinSc);
+
+  /* Sample theta component */
+  float tanThetaMSqr = alphaSqr * p.x / (1.0f - p.x);
+  float cosThetaM    = 1.0f / sqrt(1.0f + tanThetaMSqr);
+
+  /* Compute probability density of the sampled position */
+  float temp = 1 + tanThetaMSqr / alphaSqr;
+  float pdf  = INV_PI / (ax * ay * cosThetaM * cosThetaM * cosThetaM * temp * temp);
+
+  /* Prevent potential numerical issues in other stages of the model */
+  if(pdf < 1e-20)
+    pdf = 0;
+
+  float sinThetaM = sqrt(max(0, 1 - cosThetaM * cosThetaM));
+
+  return vec3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
+}
+
 vec3 sampleSpecular(in float clearcoat, in vec3 wo, in float clearcoatRoughness, in float ax, in float ay)
 {
   // Select lobe by the relative weights.
@@ -267,7 +297,8 @@ vec3 sampleSpecular(in float clearcoat, in vec3 wo, in float clearcoatRoughness,
   // if(rand(payload.seed) < gtr2Weight)
   // Sample visible normal
   // wm = sampleVisible(vec2(rx, ry), wo, ax, ay);
-  wm = SampleGGXVNDF(wo, ax, rx, ry);
+  // wm = SampleGGXVNDF(wo, ax, rx, ry);
+  wm = sampleGGXAniso(ax, ay, vec2(rx, ry));
   // else
   // wm = SampleGTR1(clearcoatRoughness, rx, ry);
   return reflect(-wo, wm);
@@ -276,7 +307,7 @@ vec3 sampleSpecular(in float clearcoat, in vec3 wo, in float clearcoatRoughness,
 float specularPdf(in vec3 wm, in vec3 wo, in float clearcoat, in float clearcoatRoughness, in float ax, in float ay)
 {
   vec3 wi = reflect(-wo, wm);
-  if(wi.z <= 0.0)
+  if(wi.z <= 0.0 || wo.z <= 0.0)
     return 0.0;
 
   float IdotM = abs(dot(wi, wm));
@@ -288,7 +319,7 @@ float specularPdf(in vec3 wm, in vec3 wo, in float clearcoat, in float clearcoat
   // float D  = mix(Dw, GTR1(wm.z, clearcoatRoughness) * abs(wm.z) / IdotM, clearcoatWeight);
   float D = smithG1(wo, wm, ax, ay) * IdotM * GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) / abs(wi.z);
   // return D * 0.25f;
-  return smithG1(wo, wm, ax, ay) * GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) / (4 * wo.z);
+  return GTR2_aniso(wm.z, wm.x, wm.y, ax, ay) * wm.z / (4*abs(dot(wo, wm)));
 }
 
 void main()
@@ -322,6 +353,7 @@ void main()
     if(dot(state.ffnormal, state.viewDir) < 0)
       state.ffnormal = -state.ffnormal;
     // Rebuild frame
+    basis(state.ffnormal, state.tangent, state.bitangent);
     local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
     global2local = transpose(local2global);
   }
@@ -370,6 +402,7 @@ void main()
       vec3 wi        = normalize(global2local * lightSample.direction);
       vec3 wh        = normalize(wi + wo);
       bsdfSample.pdf = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+      // bsdfSample.pdf = cosineHemispherePdf(wi.z);
 
       float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
 
@@ -396,9 +429,11 @@ void main()
   BsdfSample bsdfSample;
   vec3       wo        = normalize(global2local * state.viewDir);
   vec3       wi        = sampleSpecular(state.mat.clearcoat, wo, state.mat.roughness, ax, ay);
+  // vec3       wi        = cosineSampleHemisphere(vec2(rand(payload.seed), rand(payload.seed)));
   vec3       wh        = normalize(wi + wo);
   bsdfSample.direction = normalize(local2global * wi);
   bsdfSample.pdf       = specularPdf(wh, wo, state.mat.clearcoat, clearcoatRoughness, ax, ay);
+  // bsdfSample.pdf       = cosineHemispherePdf(wi.z);
   vec3 bsdfSampleVal   = evalDisneyBrdf(state, bsdfSample.direction);
 
   if(bsdfSample.pdf < 0.0)
