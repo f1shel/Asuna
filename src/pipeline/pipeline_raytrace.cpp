@@ -200,12 +200,12 @@ void PipelineRaytrace::createRtPipeline()
   stage.stage                                    = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfLambertian] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfLambertian");
-  // ClosetHit:BrdfPbrMetalnessRoughness
+  // ClosetHit:BrdfDisney
   stage.module =
-      nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.brdf_pbr_metalness_roughness.rchit.spv", true, root));
+      nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.brdf_disney.rchit.spv", true, root));
   stage.stage                                               = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-  stages[NumStages + MaterialTypeBrdfPbrMetalnessRoughness] = stage;
-  NAME2_VK(stage.module, "ClosetHit:BrdfPbrMetalnessRoughness");
+  stages[NumStages + MaterialTypeBrdfDisney] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfDisney");
   // ClosetHit:BrdfEmissive
   stage.module =
       nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.brdf_emissive.rchit.spv", true, root));

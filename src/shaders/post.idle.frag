@@ -80,8 +80,9 @@ void main()
 
   if(tm.tmType == ToneMappingTypeNone)
     fragColor.rgb = hdr.rgb;
-  else if(tm.tmType == ToneMappingTypeGamma)
-    fragColor.rgb = linearTosRGB(hdr.rgb);
+  else if(tm.tmType == ToneMappingTypeGamma) {
+    fragColor.rgb = linearTosRGB(hdr.rgb / (1 + hdr.rgb / 1.5));
+  }
   else if(tm.tmType == ToneMappingTypeReinhard)
     fragColor.rgb = toneMapHejlRichard(hdr.rgb);
   else if(tm.tmType == ToneMappingTypeAces)

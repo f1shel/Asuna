@@ -14,6 +14,40 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+float hypot2(float a, float b)
+{
+  float r;
+  if(abs(a) > abs(b))
+  {
+    r = b / a;
+    r = abs(a) * sqrt(1.0f + r * r);
+  }
+  else if(b != 0.0f)
+  {
+    r = a / b;
+    r = abs(b) * sqrt(1.0f + r * r);
+  }
+  else
+  {
+    r = 0.0f;
+  }
+  return r;
+}
+/** \brief Assuming that the given direction is in the local coordinate
+     * system, return the tangent of the angle between the normal and v */
+float tanTheta(vec3 v)
+{
+  float temp = 1 - v.z * v.z;
+  if(temp <= 0.0f)
+    return 0.0f;
+  return sqrt(temp) / v.z;
+}
+
+float safeSqrt(float value)
+{
+  return sqrt(max(0, value));
+}
+
 vec3 transformPoint(in mat4 transform, in vec3 point)
 {
   vec4 homoPoint  = vec4(point, 1.f);

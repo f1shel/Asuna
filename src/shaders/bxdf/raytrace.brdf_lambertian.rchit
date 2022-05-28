@@ -21,12 +21,25 @@ void main()
     return;
   }
 
-  // Fetch textures
-  if(state.mat.diffuseTextureId >= 0)
-    state.mat.diffuse = texture(textureSamplers[nonuniformEXT(state.mat.diffuseTextureId)], state.uv).rgb;
   // Build local frame
   mat3 local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
   mat3 global2local = transpose(local2global);
+
+  // Fetch textures
+  if(state.mat.diffuseTextureId >= 0)
+    state.mat.diffuse = texture(textureSamplers[nonuniformEXT(state.mat.diffuseTextureId)], state.uv).rgb;
+  if(state.mat.normalTextureId >= 0)
+  {
+    vec3 c         = texture(textureSamplers[nonuniformEXT(state.mat.normalTextureId)], state.uv).rgb;
+    c.y            = 1 - c.y;
+    vec3 n         = 2 * c - 1;
+    state.ffnormal = normalize(local2global * n);
+    if(dot(state.ffnormal, state.viewDir) < 0)
+      state.ffnormal = -state.ffnormal;
+    // Rebuild frame
+    local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
+    global2local = transpose(local2global);
+  }
 
   // Direct light
   {
@@ -76,7 +89,7 @@ void main()
     }
 
     payload.shouldDirectLight = 1;
-    payload.lightHitPos = offsetPositionAlongNormal(state.hitPos, state.ffnormal);
+    payload.lightHitPos       = offsetPositionAlongNormal(state.hitPos, state.ffnormal);
   }
 
   // Sample next ray

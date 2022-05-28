@@ -7,7 +7,29 @@
 class Material
 {
 public:
-  Material() {}
+  Material()
+  {
+    m_material.diffuse            = vec3(0.f);
+    m_material.roughness          = 0.f;
+    m_material.emittance          = vec3(0.f);
+    m_material.metalness          = 0.f;
+    m_material.roughness          = 0.5f;
+    m_material.subsurface         = 0.f;
+    m_material.specular           = 0.5f;
+    m_material.specularTint       = 0.f;
+    m_material.anisotropic        = 0.f;
+    m_material.sheen              = 0.f;
+    m_material.sheenTint          = 0.5f;
+    m_material.clearcoat          = 0.f;
+    m_material.clearcoatGloss     = 1.f;
+    m_material.emittanceFactor    = 1.f;
+    m_material.diffuseTextureId   = -1;
+    m_material.emittanceTextureId = -1;
+    m_material.metalnessTextureId = -1;
+    m_material.normalTextureId    = -1;
+    m_material.roughnessTextureId = -1;
+    m_material.type               = MaterialTypeBrdfLambertian;
+  }
   Material(const GpuMaterial& material)
       : m_material(material)
   {
@@ -16,18 +38,7 @@ public:
   MaterialType getType() { return MaterialType(m_material.type); }
 
 private:
-  GpuMaterial m_material = {
-      vec3(0.0),                   // diffuse albedo
-      0.0,                         // roughness
-      vec3(0.0),                   // emittance
-      0.0,                         // metalness
-      vec3(1.0),                   // emittance factor
-      -1,                          // diffuse albedo texture id
-      -1,                          // roughness texture id
-      -1,                          // roughness texture id
-      -1,                          // emittance texture
-      MaterialTypeBrdfLambertian,  // material type
-  };
+  GpuMaterial m_material;
 };
 
 class MaterialAlloc : public GpuAlloc

@@ -354,10 +354,14 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
     if(materialJson.contains("diffuse_texture"))
       material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if(materialJson.contains("normal_texture"))
+      material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
   }
-  else if(materialJson["type"] == "brdf_pbr_metalness_roughness")
+  else if(materialJson["type"] == "brdf_disney")
   {
-    material.type = MaterialTypeBrdfPbrMetalnessRoughness;
+    material.type = MaterialTypeBrdfDisney;
+    if(materialJson.contains("normal_texture"))
+      material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
     if(materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
     if(materialJson.contains("diffuse_texture"))
@@ -366,6 +370,26 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
       material.metalness = materialJson["metalness"];
     if(materialJson.contains("metalness_texture"))
       material.metalnessTextureId = m_pScene->getTextureId(materialJson["metalness_texture"]);
+    if(materialJson.contains("roughness"))
+      material.roughness = materialJson["roughness"];
+    if(materialJson.contains("roughness_texture"))
+      material.roughnessTextureId = m_pScene->getTextureId(materialJson["roughness_texture"]);
+    if(materialJson.contains("subsurface"))
+      material.subsurface = materialJson["subsurface"];
+    if(materialJson.contains("specular"))
+      material.specular = materialJson["specular"];
+    if(materialJson.contains("specular_tint"))
+      material.specularTint = materialJson["specular_tint"];
+    if(materialJson.contains("anisotropic"))
+      material.anisotropic = materialJson["anisotropic"];
+    if(materialJson.contains("sheen"))
+      material.sheen = materialJson["sheen"];
+    if(materialJson.contains("sheen_tint"))
+      material.sheenTint = materialJson["sheen_tint"];
+    if(materialJson.contains("clearcoat"))
+      material.clearcoat = materialJson["clearcoat"];
+    if(materialJson.contains("clearcoat_gloss"))
+      material.clearcoatGloss = materialJson["clearcoat_gloss"];
   }
   else if(materialJson["type"] == "brdf_emissive")
   {
