@@ -14,6 +14,11 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+vec3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi, float cosPhi) {
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
+
 bool checkInfNan(in vec3 M)
 {
   return isnan((M).x) || isnan((M).y) || isnan((M).z) || isinf((M).x) || isinf((M).y) || isinf((M).z);
