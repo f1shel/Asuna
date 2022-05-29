@@ -134,6 +134,8 @@ float DielectricFresnel(float cosThetaI, float eta)
   if(sinThetaTSq > 1.0)
     return 1.0;
 
+  return sinThetaTSq;
+
   float cosThetaT = sqrt(max(1.0 - sinThetaTSq, 0.0));
 
   float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
@@ -190,14 +192,14 @@ vec3 EvalSpecReflection(float metallic, float roughness, float eta, vec3 specCol
   if(L.z <= 0.0)
     return vec3(0.0);
 
-  float FM = DisneyFresnel(metallic, 1.5, dot(L, H), dot(V, H));
+  float FM = DisneyFresnel(metallic, eta, dot(L, H), dot(V, H));
   vec3  F  = mix(specCol, vec3(1.0), FM);
   float D  = GTR2(H.z, roughness);
   float G1 = SmithG(abs(V.z), roughness);
   float G2 = G1 * SmithG(abs(L.z), roughness);
 
   pdf = G1 * D / (4.0 * V.z);
-  return F * D * G2 / (4.0 * L.z * V.z);
+  return G2 * D * F / (4.0 * L.z * V.z);
 }
 
 vec3 EvalClearcoat(float clearcoatRoughness, float clearcoat, vec3 V, vec3 L, vec3 H, out float pdf)
@@ -225,11 +227,16 @@ void GetSpecColor(vec3 baseColor, float metallic, float specularTint, float shee
   sheenCol    = mix(vec3(1.0), ctint, sheenTint);
 }
 
-void GetLobeProbabilities(out float diffuseWt, out float specReflectWt, out float clearcoatWt)
+void GetLobeProbabilities(float metallic, float clearcoat, vec3 baseColor, vec3 specCol, float approxFresnel, out float diffuseWt, out float specReflectWt, out float clearcoatWt)
 {
-  diffuseWt     = 0.3333;
-  specReflectWt = 0.3333;
-  clearcoatWt   = 0.3333;
+    diffuseWt = Luminance(baseColor) * (1.0 - metallic);
+    specReflectWt = Luminance(mix(specCol, vec3(1.0), approxFresnel));
+    clearcoatWt = 0.25 * clearcoat * (1.0 - metallic);
+    float totalWt = diffuseWt + specReflectWt + clearcoatWt;
+
+    diffuseWt /= totalWt;
+    specReflectWt /= totalWt;
+    clearcoatWt /= totalWt;
 }
 
 vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 L, out float pdf)
@@ -253,7 +260,7 @@ vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 
   float diffuseWt, specReflectWt, specRefractWt, clearcoatWt;
   // Note: Fresnel is approx and based on N and not H since H isn't available at this stage.
   float approxFresnel = DisneyFresnel(mat.metalness, 1.5, V.z, V.z);
-  GetLobeProbabilities(diffuseWt, specReflectWt, clearcoatWt);
+  GetLobeProbabilities(mat.metalness, mat.clearcoat, mat.diffuse, specCol, approxFresnel, diffuseWt, specReflectWt, clearcoatWt);
 
   // CDF for picking a lobe
   float cdf[3];
@@ -262,10 +269,10 @@ vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 
   cdf[2] = cdf[1] + specReflectWt;
 
   float clearcoatRoughness = mix(0.1, 0.001, mat.clearcoatGloss);
+  float r0 = rand(seed);
 
-  if(r1 < cdf[0])  // Diffuse Reflection Lobe
+  if(r0 < cdf[0])  // Diffuse Reflection Lobe
   {
-    r1 /= cdf[0];
     L = cosineSampleHemisphere(vec2(r1, r2));
 
     vec3 H = normalize(L + V);
@@ -273,10 +280,8 @@ vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 
     f = EvalDiffuse(mat.roughness, mat.metalness, mat.subsurface, mat.sheen, mat.diffuse, sheenCol, V, L, H, pdf);
     pdf *= diffuseWt;
   }
-  else if(r1 < cdf[1])  // Clearcoat Lobe
+  else if(r0 < cdf[1])  // Clearcoat Lobe
   {
-    r1 = (r1 - cdf[0]) / (cdf[1] - cdf[0]);
-
     vec3 H = SampleGTR1(clearcoatRoughness, r1, r2);
 
     if(H.z < 0.0)
@@ -289,7 +294,6 @@ vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 
   }
   else  // Specular Reflection/Refraction Lobes
   {
-    r1     = (r1 - cdf[1]) / (1.0 - cdf[1]);
     vec3 H = SampleGGXVNDF(V, mat.roughness, r1, r2);
 
     if(H.z < 0.0)
@@ -298,6 +302,7 @@ vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 
     // TODO: Refactor into metallic BRDF and specular BSDF
 
     L = normalize(reflect(-V, H));
+//    L = cosineSampleHemisphere(vec2(r1, r2));
 
     f = EvalSpecReflection(mat.metalness, mat.roughness, 1.5, specCol, V, L, H, pdf);
 
@@ -334,7 +339,7 @@ vec3 DisneyEval(in GpuMaterial mat, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
   // Lobe weights
   float diffuseWt, specReflectWt, clearcoatWt;
   float fresnel = DisneyFresnel(mat.metalness, 1.5, dot(L, H), dot(V, H));
-  GetLobeProbabilities(diffuseWt, specReflectWt, clearcoatWt);
+  GetLobeProbabilities(mat.metalness, mat.clearcoat, mat.diffuse, specCol, fresnel, diffuseWt, specReflectWt, clearcoatWt);
 
   float pdf;
   float clearcoatRoughness = mix(0.1, 0.001, mat.clearcoatGloss);

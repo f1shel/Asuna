@@ -22,6 +22,12 @@ void main()
     return;
   }
 
+  if(payload.depth >= pc.maxPathDepth)
+  {
+    payload.stop = 1;
+    return;
+  }
+
   // Build local frame
   mat3 local2global = mat3(state.tangent, state.bitangent, state.ffnormal);
   mat3 global2local = transpose(local2global);
@@ -55,27 +61,42 @@ void main()
 
     vec3  Li               = vec3(0);
     bool  allowDoubleSide  = false;
-    float envOrAnalyticPdf = 0.5;
 
-    if(pc.numLights == 0)
-      envOrAnalyticPdf = 1.0;
-    if(rand(payload.seed) < envOrAnalyticPdf)
+    /*
+     * 4 cases:
+     * (1) has env & light: envSelectPdf = 0.5, lightSelectPdf = 0.5
+     * (2) no env & light: skip direct light
+     * (3) has env, no light: envSelectPdf = 1.0, lightSelectPdf = 0.0
+     * (4) no env, has light: envSelectPdf = 0.0, lightSelectPdf = 1.0
+     */
+    bool hasEnv = (pc.hasEnvMap == 1 || sunAndSky.in_use == 1);
+    bool hasLight = (pc.numLights > 0);
+    float envSelectPdf, lightSelectPdf;
+    if (hasEnv && hasLight) envSelectPdf = lightSelectPdf = 0.5f;
+    else if (hasEnv) envSelectPdf = 1.f, lightSelectPdf = 0.f;
+    else if (hasLight) envSelectPdf = 0.f, lightSelectPdf = 1.f;
+    else envSelectPdf = lightSelectPdf = 0.f;
+
+    float selectRand = rand(payload.seed);
+    if(selectRand < envSelectPdf)
     {
       sampleEnvironmentLight(lightSample);
       lightSample.normal = -state.ffnormal;
-      lightSample.emittance /= envOrAnalyticPdf;
+      lightSample.emittance /= envSelectPdf;
     }
-    else
+    else if (selectRand < envSelectPdf + lightSelectPdf)
     {
       // sample analytic light
       int      lightIndex = min(1 + int(rand(payload.seed) * pc.numLights), pc.numLights);
       GpuLight light      = lights.l[lightIndex];
       sampleOneLight(payload.seed, light, state.hitPos, lightSample);
       lightSample.emittance *= pc.numLights;  // selection pdf
-      lightSample.emittance /= 1.0 - envOrAnalyticPdf;
-      debugPrintfEXT("light position: %v3f emittance: %v3f\n", light.position, lightSample.emittance);
+      lightSample.emittance /= lightSelectPdf;
+//      debugPrintfEXT("light position: %v3f emittance: %v3f\n", light.position, lightSample.emittance);
       allowDoubleSide = (light.doubleSide == 1);
     }
+
+    if (envSelectPdf + lightSelectPdf > 0.f) {
 
     if(dot(lightSample.direction, state.ffnormal) > 0.0 && (dot(lightSample.normal, lightSample.direction) < 0 || allowDoubleSide))
     {
@@ -83,31 +104,29 @@ void main()
 
       vec3 bsdfSampleVal = DisneyEval(state.mat, state.viewDir, state.ffnormal, lightSample.direction, bsdfSample.pdf);
 
-      float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
+      if (bsdfSample.pdf > 0.0) {
 
-      Li += misWeight * bsdfSampleVal * max(dot(lightSample.direction, state.ffnormal), 0.0) * lightSample.emittance
-            / (lightSample.pdf + EPS);
+          float misWeight = powerHeuristic(lightSample.pdf, bsdfSample.pdf);
 
-      payload.lightVisible  = 1;
-      payload.lightDir      = lightSample.direction;
-      payload.lightDist     = lightSample.dist;
-      payload.lightRadiance = Li * payload.throughput;
+          Li += misWeight * bsdfSampleVal * max(dot(lightSample.direction, state.ffnormal), 0.0) * lightSample.emittance
+                / (lightSample.pdf + EPS);
+
+          payload.lightVisible  = 1;
+          payload.lightDir      = lightSample.direction;
+          payload.lightDist     = lightSample.dist;
+          payload.lightRadiance = Li * payload.throughput;
+      }
     }
-
     payload.shouldDirectLight = 1;
     payload.lightHitPos       = offsetPositionAlongNormal(state.hitPos, state.ffnormal);
-  }
-
-  if(payload.depth >= pc.maxPathDepth)
-  {
-    payload.stop = 1;
-    return;
+    }
   }
 
   // Sample next ray
   BsdfSample bsdfSample;
   vec3       bsdfSampleVal =
       DisneySample(state.mat, payload.seed, state.viewDir, state.ffnormal, bsdfSample.direction, bsdfSample.pdf);
+  if (bsdfSample.direction.z <= 0) bsdfSample.pdf = 0.0;
   bsdfSample.direction = normalize(local2global * bsdfSample.direction);
   vec3 throughput      = bsdfSampleVal * abs(dot(state.ffnormal, bsdfSample.direction)) / (bsdfSample.pdf + EPS);
 
@@ -128,4 +147,11 @@ void main()
     debugPrintfEXT("val: %v3f, pdf: %f\n", bsdfSampleVal, bsdfSample.pdf);
   }
   */
+          // Russian roulette
+            float q = min(max(payload.throughput.x, max(payload.throughput.y, payload.throughput.z)) + 0.001, 0.95);
+            if (rand(payload.seed) > q) {
+                payload.stop = 1;
+                return;
+            }
+            payload.throughput /= q;
 }

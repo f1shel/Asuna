@@ -90,6 +90,12 @@ void main()
                   0                       // payload (location = 0)
       );
 
+      ++payload.depth;
+//      // next ray, increment path depth
+//      if(payload.depth >= pc.maxPathDepth)
+//        break;
+      if(payload.stop > 0)
+        break;
       if(payload.shouldDirectLight == 1 && payload.lightVisible == 1)
       {
         // We are adding the contribution to the radiance only if the ray is not
@@ -117,13 +123,6 @@ void main()
           DEBUG_INF_NAN(payload.radiance, "error when updating radiance\n");
         }
       }
-
-      if(payload.stop > 0)
-        break;
-      // next ray, increment path depth
-      if(payload.depth >= pc.maxPathDepth)
-        break;
-      ++payload.depth;
     }
 
     radiance += payload.radiance;
