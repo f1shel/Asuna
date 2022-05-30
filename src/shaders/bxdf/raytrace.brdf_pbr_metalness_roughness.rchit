@@ -8,14 +8,77 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 #include "../utils/rchit_layouts.glsl"
+// #include "raytrace.brdf_pbr.tools.glsl"
+
+float sqr(float x)
+{
+  return x * x;
+}
+
+vec3 fresnelSchlick(float cosThetaI, vec3 specCol)
+{
+  return specCol + (1 - specCol) * pow(clamp(1 - cosThetaI, 0, 1), 5);
+}
+
+float dAnisoGGX(float nDotH, float hDotX, float hDotY, float ax, float ay)
+{
+  return 1 / max(PI * ax * ay * sqr(sqr(hDotX / ax) + sqr(hDotY / ay) + sqr(nDotH)), EPS);
+}
+
+float g1SmithAnisoGGX(float nDotV, float vDotX, float vDotY, float ax, float ay)
+{
+  return 1 / (nDotV + safeSqrt(sqr(nDotV) + sqr(ax * vDotX) + sqr(ay * vDotY)));
+}
+
+vec3 sampleAnisoGGX(vec3 lwo, float roughness)
+{
+  float ax     = max(sqr(roughness), 0.001);
+  float ay     = ax;
+  vec2  u      = rand2(payload.seed);
+  float factor = safeSqrt(u.x / (1 - u.x));
+  float xh     = ax * factor * cos(TWO_PI * u.y);
+  float yh     = ay * factor * sin(TWO_PI * u.y);
+  vec3  lwh    = makeNormal(vec3(-xh, -yh, 1));
+  vec3  lwi    = reflect(-lwo, lwh);
+  return lwi;
+}
+
+float anisoGGXPdf(vec3 lwh, vec3 lwo, float roughness)
+{
+  float ax  = max(sqr(roughness), 0.001);
+  float ay  = ax;
+  float pdf = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay) * lwh.z / dot(lwh, lwo);
+  return pdf;
+}
+
+vec3 pbrEval(vec3 lwi, vec3 lwo, vec3 albedo, float roughness, float metalness, out float pdf)
+{
+  pdf = 0.0;
+  if(lwi.z <= 0.0 || lwo.z <= 0.0)
+    return vec3(0.0);
+  vec3 lwh = makeNormal(lwi + lwo);
+  pdf      = anisoGGXPdf(lwh, lwo, roughness);
+
+  float ax    = max(sqr(roughness), 0.001);
+  float ay    = ax;
+  float hDotV = dot(lwo, lwh);
+  float hDotL = dot(lwi, lwh);
+  vec3  Fs    = fresnelSchlick(hDotV, mix(vec3(0.04), albedo, metalness));
+  float Ds    = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay);
+  float Gs    = g1SmithAnisoGGX(max(lwi.z, 0.0), lwi.x, lwi.y, ax, ay);
+  Gs *= g1SmithAnisoGGX(max(lwo.z, 0.0), lwo.x, lwo.y, ax, ay);
+  vec3 diffuse  = albedo * (1 - metalness) * INV_PI;
+  vec3 specular = Fs * Ds * Gs;
+  return diffuse + specular;
+}
 
 void main()
 {
-  // Get hit record
+  // Get hit state
   HitState state = getHitState();
 
   // Hit Light
-  if(state.lightId >= 0)
+  if(state.lightId > 0)
   {
     hitLight(state.lightId, state.hitPos);
     return;
@@ -24,6 +87,10 @@ void main()
   // Fetch textures
   if(state.mat.diffuseTextureId >= 0)
     state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
+  if(state.mat.metalnessTextureId >= 0)
+    state.mat.metalness = textureEval(state.mat.metalnessTextureId, state.uv).r;
+  if(state.mat.roughnessTextureId >= 0)
+    state.mat.roughness = textureEval(state.mat.roughnessTextureId, state.uv).r;
   if(state.mat.normalTextureId >= 0)
   {
     vec3 c         = textureEval(state.mat.normalTextureId, state.uv).rgb;
@@ -94,7 +161,6 @@ void main()
 
     // Light at the back of the surface is not visible
     payload.directVisible = (dot(lightSample.direction, state.ffnormal) > 0.0);
-
     // Surface on the back of the light is also not illuminated
     payload.directVisible =
         payload.directVisible
@@ -102,9 +168,16 @@ void main()
 
     if(payload.directVisible)
     {
+      BsdfSample bsdfSample;
+
       // Multi importance sampling
-      float bsdfPdf = cosineHemispherePdf(dot(lightSample.direction, state.ffnormal));
-      vec3 bsdfVal = state.mat.diffuse * INV_PI;
+      float bsdfPdf = 0;
+      vec3  lwi     = makeNormal(toLocal(state.tangent, state.bitangent,
+                                         state.ffnormal, lightSample.direction));
+      vec3  lwo     = makeNormal(toLocal(state.tangent, state.bitangent,
+                                         state.ffnormal, state.viewDir));
+      vec3  bsdfVal = pbrEval(lwi, lwo, state.mat.diffuse, state.mat.roughness,
+                              state.mat.metalness, bsdfPdf);
       float misWeight = bsdfPdf > 0.0 ? powerHeuristic(lightSample.pdf, bsdfPdf) : 1.0;
 
       Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal)
@@ -118,13 +191,16 @@ void main()
   BsdfSample bsdfSample;
 
   // Shading frame, local tangent space
-  bsdfSample.direction = cosineSampleHemisphere(rand2(payload.seed));
-  bsdfSample.pdf       = cosineHemispherePdf(bsdfSample.direction.z);
-  
+  vec3 lwo =
+      makeNormal(toLocal(state.tangent, state.bitangent, state.ffnormal, state.viewDir));
+  bsdfSample.direction = sampleAnisoGGX(lwo, state.mat.roughness);
+  vec3 bsdfVal         = pbrEval(bsdfSample.direction, lwo, state.mat.diffuse,
+                                 state.mat.roughness, state.mat.metalness, bsdfSample.pdf);
+
   // World space
   bsdfSample.direction =
       toWorld(state.tangent, state.bitangent, state.ffnormal, bsdfSample.direction);
-  vec3 bsdfVal = state.mat.diffuse * INV_PI;
+  bsdfSample.direction = makeNormal(bsdfSample.direction);
 
   // Reject invalid sample
   if(bsdfSample.pdf <= 0.0 || length(bsdfVal) == 0.0)

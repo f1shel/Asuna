@@ -60,16 +60,21 @@ HitState getHitState()
   vec3        bary      = vec3(1.0 - _bary.x - _bary.y, _bary.x, _bary.y);
   state.lightId         = _inst.lightId;
   state.uv              = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
-  state.hitPos          = gl_ObjectToWorldEXT * vec4(v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z, 1.f);
-  state.shadingNormal   = normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
-  state.faceNormal      = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));
-  state.viewDir         = -normalize(gl_WorldRayDirectionEXT);
+  state.hitPos          = gl_ObjectToWorldEXT
+                 * vec4(v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z, 1.f);
+  state.shadingNormal =
+      normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
+  state.faceNormal = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));
+  state.viewDir    = -normalize(gl_WorldRayDirectionEXT);
   if(state.lightId < 0)
     state.mat = Materials(_inst.materialAddress).m[0];
   if(pc.useFaceNormal == 1)
-    state.ffnormal = dot(state.faceNormal, state.viewDir) > 0.0 ? state.faceNormal : -state.faceNormal;
+    state.ffnormal = dot(state.faceNormal, state.viewDir) > 0.0 ? state.faceNormal :
+                                                                  -state.faceNormal;
   else
-    state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0.0 ? state.shadingNormal : -state.shadingNormal;
+    state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0.0 ?
+                         state.shadingNormal :
+                         -state.shadingNormal;
   basis(state.ffnormal, state.tangent, state.bitangent);
 
   return state;
@@ -82,17 +87,17 @@ void hitLight(in int lightId, in vec3 hitPos)
   vec3     lightNormal         = normalize(cross(light.u, light.v));
   float    lightSideProjection = dot(lightNormal, lightDirection);
 
-  payload.stop = 1;
-  // single side light
+  payload.stop = true;
+  // Single side light
   if(lightSideProjection > 0)
     return;
-  // do not mis
-  if(payload.depth == 0)
+  // Do not mis
+  if(payload.depth == 1)
   {
     payload.radiance = light.emittance;
     return;
   }
-  // do mis
+  // Do mis
   float lightDist  = length(hitPos - payload.ray.origin);
   float distSquare = lightDist * lightDist;
   float lightPdf   = distSquare / (light.area * abs(lightSideProjection) + EPS);
@@ -103,28 +108,36 @@ void hitLight(in int lightId, in vec3 hitPos)
 
 void sampleEnvironmentLight(inout LightSample lightSample)
 {
-  // sample environment light
+  // Sample environment light
   lightSample.shouldMis = 1.0;
   lightSample.dist      = INFINITY;
   if(sunAndSky.in_use == 1)
   {
-    lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
+    lightSample.direction =
+        uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
     lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
     lightSample.pdf       = uniformSpherePdf();
   }
   else if(pc.hasEnvMap == 1)
   {
-    lightSample.direction = sampleEnvmap(payload.seed, envmapSamplers, pc.envRotateAngle, pc.envMapResolution, lightSample.pdf);
-    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction, pc.envRotateAngle, pc.envMapIntensity);
+    lightSample.direction = sampleEnvmap(payload.seed, envmapSamplers, pc.envRotateAngle,
+                                         pc.envMapResolution, lightSample.pdf);
+    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction,
+                                       pc.envRotateAngle, pc.envMapIntensity);
   }
   else
   {
-    lightSample.direction = uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
+    lightSample.direction =
+        uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
     lightSample.emittance = pc.bgColor;
     lightSample.pdf       = uniformSpherePdf();
   }
 }
 
-void evalEnvironmentLight() {}
+vec4 textureEval(int texId, vec2 uv)
+{
+  return texture(textureSamplers[nonuniformEXT(texId)], uv).rgba;
+}
+
 
 #endif

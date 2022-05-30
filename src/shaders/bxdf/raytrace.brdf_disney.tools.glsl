@@ -237,6 +237,10 @@ void GetLobeProbabilities(float metallic, float clearcoat, vec3 baseColor, vec3 
     diffuseWt /= totalWt;
     specReflectWt /= totalWt;
     clearcoatWt /= totalWt;
+
+    diffuseWt = 0.0;
+    specReflectWt = 0.0;
+    clearcoatWt = 0.0;
 }
 
 vec3 DisneySample(in GpuMaterial mat, inout uint seed, vec3 V, vec3 N, out vec3 L, out float pdf)

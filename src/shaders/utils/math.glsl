@@ -10,24 +10,26 @@
 #define PI_OVER_2 1.57079632679489661923
 #define PI_OVER_4 0.78539816339744830961
 
-#define EPS 0.0001
+#define EPS 0.001
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
-vec3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi, float cosPhi) {
-    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+vec3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi, float cosPhi)
+{
+  return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 }
 
 
 bool checkInfNan(in vec3 M)
 {
-  return isnan((M).x) || isnan((M).y) || isnan((M).z) || isinf((M).x) || isinf((M).y) || isinf((M).z);
+  return isnan((M).x) || isnan((M).y) || isnan((M).z) || isinf((M).x)
+         || isinf((M).y) || isinf((M).z);
 }
 
-#define DEBUG_INF_NAN(M, str)                                                                                          \
-  if(checkInfNan(M))                                                                                                   \
-  {                                                                                                                    \
-    debugPrintfEXT(str);                                                                                               \
+#define DEBUG_INF_NAN(M, str)                                                  \
+  if(checkInfNan(M))                                                           \
+  {                                                                            \
+    debugPrintfEXT(str);                                                       \
   }
 
 float hypot2(float a, float b)
@@ -84,6 +86,23 @@ vec3 transformDirection(in mat4 transform, in vec3 direction)
   return normalize(tDir);
 }
 
+vec3 toWorld(vec3 X, vec3 Y, vec3 Z, vec3 V)
+{
+  return V.x * X + V.y * Y + V.z * Z;
+}
+
+vec3 toLocal(vec3 X, vec3 Y, vec3 Z, vec3 V)
+{
+  return vec3(dot(V, X), dot(V, Y), dot(V, Z));
+}
+
+vec3 makeNormal(vec3 n)
+{
+  if(length(n) == 0)
+    return n;
+  return normalize(n);
+}
+
 /*
  * Generate a random seed for the random generator.
  *
@@ -128,6 +147,16 @@ float rand(inout uint seed)
 {
   uint r = pcg(seed);
   return r * (1.0 / float(0xffffffffu));
+}
+
+vec2 rand2(inout uint seed)
+{
+  return vec2(rand(seed), rand(seed));
+}
+
+vec3 rand3(inout uint seed)
+{
+  return vec3(rand(seed), rand(seed), rand(seed));
 }
 
 vec3 uniformSampleSphere(in vec2 u)
@@ -264,9 +293,12 @@ vec3 offsetPositionAlongNormal(vec3 worldPosition, vec3 normal)
   // Offset each component of worldPosition using its binary representation.
   // Handle the sign bits correctly.
   const vec3 p_i = vec3(  //
-      intBitsToFloat(floatBitsToInt(worldPosition.x) + ((worldPosition.x < 0) ? -of_i.x : of_i.x)),
-      intBitsToFloat(floatBitsToInt(worldPosition.y) + ((worldPosition.y < 0) ? -of_i.y : of_i.y)),
-      intBitsToFloat(floatBitsToInt(worldPosition.z) + ((worldPosition.z < 0) ? -of_i.z : of_i.z)));
+      intBitsToFloat(floatBitsToInt(worldPosition.x)
+                     + ((worldPosition.x < 0) ? -of_i.x : of_i.x)),
+      intBitsToFloat(floatBitsToInt(worldPosition.y)
+                     + ((worldPosition.y < 0) ? -of_i.y : of_i.y)),
+      intBitsToFloat(floatBitsToInt(worldPosition.z)
+                     + ((worldPosition.z < 0) ? -of_i.z : of_i.z)));
 
   // Use a floating-point offset instead for points near (0,0,0), the origin.
   const float origin     = 1.0f / 32.0f;

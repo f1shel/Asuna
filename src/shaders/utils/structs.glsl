@@ -41,14 +41,14 @@ struct RayPayload
   vec3  throughput;
   uint  depth;
   uint  seed;
-  uint  stop;
+  bool  stop;
   // for direct light
-  uint  shouldDirectLight;
-  uint  lightVisible;
-  float lightDist;
-  vec3  lightHitPos;
-  vec3  lightDir;
-  vec3  lightRadiance;
+  bool  shouldDirectLight;
+  bool  directVisible;
+  float directDist;
+  vec3  directHitPos;
+  vec3  directDir;
+  vec3  directContribution;
 };
 
 #endif

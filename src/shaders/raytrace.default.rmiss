@@ -21,38 +21,24 @@ layout(push_constant)                            uniform _RtxState  { GpuPushCon
 
 void main()
 {
-  // Stop path tracing loop from rgen shader
-  payload.stop = 1;
-  if(payload.depth == 0) return;
-  // eval environment light
-  vec3  env;
-  float pdf;
+  // Stop ray if it does not hit anything
+  payload.stop = true;
+
+  // Only count radiance when depth is 1.
+  // This is because envlight has already been considered in direct light.
+  if(payload.depth > 1)
+    return;
+
+  // Evaluate environment light
+  // Depth is 1 means no surface has been hit before, so we directly add
+  // the environment light contribution
+  vec3 env;
   if(sunAndSky.in_use == 1)
-  {
     env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
-    pdf = uniformSpherePdf();
-  }
   else if(pc.hasEnvMap == 1)
-  {
-    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle, pc.envMapIntensity);
-    pdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle, pc.envMapResolution);
-  }
+    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle,
+                     pc.envMapIntensity);
   else
-  {
     env = pc.bgColor;
-    pdf = uniformSpherePdf();
-  }
-  float misWeight = 1.0;
-  if(payload.depth > 0)
-    misWeight = powerHeuristic(payload.bsdfPdf, pdf);
-  // Done sampling return
-  vec3 radiance = misWeight * env * payload.throughput;
-  payload.radiance += radiance;
-  /*
-  DEBUG_INF_NAN(radiance, "error when ray missing\n");
-  if (checkInfNan(radiance))
-  {
-    debugPrintfEXT("mis: %f, env: %v3f, throughput: %v3f\n", misWeight, env, payload.throughput);
-  }
-  */
+  payload.radiance += payload.throughput * env;
 }

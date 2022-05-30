@@ -5,10 +5,10 @@
 
 // clang-format off
 START_ENUM(MaterialType)
-  MaterialTypeBrdfLambertian = 0,
-  MaterialTypeBrdfDisney     = 1,
-  MaterialTypeBrdfEmissive   = 2,
-  MaterialTypeNum            = 3
+  MaterialTypeBrdfLambertian                = 0,
+  MaterialTypeBrdfEmissive                  = 1,
+  MaterialTypeBrdfPbrMetalnessRoughness     = 2,
+  MaterialTypeNum                           = 3
 END_ENUM();
 // clang-format on
 

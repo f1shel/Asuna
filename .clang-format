@@ -21,7 +21,7 @@ BreakBeforeBinaryOperators: NonAssignment
 BreakBeforeBraces: Custom
 BreakBeforeTernaryOperators: 'false'
 BreakConstructorInitializersBeforeComma: 'true'
-ColumnLimit: '120'
+ColumnLimit: '80'
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
 Cpp11BracedListStyle: 'true'
 IndentCaseLabels: 'true'
