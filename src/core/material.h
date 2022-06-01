@@ -10,6 +10,8 @@ public:
   Material()
   {
     m_material.diffuse            = vec3(0.f);
+    m_material.anisoAlpha         = vec2(0.f);
+    m_material.rhoSpec            = vec3(0.f);
     m_material.roughness          = 0.f;
     m_material.emittance          = vec3(0.f);
     m_material.metalness          = 0.f;
@@ -28,6 +30,7 @@ public:
     m_material.metalnessTextureId = -1;
     m_material.normalTextureId    = -1;
     m_material.roughnessTextureId = -1;
+    m_material.tangentTextureId   = -1;
     m_material.type               = MaterialTypeBrdfLambertian;
   }
   Material(const GpuMaterial& material)

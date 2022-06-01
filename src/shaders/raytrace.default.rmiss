@@ -24,21 +24,26 @@ void main()
   // Stop ray if it does not hit anything
   payload.stop = true;
 
-  // Only count radiance when depth is 1.
-  // This is because envlight has already been considered in direct light.
-  if(payload.depth > 1)
-    return;
-
-  // Evaluate environment light
-  // Depth is 1 means no surface has been hit before, so we directly add
-  // the environment light contribution
+  // Evaluate environment light and only do mis when depth > 1.
   vec3 env;
-  if(sunAndSky.in_use == 1)
+  float envPdf = 0.0;
+  if(sunAndSky.in_use == 1) {
     env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
-  else if(pc.hasEnvMap == 1)
+    envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);
+  }
+  else if(pc.hasEnvMap == 1) {
     env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle,
                      pc.envMapIntensity);
-  else
+    envPdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle,
+                     pc.envMapResolution);
+  }
+  else {
     env = pc.bgColor;
-  payload.radiance += payload.throughput * env;
+    envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);
+  }
+
+  // Multiple importance sampling
+  float misWeight = payload.depth > 1 ? powerHeuristic(payload.bsdfPdf, envPdf) : 1.f;
+
+  payload.radiance += payload.throughput * env * misWeight;
 }

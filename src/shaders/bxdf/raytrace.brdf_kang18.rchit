@@ -14,64 +14,105 @@ float sqr(float x)
   return x * x;
 }
 
-vec3 fresnelSchlick(float cosThetaI, vec3 f0)
+float fresnelSchlick(float cosThetaI, float f0)
 {
   return f0 + (1 - f0) * pow(clamp(1 - cosThetaI, 0, 1), 5);
 }
 
-float dAnisoGGX(float nDotH, float hDotX, float hDotY, float ax, float ay)
+float dAnisoGGX(float HdotN, float HdotX, float HdotY, float ax, float ay)
 {
-  return 1 / max(PI * ax * ay * sqr(sqr(hDotX / ax) + sqr(hDotY / ay) + sqr(nDotH)), EPS);
+  return 1 /
+         // ---------------------------------------------------------
+         (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + sqr(HdotN)));
 }
 
-float g1SmithAnisoGGX(float nDotV, float vDotX, float vDotY, float ax, float ay)
+vec3 importanceSampleAnisoGGX(vec3 lwo, float ax, float ay)
 {
-  return 1 / (nDotV + safeSqrt(sqr(nDotV) + sqr(ax * vDotX) + sqr(ay * vDotY)));
-}
+  float u1     = rand(payload.seed);
+  float u2     = rand(payload.seed);
+  float factor = sqrt(u1 / (1 - u1));
+  float phi    = TWO_PI * u2;
 
-vec3 sampleAnisoGGX(vec3 lwo, float ax, float ay)
-{
-  vec2  u      = rand2(payload.seed);
-  float factor = safeSqrt(u.x / (1 - u.x));
-  float xh     = ax * factor * cos(TWO_PI * u.y);
-  float yh     = ay * factor * sin(TWO_PI * u.y);
-  vec3  lwh    = makeNormal(vec3(-xh, -yh, 1));
-  vec3  lwi    = reflect(-lwo, lwh);
+  vec3 lwh = vec3(0, 0, 1);
+  lwh.x    = -ax * factor * cos(phi);
+  lwh.y    = -ay * factor * sin(phi);
+  lwh      = makeNormal(lwh);
+
+  float HdotV = dot(lwh, lwo);
+  vec3 lwi = reflect(-lwo, lwh);
+
   return lwi;
 }
 
-float anisoGGXPdf(vec3 lwh, vec3 lwo, float ax, float ay)
+float importanceAnisoGGXPdf(in vec3 lwh, in vec3 lwo, in float ax, in float ay)
 {
-  vec3 lwi = reflect(-lwo, lwh);
-  float pdf = 0.0;
-  if(lwi.z > 0.0) {
-    pdf = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay) * lwh.z / (4 * dot(lwh, lwo));
+  float pdf = 0.0, HdotV = dot(lwh, lwo);
+  vec3  lwi = reflect(-lwo, lwh);
+  if(lwi.z > 0.0)
+  {
+    pdf = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay) * abs(lwh.z) / (4 * HdotV + EPS);
   }
   return pdf;
 }
 
-vec3 pbrEval(vec3 lwi, vec3 lwo, vec3 albedo, float ax, float ay, float metalness, out float pdf)
+float g1SmithAnisoGGX(float NdotV, float VdotX, float VdotY, float ax, float ay)
+{
+  if(NdotV <= 0.0)
+    return 0.0;
+  vec3 factor = vec3(ax * VdotX, ay * VdotY, NdotV);
+  return 1 / (NdotV + length(factor));
+}
+
+const float DIFFUSE_LOBE_PROBABILITY = 0.5;
+
+vec3 kangEval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 rhoDiff, vec3 rhoSpec, float ax, float ay, float metalness, out float pdf)
 {
   pdf = 0.0;
-  if(lwi.z <= 0.0 || lwo.z <= 0.0)
-    return vec3(0.0);
-  vec3 lwh = makeNormal(lwi + lwo);
-  pdf      = anisoGGXPdf(lwh, lwo, ax, ay);
 
-  float hDotV = dot(lwo, lwh);
-  float hDotL = dot(lwi, lwh);
-  vec3  Fs    = fresnelSchlick(hDotV, mix(vec3(0.04), albedo, metalness));
-  float Ds    = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay);
-  float Gs    = g1SmithAnisoGGX(max(lwi.z, 0.0), lwi.x, lwi.y, ax, ay);
-  Gs *= g1SmithAnisoGGX(max(lwo.z, 0.0), lwo.x, lwo.y, ax, ay);
-  vec3 diffuse  = albedo * (1 - metalness) * INV_PI;
-  vec3 specular = Fs * Ds * Gs;
+  float NdotL = dot(N, L);
+  float NdotV = dot(N, V);
+  if(NdotL <= 0.0 || NdotV <= 0.0)
+    return vec3(0.0);
+
+  vec3 H = makeNormal(L + V);
+
+  float HdotN = dot(H, N);
+  float HdotX = dot(H, X);
+  float HdotY = dot(H, Y);
+  float HdotL = dot(H, L);
+  float HdotV = dot(H, V);
+
+  float Fs = fresnelSchlick(HdotV, 0.04);
+  float Ds = dAnisoGGX(HdotN, HdotX, HdotY, ax, ay);
+  float Gs = g1SmithAnisoGGX(NdotV, dot(V, X), dot(V, Y), ax, ay);
+  Gs *= g1SmithAnisoGGX(NdotL, dot(L, X), dot(L, Y), ax, ay);
+  vec3 diffuse  = rhoDiff * INV_PI;
+  vec3 specular = rhoSpec * Fs * Ds * Gs;
+
+  vec3 lwh = makeNormal(toLocal(X, Y, N, H));
+  vec3 lwo = makeNormal(toLocal(X, Y, N, V));
+  vec3 lwi = makeNormal(toLocal(X, Y, N, L));
+
+  float r = rand(payload.seed);
+  if(r < DIFFUSE_LOBE_PROBABILITY) {
+    pdf = cosineHemispherePdf(lwi.z);
+    return diffuse;
+  }
+  else {
+    pdf = importanceAnisoGGXPdf(lwh, lwo, ax, ay);
+    return specular;
+  }
+
   return diffuse + specular;
 }
 
-vec3 pbrSample(vec3 lwo, float ax, float ay)
+vec3 kangSample(vec3 lwo, float ax, float ay)
 {
-  return sampleAnisoGGX(lwo, ax, ay);
+  float r = rand(payload.seed);
+  if(r < DIFFUSE_LOBE_PROBABILITY)
+    return cosineSampleHemisphere(rand2(payload.seed));
+  else
+    return importanceSampleAnisoGGX(lwo, ax, ay);
 }
 
 void main()
@@ -79,36 +120,41 @@ void main()
   // Get hit state
   HitState state = getHitState();
 
-  // Hit Light
-  if(state.lightId > 0)
-  {
-    hitLight(state.lightId, state.hitPos);
-    return;
-  }
-
   // Fetch textures
   if(state.mat.diffuseTextureId >= 0)
     state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
   if(state.mat.metalnessTextureId >= 0)
-    state.mat.metalness = textureEval(state.mat.metalnessTextureId, state.uv).r;
+    state.mat.rhoSpec =
+        0.1 * textureEval(state.mat.metalnessTextureId, state.uv).rgb;
   if(state.mat.roughnessTextureId >= 0)
-    state.mat.roughness = textureEval(state.mat.roughnessTextureId, state.uv).r;
+    state.mat.anisoAlpha = textureEval(state.mat.roughnessTextureId, state.uv).rg;
   if(state.mat.normalTextureId >= 0)
   {
-    vec3 c         = textureEval(state.mat.normalTextureId, state.uv).rgb;
-    vec3 n         = 2 * c - 1;
-    state.ffnormal = toWorld(state.tangent, state.bitangent, state.ffnormal, n);
-    state.ffnormal = makeNormal(state.ffnormal);
-
-    // Ensure face forward shading normal
-    if(dot(state.ffnormal, state.viewDir) < 0)
-      state.ffnormal = -state.ffnormal;
-
-    // Rebuild frame
-    basis(state.ffnormal, state.tangent, state.bitangent);
+    vec3 c              = textureEval(state.mat.normalTextureId, state.uv).rgb;
+    vec3 n              = 2 * c - 1;
+    n                   = (n * gl_WorldToObjectEXT).xyz;
+    state.shadingNormal = makeNormal(n);
+    if(pc.useFaceNormal == 1)
+      state.ffnormal = dot(state.faceNormal, state.viewDir) > 0.0 ? state.faceNormal :
+                                                                    -state.faceNormal;
+    else
+      state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0.0 ?
+                           state.shadingNormal :
+                           -state.shadingNormal;
   }
-  float ax = max(sqr(state.mat.roughness), 0.001);
-  float ay = ax;
+  if(state.mat.tangentTextureId >= 0)
+  {
+    vec3 c        = textureEval(state.mat.tangentTextureId, state.uv).rgb;
+    vec3 t        = 2 * c - 1;
+    t             = (t * gl_WorldToObjectEXT).xyz;
+    state.tangent = makeNormal(t);
+  }
+  // Rebuild frame
+  state.bitangent = makeNormal(cross(state.ffnormal, state.tangent));
+  state.tangent   = makeNormal(cross(state.bitangent, state.ffnormal));
+
+  float ax = state.mat.anisoAlpha.x;
+  float ay = state.mat.anisoAlpha.y;
 
   // Direct light
   {
@@ -176,12 +222,9 @@ void main()
 
       // Multi importance sampling
       float bsdfPdf = 0;
-      vec3  lwi     = makeNormal(toLocal(state.tangent, state.bitangent,
-                                         state.ffnormal, lightSample.direction));
-      vec3  lwo     = makeNormal(toLocal(state.tangent, state.bitangent,
-                                         state.ffnormal, state.viewDir));
-      vec3  bsdfVal =
-          pbrEval(lwi, lwo, state.mat.diffuse, ax, ay, state.mat.metalness, bsdfPdf);
+      vec3 bsdfVal = kangEval(lightSample.direction, state.viewDir, state.ffnormal,
+                              state.tangent, state.bitangent, state.mat.diffuse,
+                              state.mat.rhoSpec, ax, ay, state.mat.metalness, bsdfPdf);
       float misWeight = bsdfPdf > 0.0 ? powerHeuristic(lightSample.pdf, bsdfPdf) : 1.0;
 
       Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal)
@@ -197,9 +240,11 @@ void main()
   // Shading frame, local tangent space
   vec3 lwo =
       makeNormal(toLocal(state.tangent, state.bitangent, state.ffnormal, state.viewDir));
-  bsdfSample.direction = pbrSample(lwo, ax, ay);
-  vec3 bsdfVal = pbrEval(bsdfSample.direction, lwo, state.mat.diffuse, ax, ay,
-                         state.mat.metalness, bsdfSample.pdf);
+  bsdfSample.direction = kangSample(lwo, ax, ay);
+  vec3 bsdfVal =
+      kangEval(bsdfSample.direction, state.viewDir, state.ffnormal,
+               state.tangent, state.bitangent, state.mat.diffuse,
+               state.mat.rhoSpec, ax, ay, state.mat.metalness, bsdfSample.pdf);
 
   // World space
   bsdfSample.direction =

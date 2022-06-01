@@ -247,7 +247,7 @@ void Loader::addCamera(const nlohmann::json& cameraJson)
   nvmath::vec4f fxfycxcy       = 0.0f;
   float         fov            = defaultSceneOptions["camera"]["fov"];
   float         aperture       = defaultSceneOptions["camera"]["aperture"];
-  float         focalDistance  = defaultSceneOptions["camera"]["focal_distance"];
+  float         focalDistance = defaultSceneOptions["camera"]["focal_distance"];
   if(cameraJson["type"] == "perspective")
   {
     if(cameraJson.contains("fov"))
@@ -334,10 +334,11 @@ void Loader::addTexture(const nlohmann::json& textureJson)
 {
   JsonCheckKeys(textureJson, {"name", "path"});
   std::string textureName = textureJson["name"];
-  auto        texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
+  auto texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
   if(texturePath.empty())
   {
-    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error", std::string(textureJson["path"]).c_str());
+    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
+         std::string(textureJson["path"]).c_str());
     exit(1);
   }
   float gamma = defaultSceneOptions["textures"]["gamma"];
@@ -375,11 +376,13 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
     if(materialJson.contains("metalness"))
       material.metalness = materialJson["metalness"];
     if(materialJson.contains("metalness_texture"))
-      material.metalnessTextureId = m_pScene->getTextureId(materialJson["metalness_texture"]);
+      material.metalnessTextureId =
+          m_pScene->getTextureId(materialJson["metalness_texture"]);
     if(materialJson.contains("roughness"))
       material.roughness = materialJson["roughness"];
     if(materialJson.contains("roughness_texture"))
-      material.roughnessTextureId = m_pScene->getTextureId(materialJson["roughness_texture"]);
+      material.roughnessTextureId =
+          m_pScene->getTextureId(materialJson["roughness_texture"]);
     // if(materialJson.contains("subsurface"))
     //   material.subsurface = materialJson["subsurface"];
     // if(materialJson.contains("specular"))
@@ -405,7 +408,20 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
     if(materialJson.contains("emittance_factor"))
       material.emittanceFactor = Json2Vec3(materialJson["emittance_factor"]);
     if(materialJson.contains("emittance_texture"))
-      material.emittanceTextureId = m_pScene->getTextureId(materialJson["emittance_texture"]);
+      material.emittanceTextureId =
+          m_pScene->getTextureId(materialJson["emittance_texture"]);
+  }
+  else if(materialJson["type"] == "brdf_kang18")
+  {
+    material.type = MaterialTypeBrdfKang18;
+    JsonCheckKeys(materialJson, {"diffuse_texture", "specular_texture",
+                                 "normal_texture", "alpha_texture", "tangent_texture"});
+    material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
+    material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    material.metalnessTextureId =
+        m_pScene->getTextureId(materialJson["specular_texture"]);
+    material.roughnessTextureId = m_pScene->getTextureId(materialJson["alpha_texture"]);
+    material.tangentTextureId = m_pScene->getTextureId(materialJson["tangent_texture"]);
   }
   else
   {
@@ -420,7 +436,7 @@ void Loader::addMesh(const nlohmann::json& meshJson)
 {
   JsonCheckKeys(meshJson, {"name", "path"});
   std::string meshName = meshJson["name"];
-  auto        meshPath = nvh::findFile(meshJson["path"], {m_sceneFileDir}, true);
+  auto meshPath = nvh::findFile(meshJson["path"], {m_sceneFileDir}, true);
   if(meshPath.empty())
   {
     // TODO: LOGE
@@ -526,7 +542,8 @@ void Loader::addEnvMap(const nlohmann::json& envmapJson)
   auto texturePath = nvh::findFile(envmapJson["path"], {m_sceneFileDir}, true);
   if(texturePath.empty())
   {
-    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error", std::string(envmapJson["path"]).c_str());
+    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
+         std::string(envmapJson["path"]).c_str());
     exit(1);
   }
   m_pScene->addEnvMap(texturePath);

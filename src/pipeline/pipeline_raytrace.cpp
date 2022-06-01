@@ -212,6 +212,12 @@ void PipelineRaytrace::createRtPipeline()
   stage.stage                                               = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfPbrMetalnessRoughness] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfPbrMetalnessRoughness");
+  // ClosetHit:BrdfKang18
+  stage.module =
+      nvvk::createShaderModule(m_device, nvh::loadFile("shaders/raytrace.brdf_kang18.rchit.spv", true, root));
+  stage.stage                                               = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBrdfKang18] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfKang18");
   // Shader groups
   VkRayTracingShaderGroupCreateInfoKHR              group = nvvk::make<VkRayTracingShaderGroupCreateInfoKHR>();
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
