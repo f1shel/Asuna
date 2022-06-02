@@ -93,7 +93,7 @@ $ ./asuna.exe --scene scenes/cornell_box/scene.json [--offline] [--spp 1024] [--
 
 ```c++
 class AsunaTracer : public AppBaseVk {
-	class Context; ----------------|
+    class Context; ----------------|
     class Scene;   ----------|     |
     class Pipeline;   <------|-----|
     void run();
