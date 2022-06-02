@@ -8,8 +8,6 @@
 #include <nvvk/structs_vk.hpp>
 #include <imgui_helper.h>
 #include <imgui_orient.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 #include <ext/tqdm.h>
 
 #include <bitset>  // std::bitset
@@ -189,14 +187,14 @@ void Tracer::runOffline()
 
     // save image
     static char outputName[50];
-    sprintf(outputName, "%s_shot_%04d.hdr", m_tis.outputname.c_str(), shotId);
-    saveImage(pixelBuffer, outputName);
+    sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(), shotId);
+    saveBufferToImage(pixelBuffer, outputName);
   }
   // Destroy temporary buffer
   m_alloc.destroy(pixelBuffer);
 }
 
-void Tracer::imageToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut)
+void Tracer::vkTextureToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut)
 {
   nvvk::CommandPool genCmdBuf(m_context.getDevice(), m_context.getQueueFamily());
   VkCommandBuffer   cmdBuf = genCmdBuf.createCommandBuffer();
@@ -231,17 +229,17 @@ void Tracer::saveImageTest()
   VkDeviceSize       bufferSize  = 4 * sizeof(float) * m_size.width * m_size.height;
   nvvk::Buffer       pixelBuffer = m_alloc.createBuffer(bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-  saveImage(pixelBuffer, m_tis.outputname);
-  //saveImage(pixelBuffer, "channel0.hdr", 0);
-  // saveImage(pixelBuffer, "channel1.hdr", 1);
-  // saveImage(pixelBuffer, "channel2.hdr", 2);
-  // saveImage(pixelBuffer, "channel3.hdr", 3);
+  saveBufferToImage(pixelBuffer, m_tis.outputname);
+  // saveBufferToImage(pixelBuffer, "channel0.hdr", 0);
+  // saveBufferToImage(pixelBuffer, "channel1.hdr", 1);
+  // saveBufferToImage(pixelBuffer, "channel2.hdr", 2);
+  // saveBufferToImage(pixelBuffer, "channel3.hdr", 3);
 
   // Destroy temporary buffer
   m_alloc.destroy(pixelBuffer);
 }
 
-void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId)
+void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId)
 {
   bool isRelativePath = path(outputpath).is_relative();
   if(isRelativePath)
@@ -251,13 +249,13 @@ void Tracer::saveImage(nvvk::Buffer pixelBuffer, std::string outputpath, int cha
   auto  m_size  = m_context.getSize();
 
   if(channelId == -1)
-    imageToBuffer(m_context.getOfflineColor(), pixelBuffer.buffer);
+    vkTextureToBuffer(m_context.getOfflineColor(), pixelBuffer.buffer);
   else
-    imageToBuffer(m_pipelineGraphics.getColorTexture(channelId), pixelBuffer.buffer);
+    vkTextureToBuffer(m_pipelineGraphics.getColorTexture(channelId), pixelBuffer.buffer);
 
   // Write the buffer to disk
   void* data   = m_alloc.map(pixelBuffer);
-  int   result = stbi_write_hdr(outputpath.c_str(), m_size.width, m_size.height, 4, reinterpret_cast<float*>(data));
+  writeImage(outputpath.c_str(), m_size.width, m_size.height, reinterpret_cast<float*>(data));
   m_alloc.unmap(pixelBuffer);
 }
 

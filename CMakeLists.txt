@@ -59,6 +59,47 @@ _add_package_ImGUI()
 _add_nvpro_core_lib()
 
 #--------------------------------------------------------------------------------------------------
+# ZLib
+SET(ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
+SET(ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+ADD_SUBDIRECTORY(${THIRD_PARTY_DIR}/zlib)
+
+SET(ZLIB_INCLUDE_DIR "${THIRD_PARTY_DIR}/zlib")
+SET(ZLIB_LIBRARY zlibstatic)
+SET_PROPERTY(TARGET zlibstatic PROPERTY FOLDER "ext")
+INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR} "${CMAKE_CURRENT_BINARY_DIR}/src/ext/zlib")
+INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIRS})
+
+#--------------------------------------------------------------------------------------------------
+# OpenEXR
+SET(ILMBASE_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
+SET(OPENEXR_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
+SET(OPENEXR_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
+SET(ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
+
+ADD_SUBDIRECTORY(${THIRD_PARTY_DIR}/openexr)
+
+# For std::binary_function
+set_property(TARGET IlmImf-obj PROPERTY CXX_STANDARD 14)
+# Remove error exception warning
+set_property(TARGET Imath IlmImf PROPERTY CXX_STANDARD 14)
+
+INCLUDE_DIRECTORIES (
+  ${THIRD_PARTY_DIR}/openexr/IlmBase/Imath
+  ${THIRD_PARTY_DIR}/openexr/IlmBase/Half
+  ${THIRD_PARTY_DIR}/openexr/IlmBase/Iex
+  ${THIRD_PARTY_DIR}/openexr/OpenEXR/IlmImf
+  ${CMAKE_BINARY_DIR}/src/ext/openexr/IlmBase/config
+  ${CMAKE_BINARY_DIR}/src/ext/openexr/OpenEXR/config
+)
+IF(WIN32)
+  SET(OPENEXR_LIBS IlmImf Imath Half ${ZLIB_LIBRARY})
+ELSE()
+  SET(OPENEXR_LIBS IlmImf Imath Half)
+ENDIF()
+
+
+#--------------------------------------------------------------------------------------------------
 # Memory Allocation
 #   Forcing to use our memory allocator DMA (similar to Vulkan Memory Allocator (VMA))
 # target_compile_definitions(${PROJNAME} PUBLIC ALLOC_VMA)
@@ -244,9 +285,27 @@ source_group("shaders" FILES ${SRC_SHADERS_RAYTRACE} ${SRC_SHADERS_GRAPHICS} ${S
 source_group("shaders\\utils" FILES ${SRC_SHADERS_UTILS})
 source_group("shaders\\bxdf" FILES ${SRC_SHADERS_RAYTRACE_BXDF} ${SRC_SHADERS_RAYTRACE_BXDF_UTILS})
 
+SET_PROPERTY(TARGET
+  IexMath
+  eLut
+  toFloat
+  b44ExpLogTable
+  dwaLookups
+  IlmThread
+  Half
+  Iex
+  Imath
+  IlmImf
+  CopyIlmBaseLibs
+  IlmImf-obj
+  nvpro_core
+  glfw
+  imgui
+PROPERTY FOLDER "ext")
+
 #--------------------------------------------------------------------------------------------------
 # Linkage
-target_link_libraries(${PROJNAME} ${PLATFORM_LIBRARIES} nvpro_core)
+target_link_libraries(${PROJNAME} ${PLATFORM_LIBRARIES} nvpro_core ${OPENEXR_LIBS} ${ZLIB_LIBRARY})
 
 foreach(DEBUGLIB ${LIBRARIES_DEBUG})
     target_link_libraries(${PROJNAME} debug ${DEBUGLIB})

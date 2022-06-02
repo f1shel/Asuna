@@ -1,3 +1,9 @@
 [submodule "src/ext/nvpro_core"]
 	path = src/ext/nvpro_core
 	url = https://github.com/nvpro-samples/nvpro_core.git
+[submodule "src/ext/zlib"]
+	path = src/ext/zlib
+	url = https://github.com/f1shel/zlib.git
+[submodule "src/ext/openexr"]
+	path = src/ext/openexr
+	url = https://github.com/f1shel/openexr.git
