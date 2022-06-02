@@ -9,8 +9,7 @@
 
 #include "../utils/rchit_layouts.glsl"
 
-void main()
-{
+void main() {
   // Treat emissive as a light
   payload.stop = true;
 
@@ -18,10 +17,11 @@ void main()
   HitState state = getHitState();
 
   // Fetch textures
-  if(state.mat.emittanceTextureId >= 0)
-    state.mat.emittance = state.mat.emittanceFactor
-                          * textureEval(state.mat.emittanceTextureId, state.uv).rgb;
+  if (state.mat.emittanceTextureId >= 0)
+    state.mat.emittance =
+        state.mat.emittanceFactor *
+        textureEval(state.mat.emittanceTextureId, state.uv).rgb;
 
-  if(pc.ignoreEmissive == 0)
+  if (pc.ignoreEmissive == 0)
     payload.radiance += state.mat.emittance * payload.throughput;
 }

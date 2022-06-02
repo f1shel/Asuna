@@ -21,53 +21,50 @@ layout(set = RtScene, binding = SceneCamera)          uniform _Camera   { GpuCam
 layout(location = 0) rayPayloadEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
-void main()
-{
+void main() {
   // Initialize the seed for the random number
   payload.seed = xxhash32Seed(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
 
   // Set camera origin in world space
-  uint rayFlags    = gl_RayFlagsCullBackFacingTrianglesEXT;
-  vec3 origin      = transformPoint(cameraInfo.cameraToWorld, vec3(0.f));
+  uint rayFlags = gl_RayFlagsCullBackFacingTrianglesEXT;
+  vec3 origin = transformPoint(cameraInfo.cameraToWorld, vec3(0.f));
   vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy);
   vec3 rayOrigin, rayDir;
 
   // Multiple samples per frame and finally average them
   vec3 radiance = vec3(0.f);
-  for(uint i = 0; i < pc.spp; ++i)
-  {
+  for (uint i = 0; i < pc.spp; ++i) {
     // Disturb around the pixel center
-    vec2 jitter = pc.curFrame == 0 ? vec2(0.5f, 0.5f) :
-                                     vec2(rand(payload.seed), rand(payload.seed));
-    vec2 pixel  = pixelCenter + jitter;
+    vec2 jitter = pc.curFrame == 0
+                      ? vec2(0.5f, 0.5f)
+                      : vec2(rand(payload.seed), rand(payload.seed));
+    vec2 pixel = pixelCenter + jitter;
 
     vec4 target;
-    if(cameraInfo.type == CameraTypePerspective)
-    {
+    if (cameraInfo.type == CameraTypePerspective) {
       rayOrigin = origin;
 
       // Compute raster and camera sample positions
-      vec3 pFilm   = vec3(pixel, 0.f);
+      vec3 pFilm = vec3(pixel, 0.f);
       vec3 pCamera = transformPoint(cameraInfo.rasterToCamera, pFilm);
 
       // Treat point as direction since camera origin is at (0,0,0)
       vec3 r = normalize(pCamera);
 
       // Modify ray for depth of field
-      if(cameraInfo.aperture > 0.f)
-      {
+      if (cameraInfo.aperture > 0.f) {
         // Sample point on lens
         vec2 uLens = rand2(payload.seed);
         vec2 pLens = cameraInfo.aperture * concentricSampleDisk(uLens);
 
         // Compute point on plane of focus
-        float ft     = cameraInfo.focalDistance / r.z;
-        vec3  pFocus = ft * r;
+        float ft = cameraInfo.focalDistance / r.z;
+        vec3 pFocus = ft * r;
 
         // Update ray for effect of lens
-        vec3 o    = vec3(pLens, 0.f);
+        vec3 o = vec3(pLens, 0.f);
         rayOrigin = transformPoint(cameraInfo.cameraToWorld, o);
-        r         = pFocus - o;
+        r = pFocus - o;
       }
 
       // Transform ray to world space
@@ -77,40 +74,38 @@ void main()
     // TODO: add opencv camera
 
     // Path trace
-    payload.ray        = Ray(rayOrigin, rayDir);
-    payload.bsdfPdf    = 1.0;
-    payload.radiance   = vec3(0.0);
+    payload.ray = Ray(rayOrigin, rayDir);
+    payload.bsdfPdf = 1.0;
+    payload.radiance = vec3(0.0);
     payload.throughput = vec3(1.0);
-    payload.stop       = false;
+    payload.stop = false;
 
-    for(payload.depth = 1; payload.depth <= pc.maxPathDepth; payload.depth++)
-    {
+    for (payload.depth = 1; payload.depth <= pc.maxPathDepth; payload.depth++) {
       // Initialize direct light setting
-      payload.shouldDirectLight  = true;
-      payload.directVisible      = false;
+      payload.shouldDirectLight = true;
+      payload.directVisible = false;
       payload.directContribution = vec3(0);
 
       // Check hit and call closest hit shader
       traceRayEXT(tlas, rayFlags, 0xFF, 0, 0, 0, payload.ray.origin, MINIMUM,
                   payload.ray.direction, INFINITY, 0);
 
-      if(payload.shouldDirectLight && payload.directVisible)
-      {
+      if (payload.shouldDirectLight && payload.directVisible) {
         // We are adding the contribution to the radiance only if the ray is not
-        // occluded by an object. This is done here to minimize live state across
-        // ray-trace calls. Shoot shadow ray up to the light(INFINITY == environement)
-        Ray   shadowRay = Ray(payload.directHitPos, payload.directDir);
-        uint  rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        // occluded by an object. This is done here to minimize live state
+        // across ray-trace calls. Shoot shadow ray up to the light(INFINITY ==
+        // environement)
+        Ray shadowRay = Ray(payload.directHitPos, payload.directDir);
+        uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT;
         float maxDist = payload.directDist - EPS;
-        isShadowed    = true;
+        isShadowed = true;
         traceRayEXT(tlas, rayFlags, 0xFF, 0, 0, 1, shadowRay.origin, 0.0,
                     shadowRay.direction, maxDist, 1);
-        if(!isShadowed)
-          payload.radiance += payload.directContribution;
+        if (!isShadowed) payload.radiance += payload.directContribution;
       }
 
-      if(payload.stop)
-        break;
+      if (payload.stop) break;
     }
 
     radiance += payload.radiance;
@@ -119,14 +114,14 @@ void main()
   radiance /= float(pc.spp);
 
   // Saving result
-  if(pc.curFrame == 0)
+  if (pc.curFrame == 0)
     // First frame, replace the value in the buffer
     imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(radiance, 1.f));
-  else
-  {
+  else {
     // Do accumulation over time
-    float a         = 1.0f / float(pc.curFrame + 1);
-    vec3  old_color = imageLoad(images[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
-    imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_color, radiance, a), 1.f));
+    float a = 1.0f / float(pc.curFrame + 1);
+    vec3 old_color = imageLoad(images[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
+    imageStore(images[0], ivec2(gl_LaunchIDEXT.xy),
+               vec4(mix(old_color, radiance, a), 1.f));
   }
 }
