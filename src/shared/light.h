@@ -12,16 +12,15 @@ START_ENUM(LightType)
 END_ENUM();
 // clang-format on
 
-struct GpuLight
-{
-  int   type;
-  vec3  position;
-  vec3  direction;
-  vec3  emittance;
-  vec3  u, v;
+struct GpuLight {
+  int type;
+  vec3 position;
+  vec3 direction;
+  vec3 emittance;
+  vec3 u, v;
   float radius;
   float area;
-  uint  doubleSide;
+  uint doubleSide;
 };
 
 #endif

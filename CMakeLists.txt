@@ -121,6 +121,7 @@ file(GLOB SRC_LOADER
     ${SOURCE_DIR}/loader/*.cpp)
 
 file(GLOB SRC_TRACER
+    ${SOURCE_DIR}/tracer/gui.cpp
     ${SOURCE_DIR}/tracer/tracer.h
     ${SOURCE_DIR}/tracer/tracer.cpp)
 

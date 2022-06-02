@@ -6,36 +6,39 @@
 #include "pipeline/pipeline_raytrace.h"
 #include "scene/scene.h"
 
-struct TracerInitSettings
-{
-  bool   offline    = false;
-  string scenefile  = "";
+struct TracerInitSettings {
+  bool offline = false;
+  string scenefile = "";
   string outputname = "";
-  int    sceneSpp   = 0;
+  int sceneSpp = 0;
 };
 
-class Tracer
-{
+class Tracer {
 public:
   void init(TracerInitSettings tis);
   void run();
   void deinit();
-  void resetFrame();
 
 private:
   TracerInitSettings m_tis;
-  ContextAware       m_context;           // context
-  Scene              m_scene;             // scene
-  PipelineGraphics   m_pipelineGraphics;  // pipelines
-  PipelineRaytrace   m_pipelineRaytrace;
-  PipelinePost       m_pipelinePost;
+  ContextAware m_context;
+  Scene m_scene;
+  PipelineGraphics m_pipelineGraphics;
+  PipelineRaytrace m_pipelineRaytrace;
+  PipelinePost m_pipelinePost;
 
 private:
   void runOnline();
   void runOffline();
-  void vkTextureToBuffer(const nvvk::Texture& imgIn, const VkBuffer& pixelBufferOut);
-  void saveImageTest();
-  void saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath, int channelId = -1);
+  void vkTextureToBuffer(const nvvk::Texture& imgIn,
+                         const VkBuffer& pixelBufferOut);
+
+  // Transfer color data to pixelBuffer, and write it to disk as an image.
+  // channelId controls which color data will be copied to pixelBuffer:
+  // (1) channelId = -1, copy ldr output after post processing
+  // (2) channelId > 0, copy corresponding hdr channel before post processing
+  void saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
+                         int channelId = -1);
 
 private:
   void renderGUI();

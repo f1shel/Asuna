@@ -3,17 +3,15 @@
 
 #include "binding.h"
 
-struct GpuPushConstantGraphics
-{
+struct GpuPushConstantGraphics {
   uint placeholder;
 };
 
-struct GpuPushConstantRaytrace
-{
-  int  spp;
-  int  curFrame;
-  int  maxPathDepth;
-  int  numLights;
+struct GpuPushConstantRaytrace {
+  int spp;
+  int curFrame;
+  int maxPathDepth;
+  int numLights;
   vec3 bgColor;
   uint useFaceNormal;
   uint ignoreEmissive;
@@ -37,19 +35,18 @@ END_ENUM();
 // clang-format on
 
 // Tonemapper used in post.frag
-struct GpuPushConstantPost
-{
+struct GpuPushConstantPost {
   float brightness;
   float contrast;
   float saturation;
   float vignette;
   float avgLum;
   float zoom;
-  vec2  renderingRatio;
-  int   autoExposure;
+  vec2 renderingRatio;
+  int autoExposure;
   float Ywhite;  // Burning white
   float key;     // Log-average luminance
-  uint  tmType;
+  uint tmType;
 };
 
 #endif

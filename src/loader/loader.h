@@ -5,22 +5,24 @@
 #include <scene/scene.h>
 #include <ext/json.hpp>
 
-class Loader
-{
+class Loader {
 public:
+  Loader() {}
   Loader(Scene* pScene);
-  void loadSceneFromJson(std::string jsonFilePath, const std::vector<std::string>& root);
+
+  // Load size first so we can create window in online mode
+  std::pair<VkExtent2D, nlohmann::json> loadJsonFirst(std::string jsonFilePath,
+                                                      const std::string& root);
+
+  void loadSceneFromJson(const nlohmann::json& sceneFileJson, Scene* pScene);
 
 private:
   void parse(const nlohmann::json& sceneJson);
   void submit();
 
 private:
-  /*
-   * addState `must` be called first
-   */
   void addState(const nlohmann::json& stateJson);
-  //void addIntegrator(const nlohmann::json& integratorJson);
+  // void addIntegrator(const nlohmann::json& integratorJson);
   void addCamera(const nlohmann::json& cameraJson);
   void addLight(const nlohmann::json& lightJson);
   void addTexture(const nlohmann::json& textureJson);
@@ -31,6 +33,6 @@ private:
   void addEnvMap(const nlohmann::json& envmapJson);
 
 private:
-  Scene* m_pScene       = nullptr;
+  Scene* m_pScene = nullptr;
   string m_sceneFileDir = "";
 };

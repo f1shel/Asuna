@@ -4,17 +4,16 @@
 
 #include <vulkan/vulkan_core.h>
 
-class Integrator
-{
+class Integrator {
 public:
   Integrator() {}
-  Integrator(uint spp, uint maxPathDepth, uint toneMappingType, uint useFaceNormal, uint ignoreEmissive, vec3 bgColor)
-  {
-    m_spp             = spp;
-    m_maxPathDepth    = maxPathDepth;
-    m_useFaceNormal   = useFaceNormal;
+  Integrator(uint spp, uint maxPathDepth, uint toneMappingType,
+             uint useFaceNormal, uint ignoreEmissive, vec3 bgColor) {
+    m_spp = spp;
+    m_maxPathDepth = maxPathDepth;
+    m_useFaceNormal = useFaceNormal;
     m_toneMappingType = toneMappingType;
-    m_ignoreEmissive  = ignoreEmissive;
+    m_ignoreEmissive = ignoreEmissive;
     m_backgroundColor = bgColor;
   }
   uint getSpp() { return m_spp; }

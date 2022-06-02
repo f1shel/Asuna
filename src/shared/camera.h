@@ -12,12 +12,11 @@ END_ENUM();
 // clang-format on
 
 // Uniform buffer set at each frame
-struct GpuCamera
-{
-  mat4  rasterToCamera;
-  mat4  cameraToWorld;
-  vec4  fxfycxcy;       // [focal_xy, center_xy], for opencv model
-  uint  type;           // camera type
+struct GpuCamera {
+  mat4 rasterToCamera;
+  mat4 cameraToWorld;
+  vec4 fxfycxcy;        // [focal_xy, center_xy], for opencv model
+  uint type;            // camera type
   float aperture;       // aspect, for thin len model
   float focalDistance;  // focal distance, for thin len model
   float padding;

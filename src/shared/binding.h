@@ -13,9 +13,7 @@ using uint = unsigned int;
 #endif
 
 #ifdef __cplusplus  // Descriptor binding helper for C++ and GLSL
-#define START_ENUM(a)                                                                                                  \
-  enum a                                                                                                               \
-  {
+#define START_ENUM(a) enum a {
 #define END_ENUM() }
 #else
 #define START_ENUM(a) const uint
@@ -71,6 +69,5 @@ END_ENUM();
 
 #define NUM_OUTPUT_IMAGES 4
 // clang-format on
-
 
 #endif

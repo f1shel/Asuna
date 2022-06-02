@@ -37,173 +37,166 @@ static json defaultSceneOptions = json::parse(R"(
 }
 )");
 
-Loader::Loader(Scene* pScene)
-    : m_pScene(pScene)
-{
-}
+Loader::Loader(Scene* pScene) : m_pScene(pScene) {}
 
-void Loader::loadSceneFromJson(std::string sceneFilePath, const std::vector<std::string>& root)
-{
-  nvh::Stopwatch sw_;
-  bool           isRelativePath = path(sceneFilePath).is_relative();
-  if(isRelativePath)
-    sceneFilePath = nvh::findFile(sceneFilePath, root, true);
-  if(sceneFilePath.empty())
+std::pair<VkExtent2D, nlohmann::json> Loader::loadJsonFirst(
+    std::string sceneFilePath, const std::string& root) {
+  bool isRelativePath = path(sceneFilePath).is_relative();
+  if (isRelativePath)
+    sceneFilePath = nvh::findFile(sceneFilePath, {root}, true);
+  if (sceneFilePath.empty()) {
+    LOGE("[x] %-20s: failed to load scene from %s", "Loader Error",
+         sceneFilePath.c_str());
     exit(1);
+  }
   m_sceneFileDir = path(sceneFilePath).parent_path().string();
 
   ifstream sceneFileStream(sceneFilePath);
-  json     sceneFileJson;
+  json sceneFileJson;
   sceneFileStream >> sceneFileJson;
 
+  JsonCheckKeys(sceneFileJson, {"state", "camera", "meshes", "instances"});
+  auto& cameraJson = sceneFileJson["camera"];
+  JsonCheckKeys(cameraJson, {"type", "film"});
+  auto& filmJson = cameraJson["film"];
+  JsonCheckKeys(filmJson, {"resolution"});
+  vec2 resolution = Json2Vec2(filmJson["resolution"]);
+  VkExtent2D filmResolution = {uint(resolution.x), uint(resolution.y)};
+
+  return std::make_pair(filmResolution, sceneFileJson);
+}
+
+void Loader::loadSceneFromJson(const json& sceneFileJson, Scene* pScene) {
+  m_pScene = pScene;
   m_pScene->reset();
   parse(sceneFileJson);
   submit();
 }
 
-void Loader::parse(const nlohmann::json& sceneFileJson)
-{
-  //JsonCheckKeys(sceneFileJson, {"integrator", "camera", "meshes", "instances"});
+void Loader::parse(const nlohmann::json& sceneFileJson) {
+  // JsonCheckKeys(sceneFileJson, {"integrator", "camera", "meshes",
+  // "instances"});
   JsonCheckKeys(sceneFileJson, {"state", "camera", "meshes", "instances"});
 
-  //auto& integratorJson = sceneFileJson["integrator"];
-  auto& stateJson     = sceneFileJson["state"];
-  auto& cameraJson    = sceneFileJson["camera"];
-  auto& meshesJson    = sceneFileJson["meshes"];
+  // auto& integratorJson = sceneFileJson["integrator"];
+  auto& stateJson = sceneFileJson["state"];
+  auto& cameraJson = sceneFileJson["camera"];
+  auto& meshesJson = sceneFileJson["meshes"];
   auto& instancesJson = sceneFileJson["instances"];
 
   // parse scene file to generate raw data
   // integrator
-  //addIntegrator(integratorJson);
+  // addIntegrator(integratorJson);
   addState(stateJson);
   // camera
   addCamera(cameraJson);
   // textures
-  if(sceneFileJson.contains("textures"))
-  {
+  if (sceneFileJson.contains("textures")) {
     auto& texturesJson = sceneFileJson["textures"];
-    for(auto& textureJson : texturesJson)
-    {
+    for (auto& textureJson : texturesJson) {
       addTexture(textureJson);
     }
   }
   // materials
-  if(sceneFileJson.contains("materials"))
-  {
+  if (sceneFileJson.contains("materials")) {
     auto& materialsJson = sceneFileJson["materials"];
-    for(auto& materialJson : materialsJson)
-    {
+    for (auto& materialJson : materialsJson) {
       addMaterial(materialJson);
     }
   }
   // lights
-  if(sceneFileJson.contains("lights"))
-  {
+  if (sceneFileJson.contains("lights")) {
     auto& lightsJson = sceneFileJson["lights"];
-    for(auto& lightJson : lightsJson)
-    {
+    for (auto& lightJson : lightsJson) {
       addLight(lightJson);
     }
   }
   // env map
-  if(sceneFileJson.contains("envmap"))
-  {
+  if (sceneFileJson.contains("envmap")) {
     auto& envmapJson = sceneFileJson["envmap"];
     addEnvMap(envmapJson);
   }
   // meshes
-  for(auto& meshJson : meshesJson)
-  {
+  for (auto& meshJson : meshesJson) {
     addMesh(meshJson);
   }
   // instances
-  for(auto& instanceJson : instancesJson)
-  {
+  for (auto& instanceJson : instancesJson) {
     addInstance(instanceJson);
   }
   // shots
-  if(sceneFileJson.contains("shots"))
-  {
+  if (sceneFileJson.contains("shots")) {
     auto& shotsJson = sceneFileJson["shots"];
-    for(auto& shotJson : shotsJson)
-    {
+    for (auto& shotJson : shotsJson) {
       addShot(shotJson);
     }
   }
 }
 
-void Loader::submit()
-{
-  m_pScene->submit();
-}
+void Loader::submit() { m_pScene->submit(); }
 
-static void parseState(const nlohmann::json& stateJson, State& pipelineState)
-{
-  if(stateJson.contains("path_tracing"))
-  {
-    const auto& ptJson   = stateJson["path_tracing"];
-    auto&       rtxState = pipelineState.rtxState;
-    if(ptJson.contains("spp"))
-      rtxState.spp = ptJson["spp"];
-    if(ptJson.contains("max_path_depth"))
+static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
+  if (stateJson.contains("path_tracing")) {
+    const auto& ptJson = stateJson["path_tracing"];
+    auto& rtxState = pipelineState.rtxState;
+    if (ptJson.contains("spp")) rtxState.spp = ptJson["spp"];
+    if (ptJson.contains("max_path_depth"))
       rtxState.maxPathDepth = ptJson["max_path_depth"];
-    if(ptJson.contains("use_face_normal"))
+    if (ptJson.contains("use_face_normal"))
       rtxState.useFaceNormal = ptJson["use_face_normal"] ? 1.f : 0.f;
-    if(ptJson.contains("ignore_emissive"))
+    if (ptJson.contains("ignore_emissive"))
       rtxState.ignoreEmissive = ptJson["ignore_emissive"] ? 1.f : 0.f;
-    if(ptJson.contains("background_color"))
+    if (ptJson.contains("background_color"))
       rtxState.bgColor = Json2Vec3(ptJson["background_color"]);
-    if(ptJson.contains("envmap_intensity"))
+    if (ptJson.contains("envmap_intensity"))
       rtxState.envMapIntensity = ptJson["envmap_intensity"];
-    if(ptJson.contains("envmap_rotate"))
+    if (ptJson.contains("envmap_rotate"))
       rtxState.envRotateAngle = ptJson["envmap_rotate"];
   }
 
-  if(stateJson.contains("post_processing"))
-  {
-    const auto& postJson       = stateJson["post_processing"];
-    auto&       postState      = pipelineState.postState;
-    string      strToneMapping = "";
-    if(postJson.contains("tone_mapping"))
+  if (stateJson.contains("post_processing")) {
+    const auto& postJson = stateJson["post_processing"];
+    auto& postState = pipelineState.postState;
+    string strToneMapping = "";
+    if (postJson.contains("tone_mapping"))
       strToneMapping = postJson["tone_mapping"];
 
     ToneMappingType tmType = ToneMappingTypeNone;
-    if(strToneMapping == "none")
+    if (strToneMapping == "none")
       tmType = ToneMappingTypeNone;
-    else if(strToneMapping == "gamma")
+    else if (strToneMapping == "gamma")
       tmType = ToneMappingTypeGamma;
-    else if(strToneMapping == "reinhard")
+    else if (strToneMapping == "reinhard")
       tmType = ToneMappingTypeReinhard;
-    else if(strToneMapping == "Aces")
+    else if (strToneMapping == "Aces")
       tmType = ToneMappingTypeAces;
-    else if(strToneMapping == "filmic")
+    else if (strToneMapping == "filmic")
       tmType = ToneMappingTypeFilmic;
-    else if(strToneMapping == "pbrt")
+    else if (strToneMapping == "pbrt")
       tmType = ToneMappingTypePbrt;
-    else if(strToneMapping == "custom")
+    else if (strToneMapping == "custom")
       tmType = ToneMappingTypeCustom;
 
     postState.tmType = tmType;
   }
 }
 
-void Loader::addState(const nlohmann::json& stateJson)
-{
+void Loader::addState(const nlohmann::json& stateJson) {
   State pipelineState;
   parseState(stateJson, pipelineState);
   m_pScene->addState(pipelineState);
 }
 
-
 /*
 void Loader::addIntegrator(const nlohmann::json& integratorJson)
 {
   int    spp                = defaultSceneOptions["integrator"]["spp"];
-  int    maxDepth           = defaultSceneOptions["integrator"]["max_path_depth"];
-  string strToneMapping     = defaultSceneOptions["integrator"]["tone_mapping"];
-  bool   boolUseFaceNormal  = defaultSceneOptions["integrator"]["use_face_normal"];
-  bool   boolIgnoreEmissive = defaultSceneOptions["integrator"]["ignore_emissive"];
-  vec3   bgColor            = Json2Vec3(defaultSceneOptions["integrator"]["background_color"]);
+  int    maxDepth           =
+defaultSceneOptions["integrator"]["max_path_depth"]; string strToneMapping     =
+defaultSceneOptions["integrator"]["tone_mapping"]; bool   boolUseFaceNormal  =
+defaultSceneOptions["integrator"]["use_face_normal"]; bool   boolIgnoreEmissive
+= defaultSceneOptions["integrator"]["ignore_emissive"]; vec3   bgColor =
+Json2Vec3(defaultSceneOptions["integrator"]["background_color"]);
   if(integratorJson.contains("spp"))
     spp = integratorJson["spp"];
   if(integratorJson.contains("max_path_depth"))
@@ -233,46 +226,39 @@ void Loader::addIntegrator(const nlohmann::json& integratorJson)
   else if(strToneMapping == "custom")
     tmType = ToneMappingTypeCustom;
 
-  m_pScene->addIntegrator(spp, maxDepth, tmType, boolUseFaceNormal, boolIgnoreEmissive, bgColor);
+  m_pScene->addIntegrator(spp, maxDepth, tmType, boolUseFaceNormal,
+boolIgnoreEmissive, bgColor);
 }
 */
 
-void Loader::addCamera(const nlohmann::json& cameraJson)
-{
+void Loader::addCamera(const nlohmann::json& cameraJson) {
   JsonCheckKeys(cameraJson, {"type", "film"});
   auto& filmJson = cameraJson["film"];
   JsonCheckKeys(filmJson, {"resolution"});
-  vec2          resolution     = Json2Vec2(filmJson["resolution"]);
-  VkExtent2D    filmResolution = {uint(resolution.x), uint(resolution.y)};
-  nvmath::vec4f fxfycxcy       = 0.0f;
-  float         fov            = defaultSceneOptions["camera"]["fov"];
-  float         aperture       = defaultSceneOptions["camera"]["aperture"];
-  float         focalDistance = defaultSceneOptions["camera"]["focal_distance"];
-  if(cameraJson["type"] == "perspective")
-  {
-    if(cameraJson.contains("fov"))
-      fov = cameraJson["fov"];
-    if(cameraJson.contains("aperture"))
-      aperture = cameraJson["aperture"];
-    if(cameraJson.contains("focal_distance"))
+  vec2 resolution = Json2Vec2(filmJson["resolution"]);
+  VkExtent2D filmResolution = {uint(resolution.x), uint(resolution.y)};
+  nvmath::vec4f fxfycxcy = 0.0f;
+  float fov = defaultSceneOptions["camera"]["fov"];
+  float aperture = defaultSceneOptions["camera"]["aperture"];
+  float focalDistance = defaultSceneOptions["camera"]["focal_distance"];
+  if (cameraJson["type"] == "perspective") {
+    if (cameraJson.contains("fov")) fov = cameraJson["fov"];
+    if (cameraJson.contains("aperture")) aperture = cameraJson["aperture"];
+    if (cameraJson.contains("focal_distance"))
       focalDistance = cameraJson["focal_distance"];
     m_pScene->addCamera(filmResolution, fov, focalDistance, aperture);
-  }
-  else if(cameraJson["type"] == "opencv")
-  {
+  } else if (cameraJson["type"] == "opencv") {
     JsonCheckKeys(cameraJson, {"fx", "fy", "cx", "cy"});
-    fxfycxcy = {cameraJson["fx"], cameraJson["fy"], cameraJson["cx"], cameraJson["cy"]};
+    fxfycxcy = {cameraJson["fx"], cameraJson["fy"], cameraJson["cx"],
+                cameraJson["cy"]};
     m_pScene->addCamera(filmResolution, fxfycxcy);
-  }
-  else
-  {
+  } else {
     // TODO
     exit(1);
   }
 }
 
-void Loader::addLight(const nlohmann::json& lightJson)
-{
+void Loader::addLight(const nlohmann::json& lightJson) {
   JsonCheckKeys(lightJson, {"type", "emittance"});
   GpuLight light = {
       LightTypeUndefined,  // type
@@ -286,17 +272,16 @@ void Loader::addLight(const nlohmann::json& lightJson)
       0,                   // double side
   };
   light.emittance = Json2Vec3(lightJson["emittance"]);
-  if(lightJson["type"] == "rect")
-  {
+  if (lightJson["type"] == "rect") {
     JsonCheckKeys(lightJson, {"position", "v1", "v2"});
-    vec3 v1        = Json2Vec3(lightJson["v1"]);
-    vec3 v2        = Json2Vec3(lightJson["v2"]);
+    vec3 v1 = Json2Vec3(lightJson["v1"]);
+    vec3 v2 = Json2Vec3(lightJson["v2"]);
     light.position = Json2Vec3(lightJson["position"]);
-    light.u        = v1 - light.position;
-    light.v        = v2 - light.position;
-    light.area     = nvmath::length(nvmath::cross(light.u, light.v));
-    light.type     = LightTypeRect;
-    if(lightJson.contains("double_side"))
+    light.u = v1 - light.position;
+    light.v = v2 - light.position;
+    light.area = nvmath::length(nvmath::cross(light.u, light.v));
+    light.type = LightTypeRect;
+    if (lightJson.contains("double_side"))
       light.doubleSide = lightJson["double_side"] ? 1 : 0;
   }
   //   else if(lightJson["type"] == "sphere")
@@ -307,7 +292,7 @@ void Loader::addLight(const nlohmann::json& lightJson)
   //     light.area     = 4.0f * PI * light.radius * light.radius;
   //     light.type     = GpuLightType::eSphereLight;
   //   }
-  //else if (lightJson["type"] == "point")
+  // else if (lightJson["type"] == "point")
   //{
   //    JsonCheckKeys(lightJson, {"position", "radius"});
   //    light.position = Json2Vec3(lightJson["position"]);
@@ -315,14 +300,11 @@ void Loader::addLight(const nlohmann::json& lightJson)
   //    light.area     = 4.0f * PI * light.radius * light.radius;
   //    light.type     = GpuLightType::eSphereLight;
   //}
-  else if(lightJson["type"] == "distant")
-  {
+  else if (lightJson["type"] == "distant") {
     JsonCheckKeys(lightJson, {"direction"});
     light.direction = Json2Vec3(lightJson["direction"]);
-    light.type      = LightTypeDirectional;
-  }
-  else
-  {
+    light.type = LightTypeDirectional;
+  } else {
     // TODO
     exit(1);
   }
@@ -330,57 +312,54 @@ void Loader::addLight(const nlohmann::json& lightJson)
   m_pScene->addLight(light);
 }
 
-void Loader::addTexture(const nlohmann::json& textureJson)
-{
+void Loader::addTexture(const nlohmann::json& textureJson) {
   JsonCheckKeys(textureJson, {"name", "path"});
   std::string textureName = textureJson["name"];
   auto texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
-  if(texturePath.empty())
-  {
+  if (texturePath.empty()) {
     LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
          std::string(textureJson["path"]).c_str());
     exit(1);
   }
   float gamma = defaultSceneOptions["textures"]["gamma"];
-  if(textureJson.contains("gamma"))
-    gamma = textureJson["gamma"];
+  if (textureJson.contains("gamma")) gamma = textureJson["gamma"];
 
   m_pScene->addTexture(textureName, texturePath, gamma);
 }
 
-void Loader::addMaterial(const nlohmann::json& materialJson)
-{
+void Loader::addMaterial(const nlohmann::json& materialJson) {
   JsonCheckKeys(materialJson, {"type", "name"});
-  std::string  materialName = materialJson["name"];
-  Material     mat;
+  std::string materialName = materialJson["name"];
+  Material mat;
   GpuMaterial& material = mat.getMaterial();
-  if(materialJson["type"] == "brdf_lambertian")
-  {
+  if (materialJson["type"] == "brdf_lambertian") {
     material.type = MaterialTypeBrdfLambertian;
-    if(materialJson.contains("diffuse_reflectance"))
+    if (materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
-    if(materialJson.contains("diffuse_texture"))
-      material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
-    if(materialJson.contains("normal_texture"))
-      material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
-  }
-  else if(materialJson["type"] == "brdf_pbr_metalness_roughness")
-  {
+    if (materialJson.contains("diffuse_texture"))
+      material.diffuseTextureId =
+          m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
+  } else if (materialJson["type"] == "brdf_pbr_metalness_roughness") {
     material.type = MaterialTypeBrdfPbrMetalnessRoughness;
-    if(materialJson.contains("normal_texture"))
-      material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
-    if(materialJson.contains("diffuse_reflectance"))
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
+    if (materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
-    if(materialJson.contains("diffuse_texture"))
-      material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
-    if(materialJson.contains("metalness"))
+    if (materialJson.contains("diffuse_texture"))
+      material.diffuseTextureId =
+          m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if (materialJson.contains("metalness"))
       material.metalness = materialJson["metalness"];
-    if(materialJson.contains("metalness_texture"))
+    if (materialJson.contains("metalness_texture"))
       material.metalnessTextureId =
           m_pScene->getTextureId(materialJson["metalness_texture"]);
-    if(materialJson.contains("roughness"))
+    if (materialJson.contains("roughness"))
       material.roughness = materialJson["roughness"];
-    if(materialJson.contains("roughness_texture"))
+    if (materialJson.contains("roughness_texture"))
       material.roughnessTextureId =
           m_pScene->getTextureId(materialJson["roughness_texture"]);
     // if(materialJson.contains("subsurface"))
@@ -399,32 +378,31 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
     //   material.clearcoat = materialJson["clearcoat"];
     // if(materialJson.contains("clearcoat_gloss"))
     //   material.clearcoatGloss = materialJson["clearcoat_gloss"];
-  }
-  else if(materialJson["type"] == "brdf_emissive")
-  {
+  } else if (materialJson["type"] == "brdf_emissive") {
     material.type = MaterialTypeBrdfEmissive;
-    if(materialJson.contains("emittance"))
+    if (materialJson.contains("emittance"))
       material.emittance = Json2Vec3(materialJson["emittance"]);
-    if(materialJson.contains("emittance_factor"))
+    if (materialJson.contains("emittance_factor"))
       material.emittanceFactor = Json2Vec3(materialJson["emittance_factor"]);
-    if(materialJson.contains("emittance_texture"))
+    if (materialJson.contains("emittance_texture"))
       material.emittanceTextureId =
           m_pScene->getTextureId(materialJson["emittance_texture"]);
-  }
-  else if(materialJson["type"] == "brdf_kang18")
-  {
+  } else if (materialJson["type"] == "brdf_kang18") {
     material.type = MaterialTypeBrdfKang18;
-    JsonCheckKeys(materialJson, {"diffuse_texture", "specular_texture",
-                                 "normal_texture", "alpha_texture", "tangent_texture"});
-    material.normalTextureId = m_pScene->getTextureId(materialJson["normal_texture"]);
-    material.diffuseTextureId = m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    JsonCheckKeys(materialJson,
+                  {"diffuse_texture", "specular_texture", "normal_texture",
+                   "alpha_texture", "tangent_texture"});
+    material.normalTextureId =
+        m_pScene->getTextureId(materialJson["normal_texture"]);
+    material.diffuseTextureId =
+        m_pScene->getTextureId(materialJson["diffuse_texture"]);
     material.metalnessTextureId =
         m_pScene->getTextureId(materialJson["specular_texture"]);
-    material.roughnessTextureId = m_pScene->getTextureId(materialJson["alpha_texture"]);
-    material.tangentTextureId = m_pScene->getTextureId(materialJson["tangent_texture"]);
-  }
-  else
-  {
+    material.roughnessTextureId =
+        m_pScene->getTextureId(materialJson["alpha_texture"]);
+    material.tangentTextureId =
+        m_pScene->getTextureId(materialJson["tangent_texture"]);
+  } else {
     // TODO
     exit(1);
   }
@@ -432,64 +410,46 @@ void Loader::addMaterial(const nlohmann::json& materialJson)
   m_pScene->addMaterial(materialName, material);
 }
 
-void Loader::addMesh(const nlohmann::json& meshJson)
-{
+void Loader::addMesh(const nlohmann::json& meshJson) {
   JsonCheckKeys(meshJson, {"name", "path"});
   std::string meshName = meshJson["name"];
   auto meshPath = nvh::findFile(meshJson["path"], {m_sceneFileDir}, true);
-  if(meshPath.empty())
-  {
+  if (meshPath.empty()) {
     // TODO: LOGE
     exit(1);
   }
   bool recomputeNormal = false;
-  if(meshJson.contains("recompute_normal"))
+  if (meshJson.contains("recompute_normal"))
     recomputeNormal = meshJson["recompute_normal"];
 
   m_pScene->addMesh(meshName, meshPath, recomputeNormal);
 }
 
-void Loader::addInstance(const nlohmann::json& instanceJson)
-{
+void Loader::addInstance(const nlohmann::json& instanceJson) {
   JsonCheckKeys(instanceJson, {"mesh"});
   string meshName = instanceJson["mesh"], materialName;
-  if(instanceJson.count("material"))
+  if (instanceJson.count("material"))
     materialName = instanceJson["material"];
   else
     materialName = defaultSceneOptions["materials"]["name"];
   nvmath::mat4f transform = nvmath::mat4f_id;
-  if(instanceJson.contains("toworld"))
-  {
-    for(const auto& singleton : instanceJson["toworld"])
-    {
+  if (instanceJson.contains("toworld")) {
+    for (const auto& singleton : instanceJson["toworld"]) {
       nvmath::mat4f t = nvmath::mat4f_id;
       JsonCheckKeys(singleton, {"type", "value"});
-      if(singleton["type"] == "matrix")
-      {
+      if (singleton["type"] == "matrix") {
         t = Json2Mat4(singleton["value"]);
-      }
-      else if(singleton["type"] == "translate")
-      {
+      } else if (singleton["type"] == "translate") {
         t.set_translation(Json2Vec3(singleton["value"]));
-      }
-      else if(singleton["type"] == "scale")
-      {
+      } else if (singleton["type"] == "scale") {
         t.set_scale(Json2Vec3(singleton["scale"]));
-      }
-      else if(singleton["type"] == "rotx")
-      {
+      } else if (singleton["type"] == "rotx") {
         t = nvmath::rotation_mat4_x(float(singleton["value"]));
-      }
-      else if(singleton["type"] == "roty")
-      {
+      } else if (singleton["type"] == "roty") {
         t = nvmath::rotation_mat4_y(float(singleton["value"]));
-      }
-      else if(singleton["type"] == "rotz")
-      {
+      } else if (singleton["type"] == "rotz") {
         t = nvmath::rotation_mat4_z(float(singleton["value"]));
-      }
-      else
-      {
+      } else {
         // TODO
         exit(1);
       }
@@ -500,48 +460,42 @@ void Loader::addInstance(const nlohmann::json& instanceJson)
   m_pScene->addInstance(transform, meshName, materialName);
 }
 
-void Loader::addShot(const nlohmann::json& shotJson)
-{
+void Loader::addShot(const nlohmann::json& shotJson) {
   JsonCheckKeys(shotJson, {"type"});
   vec3 eye, lookat, up;
   mat4 ext = nvmath::mat4f_zero;
-  if(shotJson["type"] == "lookat")
-  {
+  if (shotJson["type"] == "lookat") {
     JsonCheckKeys(shotJson, {"eye", "lookat", "up"});
-    eye    = Json2Vec3(shotJson["eye"]);
+    eye = Json2Vec3(shotJson["eye"]);
     lookat = Json2Vec3(shotJson["lookat"]);
-    up     = Json2Vec3(shotJson["up"]);
-  }
-  else if(shotJson["type"] == "opencv")
-  {
+    up = Json2Vec3(shotJson["up"]);
+  } else if (shotJson["type"] == "opencv") {
     JsonCheckKeys(shotJson, {"matrix", "up"});
     ext = Json2Mat4(shotJson["matrix"]);
-    //ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 = -ext.a03;
-    //ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22, ext.a23 = -ext.a23;
+    // ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 =
+    // -ext.a03; ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22,
+    // ext.a23 = -ext.a23;
   }
   CameraShot shot;
-  shot.ext    = ext;
-  shot.eye    = eye;
-  shot.up     = up;
+  shot.ext = ext;
+  shot.eye = eye;
+  shot.up = up;
   shot.lookat = lookat;
-  shot.state  = m_pScene->getPipelineState();  // default state
+  shot.state = m_pScene->getPipelineState();  // default state
 
-  if(shotJson.contains("state"))
-  {
-    const auto& stateJson     = shotJson["state"];
-    State&      pipelineState = shot.state;
+  if (shotJson.contains("state")) {
+    const auto& stateJson = shotJson["state"];
+    State& pipelineState = shot.state;
     parseState(stateJson, pipelineState);
   }
 
   m_pScene->addShot(shot);
 }
 
-void Loader::addEnvMap(const nlohmann::json& envmapJson)
-{
+void Loader::addEnvMap(const nlohmann::json& envmapJson) {
   JsonCheckKeys(envmapJson, {"path"});
   auto texturePath = nvh::findFile(envmapJson["path"], {m_sceneFileDir}, true);
-  if(texturePath.empty())
-  {
+  if (texturePath.empty()) {
     LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
          std::string(envmapJson["path"]).c_str());
     exit(1);
