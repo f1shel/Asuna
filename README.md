@@ -74,7 +74,7 @@ Note that `nvidia-container-toolkit` is required for accessing GPU in the docker
 ### Usage
 
 ```bash
-$ ./asuna.exe --scenes scenes/cornell_box/scene.json --offline --spp 1024
+$ ./asuna.exe --scene scenes/cornell_box/scene.json [--offline] [--spp 1024] [--out cbox]
 ```
 
 ### Architecture
