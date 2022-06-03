@@ -30,6 +30,7 @@ private:
 private:
   void runOnline();
   void runOffline();
+  void parallelLoading();
   void vkTextureToBuffer(const nvvk::Texture& imgIn,
                          const VkBuffer& pixelBufferOut);
 
@@ -41,9 +42,12 @@ private:
                          int channelId = -1);
 
 private:
+  bool m_busy = false;
+  string m_busyReasonText = "";
   void renderGUI();
   bool guiCamera();
   bool guiEnvironment();
   bool guiTonemapper();
   bool guiPathTracer();
+  void guiBusy();
 };

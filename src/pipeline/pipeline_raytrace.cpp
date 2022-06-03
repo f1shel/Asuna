@@ -91,7 +91,6 @@ void PipelineRaytrace::initRayTracing() {
   auto& m_alloc = m_pContext->getAlloc();
   auto m_device = m_pContext->getDevice();
   auto m_physicalDevice = m_pContext->getPhysicalDevice();
-  auto m_graphicsQueueIndex = m_pContext->getQueueFamily();
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR prop = {
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
@@ -101,8 +100,10 @@ void PipelineRaytrace::initRayTracing() {
   prop2.pNext = &prop;
   vkGetPhysicalDeviceProperties2(m_physicalDevice, &prop2);
 
-  m_rtBuilder.setup(m_device, &m_alloc, m_graphicsQueueIndex);
-  m_sbt.setup(m_device, m_graphicsQueueIndex, &m_alloc, prop);
+  auto& qC = m_pContext->getParallelQueues()[1];
+  m_rtBuilder.setup(m_device, &m_alloc, qC.familyIndex);
+  auto& qT = m_pContext->getParallelQueues()[2];
+  m_sbt.setup(m_device, qT.familyIndex, &m_alloc, prop);
 }
 
 void PipelineRaytrace::createBottomLevelAS() {

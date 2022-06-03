@@ -11,10 +11,10 @@ public:
   Loader(Scene* pScene);
 
   // Load size first so we can create window in online mode
-  std::pair<VkExtent2D, nlohmann::json> loadJsonFirst(std::string jsonFilePath,
-                                                      const std::string& root);
+  VkExtent2D loadSizeFirst(std::string jsonFilePath, const std::string& root);
 
-  void loadSceneFromJson(const nlohmann::json& sceneFileJson, Scene* pScene);
+  void loadSceneFromJson(std::string jsonFilePath, const std::string& root,
+                         Scene* pScene);
 
 private:
   void parse(const nlohmann::json& sceneJson);

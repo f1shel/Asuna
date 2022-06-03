@@ -203,3 +203,46 @@ bool Tracer::guiPathTracer() {
                           GuiH::Flags::Normal, 0.0f, 5.0f);
   return changed;
 }
+
+void Tracer::guiBusy() {
+  static int nb_dots = 0;
+  static float deltaTime = 0;
+  bool show = true;
+  size_t width = 270;
+  size_t height = 60;
+
+  deltaTime += ImGui::GetIO().DeltaTime;
+  if (deltaTime > .25) {
+    deltaTime = 0;
+    nb_dots = ++nb_dots % 10;
+  }
+
+  auto size = m_scene.getSize();
+  ImGui::SetNextWindowSize(ImVec2(float(width), float(height)));
+  ImGui::SetNextWindowPos(ImVec2(float(size.width - width) * 0.5f,
+                                 float(size.height - height) * 0.5f));
+
+  ImGui::SetNextWindowBgAlpha(0.75f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 15.0);
+  if (ImGui::Begin(
+          "##notitle", &show,
+          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+              ImGuiWindowFlags_NoSavedSettings |
+              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoMove |
+              ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMouseInputs)) {
+    ImVec2 available = ImGui::GetContentRegionAvail();
+
+    ImVec2 text_size = ImGui::CalcTextSize(m_busyReasonText.c_str(), nullptr,
+                                           false, available.x);
+
+    ImVec2 pos = ImGui::GetCursorPos();
+    pos.x += (available.x - text_size.x) * 0.5f;
+    pos.y += (available.y - text_size.y) * 0.5f;
+
+    ImGui::SetCursorPos(pos);
+    ImGui::TextWrapped("%s",
+                       (m_busyReasonText + std::string(nb_dots, '.')).c_str());
+  }
+  ImGui::PopStyleVar();
+  ImGui::End();
+}

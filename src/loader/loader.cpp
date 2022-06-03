@@ -39,8 +39,8 @@ static json defaultSceneOptions = json::parse(R"(
 
 Loader::Loader(Scene* pScene) : m_pScene(pScene) {}
 
-std::pair<VkExtent2D, nlohmann::json> Loader::loadJsonFirst(
-    std::string sceneFilePath, const std::string& root) {
+VkExtent2D Loader::loadSizeFirst(std::string sceneFilePath,
+                                 const std::string& root) {
   bool isRelativePath = path(sceneFilePath).is_relative();
   if (isRelativePath)
     sceneFilePath = nvh::findFile(sceneFilePath, {root}, true);
@@ -63,10 +63,25 @@ std::pair<VkExtent2D, nlohmann::json> Loader::loadJsonFirst(
   vec2 resolution = Json2Vec2(filmJson["resolution"]);
   VkExtent2D filmResolution = {uint(resolution.x), uint(resolution.y)};
 
-  return std::make_pair(filmResolution, sceneFileJson);
+  return filmResolution;
 }
 
-void Loader::loadSceneFromJson(const json& sceneFileJson, Scene* pScene) {
+void Loader::loadSceneFromJson(std::string sceneFilePath,
+                               const std::string& root, Scene* pScene) {
+  bool isRelativePath = path(sceneFilePath).is_relative();
+  if (isRelativePath)
+    sceneFilePath = nvh::findFile(sceneFilePath, {root}, true);
+  if (sceneFilePath.empty()) {
+    LOGE("[x] %-20s: failed to load scene from %s", "Loader Error",
+         sceneFilePath.c_str());
+    exit(1);
+  }
+  m_sceneFileDir = path(sceneFilePath).parent_path().string();
+
+  ifstream sceneFileStream(sceneFilePath);
+  json sceneFileJson;
+  sceneFileStream >> sceneFileJson;
+
   m_pScene = pScene;
   m_pScene->reset();
   parse(sceneFileJson);
@@ -74,19 +89,14 @@ void Loader::loadSceneFromJson(const json& sceneFileJson, Scene* pScene) {
 }
 
 void Loader::parse(const nlohmann::json& sceneFileJson) {
-  // JsonCheckKeys(sceneFileJson, {"integrator", "camera", "meshes",
-  // "instances"});
   JsonCheckKeys(sceneFileJson, {"state", "camera", "meshes", "instances"});
 
-  // auto& integratorJson = sceneFileJson["integrator"];
   auto& stateJson = sceneFileJson["state"];
   auto& cameraJson = sceneFileJson["camera"];
   auto& meshesJson = sceneFileJson["meshes"];
   auto& instancesJson = sceneFileJson["instances"];
 
   // parse scene file to generate raw data
-  // integrator
-  // addIntegrator(integratorJson);
   addState(stateJson);
   // camera
   addCamera(cameraJson);
@@ -186,50 +196,6 @@ void Loader::addState(const nlohmann::json& stateJson) {
   parseState(stateJson, pipelineState);
   m_pScene->addState(pipelineState);
 }
-
-/*
-void Loader::addIntegrator(const nlohmann::json& integratorJson)
-{
-  int    spp                = defaultSceneOptions["integrator"]["spp"];
-  int    maxDepth           =
-defaultSceneOptions["integrator"]["max_path_depth"]; string strToneMapping     =
-defaultSceneOptions["integrator"]["tone_mapping"]; bool   boolUseFaceNormal  =
-defaultSceneOptions["integrator"]["use_face_normal"]; bool   boolIgnoreEmissive
-= defaultSceneOptions["integrator"]["ignore_emissive"]; vec3   bgColor =
-Json2Vec3(defaultSceneOptions["integrator"]["background_color"]);
-  if(integratorJson.contains("spp"))
-    spp = integratorJson["spp"];
-  if(integratorJson.contains("max_path_depth"))
-    maxDepth = integratorJson["max_path_depth"];
-  if(integratorJson.contains("tone_mapping"))
-    strToneMapping = integratorJson["tone_mapping"];
-  if(integratorJson.contains("use_face_normal"))
-    boolUseFaceNormal = integratorJson["use_face_normal"];
-  if(integratorJson.contains("ignore_emissive"))
-    boolIgnoreEmissive = integratorJson["ignore_emissive"];
-  if(integratorJson.contains("background_color"))
-    bgColor = Json2Vec3(integratorJson["background_color"]);
-
-  ToneMappingType tmType = ToneMappingTypeNone;
-  if(strToneMapping == "none")
-    tmType = ToneMappingTypeNone;
-  else if(strToneMapping == "gamma")
-    tmType = ToneMappingTypeGamma;
-  else if(strToneMapping == "reinhard")
-    tmType = ToneMappingTypeReinhard;
-  else if(strToneMapping == "Aces")
-    tmType = ToneMappingTypeAces;
-  else if(strToneMapping == "filmic")
-    tmType = ToneMappingTypeFilmic;
-  else if(strToneMapping == "pbrt")
-    tmType = ToneMappingTypePbrt;
-  else if(strToneMapping == "custom")
-    tmType = ToneMappingTypeCustom;
-
-  m_pScene->addIntegrator(spp, maxDepth, tmType, boolUseFaceNormal,
-boolIgnoreEmissive, bgColor);
-}
-*/
 
 void Loader::addCamera(const nlohmann::json& cameraJson) {
   JsonCheckKeys(cameraJson, {"type", "film"});

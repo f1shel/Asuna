@@ -28,8 +28,10 @@ void Scene::submit() {
   // configure pipeline state
   m_pipelineState.rtxState.numLights = getLightsNum() - 1;
 
-  nvvk::CommandPool cmdBufGet(m_pContext->getDevice(),
-                              m_pContext->getQueueFamily());
+  auto& qGCT1 = m_pContext->getParallelQueues()[0];
+  nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), qGCT1.familyIndex,
+                              VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                              qGCT1.queue);
   VkCommandBuffer cmdBuf = cmdBufGet.createCommandBuffer();
 
   allocLights(m_pContext, cmdBuf);

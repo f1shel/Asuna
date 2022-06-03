@@ -19,6 +19,9 @@ void ContextAware::init(ContextInitSetting cis) {
 
   // Create offline resources for offline mode
   if (getOfflineMode()) createOfflineResources();
+
+  // Create parallel queues
+  createParallelQueues();
 }
 
 void ContextAware::deinit() {
@@ -52,6 +55,10 @@ VkRenderPass ContextAware::getRenderPass() {
     return AppBaseVk::getRenderPass();
   else
     return m_offlineRenderPass;
+}
+
+vector<nvvk::Context::Queue>& ContextAware::getParallelQueues() {
+  return m_parallelQueues;
 }
 
 void ContextAware::setViewport(const VkCommandBuffer& cmdBuf) {
@@ -152,6 +159,14 @@ void ContextAware::createOfflineResources() {
   NAME2_VK(m_offlineFramebuffer, "Offline Framebuffer");
 }
 
+void ContextAware::createParallelQueues() {
+  auto qGCT1 =
+      m_vkcontext.createQueue(m_contextInfo.defaultQueueGCT, "GCT1", 1.0f);
+  m_parallelQueues.push_back(qGCT1);
+  m_parallelQueues.push_back(m_vkcontext.m_queueC);
+  m_parallelQueues.push_back(m_vkcontext.m_queueT);
+}
+
 bool ContextAware::shouldGlfwCloseWindow() {
   return glfwWindowShouldClose(m_window);
 }
@@ -185,43 +200,44 @@ void ContextAware::createGlfwWindow() {
 }
 
 void ContextAware::initializeVulkan() {
-  nvvk::ContextCreateInfo contextInfo;
   if (!getOfflineMode()) {
     createGlfwWindow();
     // Set up Vulkan extensions required by glfw(surface, win32, linux, ..)
     uint32_t count{0};
     const char** reqExtensions = glfwGetRequiredInstanceExtensions(&count);
     for (uint32_t ext_id = 0; ext_id < count; ext_id++)
-      contextInfo.addInstanceExtension(reqExtensions[ext_id]);
+      m_contextInfo.addInstanceExtension(reqExtensions[ext_id]);
     // Enabling ability to present rendering
-    contextInfo.addDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    m_contextInfo.addDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
   // Using Vulkan 1.3
-  contextInfo.setVersion(1, 3);
+  m_contextInfo.setVersion(1, 3);
   // FPS in titlebar
-  contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
+  m_contextInfo.addInstanceLayer("VK_LAYER_LUNARG_monitor", true);
   // Allow debug names
-  contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);
+  m_contextInfo.addInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, true);
   // Allow pointers to buffer memory in shaders
-  contextInfo.addDeviceExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
   // Activate the ray tracing extension
   // Required by KHR_acceleration_structure; allows work to be offloaded onto
   // background threads and parallelized
-  contextInfo.addDeviceExtension(
+  m_contextInfo.addDeviceExtension(
       VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
   // KHR_acceleration_structure
   VkPhysicalDeviceAccelerationStructureFeaturesKHR asFeatures =
       nvvk::make<VkPhysicalDeviceAccelerationStructureFeaturesKHR>();
-  contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-                                 false, &asFeatures);
+  m_contextInfo.addDeviceExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                                   false, &asFeatures);
   // KHR_raytracing_pipeline
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures =
       nvvk::make<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>();
-  contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-                                 false, &rtPipelineFeatures);
+  m_contextInfo.addDeviceExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+                                   false, &rtPipelineFeatures);
+  // Extra queues for parallel load/build
+  m_contextInfo.addRequestedQueue(m_contextInfo.defaultQueueGCT, 1, 1.0f);
   // Add the required device extensions for Debug Printf. If this is
   // confusing,
-  contextInfo.addDeviceExtension(
+  m_contextInfo.addDeviceExtension(
       VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   VkValidationFeaturesEXT validationInfo =
       nvvk::make<VkValidationFeaturesEXT>();
@@ -231,14 +247,14 @@ void ContextAware::initializeVulkan() {
   validationInfo.pDisabledValidationFeatures = nullptr;
   validationInfo.enabledValidationFeatureCount = 1;
   validationInfo.pEnabledValidationFeatures = &validationFeatureToEnable;
-  contextInfo.instanceCreateInfoExt = &validationInfo;
+  m_contextInfo.instanceCreateInfoExt = &validationInfo;
 #ifdef _WIN32
   _putenv_s("DEBUG_PRINTF_TO_STDOUT", "1");
 #else   // If not _WIN32
   putenv("DEBUG_PRINTF_TO_STDOUT=1");
 #endif  // _WIN32                                                                                                      \
         // Create the Vulkan instance and then first compatible device based on info
-  m_vkcontext.init(contextInfo);
+  m_vkcontext.init(m_contextInfo);
   // Device must support acceleration structures and ray tracing pipelines:
   if (asFeatures.accelerationStructure != VK_TRUE ||
       rtPipelineFeatures.rayTracingPipeline != VK_TRUE) {

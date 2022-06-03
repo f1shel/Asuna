@@ -158,8 +158,11 @@ void PipelineGraphics::createOffscreenResources() {
 
   // Setting the image layout for both color and depth
   {
-    nvvk::CommandPool genCmdBuf(m_device, m_graphicsQueueIndex);
-    auto cmdBuf = genCmdBuf.createCommandBuffer();
+    auto& qGCT1 = m_pContext->getParallelQueues()[0];
+    nvvk::CommandPool cmdBufGet(m_pContext->getDevice(), qGCT1.familyIndex,
+                                VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+                                qGCT1.queue);
+    auto cmdBuf = cmdBufGet.createCommandBuffer();
     for (auto& m_tColor : m_tColors)
       nvvk::cmdBarrierImageLayout(cmdBuf, m_tColor.image,
                                   VK_IMAGE_LAYOUT_UNDEFINED,
@@ -169,7 +172,7 @@ void PipelineGraphics::createOffscreenResources() {
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    genCmdBuf.submitAndWait(cmdBuf);
+    cmdBufGet.submitAndWait(cmdBuf);
   }
 
   // Creating a renderpass for the offscreen

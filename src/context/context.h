@@ -68,11 +68,14 @@ public:
   // Offline render pass
   VkRenderPass getRenderPass();
 
+  vector<nvvk::Context::Queue>& getParallelQueues();
+
 private:
   void createGlfwWindow();
   void initializeVulkan();
   void createAppContext();
   void createOfflineResources();
+  void createParallelQueues();
 
 private:
   VkRenderPass m_offlineRenderPass{VK_NULL_HANDLE};
@@ -85,5 +88,11 @@ private:
   nvvk::ResourceAllocatorDedicated m_alloc;
   nvvk::DebugUtil m_debug;
   nvvk::Context m_vkcontext{};
+  nvvk::ContextCreateInfo m_contextInfo;
   std::string m_root{};
+
+  // Collecting all the Queues the application will need.
+  // - GTC1 for scene assets loading and pipeline creation
+  // - Compute for tlas creation
+  vector<nvvk::Context::Queue> m_parallelQueues{};
 };

@@ -40,12 +40,12 @@ private:
   void updateRtDescriptorSet();        // Update the descriptor pointer
 
 private:
-  nvvk::SBTWrapper m_sbt;                  // Shading binding table wrapper
-  nvvk::RaytracingBuilderKHR m_rtBuilder;  // Pipeline builder
-  vector<VkAccelerationStructureInstanceKHR>
-      m_tlas{};  // Top level acceleration structures
-  vector<nvvk::RaytracingBuilderKHR::BlasInput>
-      m_blas{};  // Bottom level acceleration structures
-  // GpuPushConstantRaytrace                       m_pushconstant{0};  // Push
-  // constant
+  // Shading binding table wrapper
+  nvvk::SBTWrapper m_sbt;
+  // Pipeline builder
+  nvvk::RaytracingBuilderKHR m_rtBuilder;
+  // Top level acceleration structures
+  vector<VkAccelerationStructureInstanceKHR> m_tlas{};
+  // Bottom level acceleration structures
+  vector<nvvk::RaytracingBuilderKHR::BlasInput> m_blas{};
 };

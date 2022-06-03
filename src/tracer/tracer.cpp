@@ -17,9 +17,8 @@ void Tracer::init(TracerInitSettings tis) {
   m_tis = tis;
 
   // Get film size and set size for context
-  Loader loader;
-  auto& [filmResolution, sceneFileJson] =
-      loader.loadJsonFirst(m_tis.scenefile, m_context.getRoot());
+  auto filmResolution =
+      Loader().loadSizeFirst(m_tis.scenefile, m_context.getRoot());
   m_context.setSize(filmResolution);
   if (tis.sceneSpp != 0) m_scene.setSpp(tis.sceneSpp);
 
@@ -27,22 +26,16 @@ void Tracer::init(TracerInitSettings tis) {
   m_context.init({m_tis.offline});
   m_scene.init(&m_context);
 
-  // Load resources into scene
-  loader.loadSceneFromJson(sceneFileJson, &m_scene);
-
-  // Create graphics pipeline
-  m_pipelineGraphics.init(&m_context, &m_scene);
-
-  // Raytrace pipeline use some resources from graphics pipeline
-  PipelineRaytraceInitSetting pis;
-  pis.pDswOut = &m_pipelineGraphics.getOutDescriptorSet();
-  pis.pDswEnv = &m_pipelineGraphics.getEnvDescriptorSet();
-  pis.pDswScene = &m_pipelineGraphics.getSceneDescriptorSet();
-  m_pipelineRaytrace.init(&m_context, &m_scene, pis);
-
-  // Post pipeline processes hdr output
-  m_pipelinePost.init(&m_context, &m_scene,
-                      &m_pipelineGraphics.getHdrOutImageInfo());
+  if (m_context.getOfflineMode())
+    parallelLoading();
+  else {
+    m_busy = true;
+    std::thread([&] {
+      m_busyReasonText = "Loading Scene";
+      parallelLoading();
+      m_busy = false;
+    }).detach();
+  }
 }
 
 void Tracer::run() {
@@ -65,9 +58,6 @@ void Tracer::runOnline() {
   clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.0f};
   clearValues[1].depthStencil = {1.0f, 0};
 
-  // For procedural rendering
-  m_pipelineRaytrace.setSpp(1);
-
   // Main loop
   while (!m_context.shouldGlfwCloseWindow()) {
     glfwPollEvents();
@@ -89,13 +79,20 @@ void Tracer::runOnline() {
     {
       vkBeginCommandBuffer(cmdBuf, &beginInfo);
 
-      // Update camera and sunsky
-      m_pipelineGraphics.run(cmdBuf);
-
       renderGUI();
 
-      // Ray tracing
-      m_pipelineRaytrace.run(cmdBuf);
+      do {
+        if (m_busy) break;
+
+        // For procedural rendering
+        m_pipelineRaytrace.setSpp(1);
+
+        // Update camera and sunsky
+        m_pipelineGraphics.run(cmdBuf);
+
+        // Ray tracing
+        m_pipelineRaytrace.run(cmdBuf);
+      } while (0);
 
       // Post processing
       {
@@ -113,7 +110,7 @@ void Tracer::runOnline() {
         vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
                              VK_SUBPASS_CONTENTS_INLINE);
 
-        m_pipelinePost.run(cmdBuf);
+        if (!m_busy) m_pipelinePost.run(cmdBuf);
 
         // Rendering UI
         ImGui::Render();
@@ -205,6 +202,25 @@ void Tracer::runOffline() {
   m_alloc.destroy(pixelBuffer);
 }
 
+void Tracer::parallelLoading() {
+  // Load resources into scene
+  Loader().loadSceneFromJson(m_tis.scenefile, m_context.getRoot(), &m_scene);
+
+  // Create graphics pipeline
+  m_pipelineGraphics.init(&m_context, &m_scene);
+
+  // Raytrace pipeline use some resources from graphics pipeline
+  PipelineRaytraceInitSetting pis;
+  pis.pDswOut = &m_pipelineGraphics.getOutDescriptorSet();
+  pis.pDswEnv = &m_pipelineGraphics.getEnvDescriptorSet();
+  pis.pDswScene = &m_pipelineGraphics.getSceneDescriptorSet();
+  m_pipelineRaytrace.init(&m_context, &m_scene, pis);
+
+  // Post pipeline processes hdr output
+  m_pipelinePost.init(&m_context, &m_scene,
+                      &m_pipelineGraphics.getHdrOutImageInfo());
+}
+
 void Tracer::vkTextureToBuffer(const nvvk::Texture& imgIn,
                                const VkBuffer& pixelBufferOut) {
   nvvk::CommandPool genCmdBuf(m_context.getDevice(),
@@ -261,6 +277,12 @@ void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
 
 void Tracer::renderGUI() {
   static bool showGui = true;
+
+  if (m_busy) {
+    guiBusy();
+    return;
+  }
+
   if (ImGui::IsKeyPressed(ImGuiKey_H)) showGui = !showGui;
   if (!showGui) return;
 
