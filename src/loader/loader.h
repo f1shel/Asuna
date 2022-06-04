@@ -8,7 +8,6 @@
 class Loader {
 public:
   Loader() {}
-  Loader(Scene* pScene);
 
   // Load size first so we can create window in online mode
   VkExtent2D loadSizeFirst(std::string jsonFilePath, const std::string& root);

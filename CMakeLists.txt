@@ -79,6 +79,10 @@ SET(ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
 
 ADD_SUBDIRECTORY(${THIRD_PARTY_DIR}/openexr)
 
+#--------------------------------------------------------------------------------------------------
+# SpdLog
+include_directories(${THIRD_PARTY_DIR}/spdlog/include)
+
 # For std::binary_function
 set_property(TARGET IlmImf-obj PROPERTY CXX_STANDARD 14)
 # Remove error exception warning

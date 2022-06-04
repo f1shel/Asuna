@@ -16,8 +16,7 @@ void Scene::init(ContextAware* pContext) {
 
 void Scene::deinit() {
   if (m_pContext == nullptr) {
-    LOGE("[x] %-20s: failed to find belonging context when deinit.",
-         "Scene Error");
+    LOG_ERROR("{}: failed to find belonging context when deinit.", "Scene");
     exit(1);
   }
   freeRawData();
@@ -25,6 +24,11 @@ void Scene::deinit() {
 }
 
 void Scene::submit() {
+  LOG_INFO("{}: submitting resources to gpu", "Scene");
+  LOG_INFO("{}: {} light(s), {} textures(s), {} material(s), {} mesh(es)", "Scene",
+           getLightsNum() - 1, getTexturesNum() - 1, getMaterialsNum() - 1,
+           getMeshesNum());
+
   // configure pipeline state
   m_pipelineState.rtxState.numLights = getLightsNum() - 1;
 
@@ -293,8 +297,7 @@ int Scene::getMeshId(const std::string& meshName) {
   if (m_pMeshes.count(meshName))
     return m_pMeshes[meshName].second;
   else {
-    LOGE("[x] %-20s: mesh %s does not exist\n", "Scene Error",
-         meshName.c_str());
+    LOG_ERROR("{}: mesh [\"{}\"] does not exist\n", "Scene", meshName);
     exit(1);
   }
   return 0;
@@ -304,8 +307,7 @@ int Scene::getTextureId(const std::string& textureName) {
   if (m_pTextures.count(textureName))
     return m_pTextures[textureName].second;
   else {
-    LOGE("[x] %-20s: texture %s does not exist\n", "Scene Error",
-         textureName.c_str());
+    LOG_ERROR("{}: texture [\"{}\"] does not exist\n", "Scene", textureName);
     exit(1);
   }
   return 0;
@@ -315,8 +317,7 @@ int Scene::getMaterialId(const std::string& materialName) {
   if (m_pMaterials.count(materialName))
     return m_pMaterials[materialName].second;
   else {
-    LOGE("[x] %-20s: material %s does not exist\n", "Scene Error",
-         materialName.c_str());
+    LOG_ERROR("{}: material [\"{}\"] does not exist\n", "Scene", materialName);
     exit(1);
   }
   return 0;
@@ -501,10 +502,10 @@ void Scene::computeSceneDimensions() {
   }
 
   if (scnBbox.isEmpty() || !scnBbox.isVolume()) {
-    LOGE(
-        "[!] %-20s: Scene bounding box invalid, Setting to: [-1,-1,-1], "
+    LOG_WARN(
+        "{}: scene bounding box invalid, Setting to: [-1,-1,-1], "
         "[1,1,1]",
-        "Scene Warning");
+        "Scene");
     scnBbox.insert({-1.0f, -1.0f, -1.0f});
     scnBbox.insert({1.0f, 1.0f, 1.0f});
   }

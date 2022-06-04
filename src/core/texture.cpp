@@ -309,11 +309,11 @@ float* readImage(const std::string& imagePath, int& width, int& height,
                                                     ".png"};
   std::string ext = path(imagePath).extension().string();
   if (!supportExtensions.count(ext)) {
-    LOGE(
-        "[x] %-20s: textures only support extensions (.hdr .exr .jpg .png) "
-        "while %s "
+    LOG_ERROR(
+        "{}: textures only support extensions (.hdr .exr .jpg .png) "
+        "while [{}] "
         "is passed in",
-        "Scene Error", ext.c_str());
+        "Scene", ext);
     exit(1);
   }
   void* pixels = nullptr;
@@ -344,11 +344,11 @@ void writeImage(const std::string& imagePath, int width, int height,
                                                     ".png", ".tga", ".bmp"};
   std::string ext = path(imagePath).extension().string();
   if (!supportExtensions.count(ext)) {
-    LOGE(
-        "[x] %-20s: textures only support extensions (.hdr .exr .jpg .png) "
-        "while %s "
+    LOG_ERROR(
+        "{}: textures only support extensions (.hdr .exr .jpg .png) "
+        "while [{}] "
         "is passed in",
-        "Scene Error", ext.c_str());
+        "Scene Error", ext);
     exit(1);
   }
   if (ext == ".hdr")

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <context/context.h>
 #include <nvmath/nvmath.h>
 #include <iostream>
 #include <ext/json.hpp>
@@ -8,8 +9,8 @@
 
 inline nvmath::vec2f Json2Vec2(const nlohmann::json& json) {
   if (json.size() < 2) {
-    LOGE("[x] %-20s: failed to extract vector2f in following json segment:\n",
-         "Scene Error");
+    LOG_ERROR("{}: failed to extract vector2f from following json segment:",
+              "Json");
     std::cout << json.dump(4) << std::endl << std::endl;
     exit(1);
   }
@@ -18,8 +19,8 @@ inline nvmath::vec2f Json2Vec2(const nlohmann::json& json) {
 
 inline nvmath::vec3f Json2Vec3(const nlohmann::json& json) {
   if (json.size() < 3) {
-    LOGE("[x] %-20s: failed to extract vector3f in following json segment:\n",
-         "Scene Error");
+    LOG_ERROR("{}: failed to extract vector3f from following json segment:",
+              "Json");
     std::cout << json.dump(4) << std::endl << std::endl;
     exit(1);
   }
@@ -28,8 +29,8 @@ inline nvmath::vec3f Json2Vec3(const nlohmann::json& json) {
 
 inline nvmath::mat4f Json2Mat4(const nlohmann::json& json) {
   if (json.size() < 16) {
-    LOGE("[x] %-20s: failed to extract 4x4 matrix in following json segment:\n",
-         "Scene Error");
+    LOG_ERROR("{}: failed to extract mat4f from following json segment:",
+              "Json");
     std::cout << json.dump(4) << std::endl << std::endl;
     exit(1);
   }
@@ -40,8 +41,8 @@ inline nvmath::mat4f Json2Mat4(const nlohmann::json& json) {
 
 inline nvmath::mat3f Json2Mat3(const nlohmann::json& json) {
   if (json.size() < 9) {
-    LOGE("[x] %-20s: failed to extract 3x3 matrix in following json segment:\n",
-         "Scene Error");
+    LOG_ERROR("{}: failed to extract mat3f from following json segment:",
+              "Json");
     std::cout << json.dump(4) << std::endl << std::endl;
     exit(1);
   }
@@ -58,8 +59,8 @@ inline void JsonCheckKeys(const nlohmann::json& json,
                           const std::vector<std::string>&& keys) {
   for (auto& key : keys) {
     if (!json.count(key)) {
-      LOGE("[x] %-20s: missing key [%s] in following json segment:\n",
-           "Scene Error", key.c_str());
+      LOG_ERROR("{}: missing key [\"{}\"] in following json segment:", "Json",
+                key.c_str());
       std::cout << json.dump(4) << std::endl << std::endl;
       exit(1);
     }

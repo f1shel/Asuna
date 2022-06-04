@@ -11,17 +11,14 @@
 
 void PipelinePost::init(ContextAware* pContext, Scene* pScene,
                         const VkDescriptorImageInfo* pImageInfo) {
+  LOG_INFO("{}: creating post-processing pipeline", "Pipeline");
   m_pContext = pContext;
   m_pScene = pScene;
-  // Ray tracing
-  nvh::Stopwatch sw_;
   createPostDescriptorSetLayout();
   bind(PostBindSet::PostInput, {&m_holdSetWrappers[uint(HoldSet::Input)]});
   createPostPipeline();
   updatePostDescriptorSet(pImageInfo);
   initPushconstant();
-  LOGI("[ ] %-20s: %6.2fms Post pipeline creation\n", "Pipeline",
-       sw_.elapsed());
 }
 
 void PipelinePost::run(const VkCommandBuffer& cmdBuf) {

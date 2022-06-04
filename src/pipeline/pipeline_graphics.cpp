@@ -15,6 +15,7 @@
 #include <vector>
 
 void PipelineGraphics::init(ContextAware* pContext, Scene* pScene) {
+  LOG_INFO("{}: creating graphics pipeline", "Pipeline");
   m_pContext = pContext;
   m_pScene = pScene;
   // Graphics pipeine
@@ -23,8 +24,6 @@ void PipelineGraphics::init(ContextAware* pContext, Scene* pScene) {
   createGraphicsDescriptorSetLayout();
   createCameraBuffer();
   updateGraphicsDescriptorSet();
-  LOGI("[ ] %-20s: %6.2fms Graphic pipeline creation\n", "Pipeline",
-       sw_.elapsed());
 }
 
 void PipelineGraphics::run(const VkCommandBuffer& cmdBuf) {

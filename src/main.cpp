@@ -3,22 +3,15 @@
 #include <ext/json.hpp>
 #include <nvh/inputparser.h>
 
-void help() {
-  LOGI(
-      "usage: asuna.exe [--help] [--out <path>] [--offline] [--scene "
-      "<path>]\n\n");
-  LOGI("   --scene   : input scene json\n");
-  LOGI("   --out     : output file\n");
-  LOGI("   --offline : disable gui and run offline\n");
-}
-
 int main(int argc, char** argv) {
   // setup some basic things for the sample, logging file for example
   NVPSystem system(PROJECT_NAME);
 
+  LOG_INFO(">>> Asuna Renderer by f1shel <<<");
+
   InputParser parser(argc, argv);
   if (parser.exist("--help")) {
-    help();
+    // TODO: help function
     exit(0);
   }
 

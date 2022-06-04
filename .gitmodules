@@ -7,3 +7,6 @@
 [submodule "src/ext/openexr"]
 	path = src/ext/openexr
 	url = https://github.com/f1shel/openexr.git
+[submodule "src/ext/spdlog"]
+	path = src/ext/spdlog
+	url = https://github.com/gabime/spdlog

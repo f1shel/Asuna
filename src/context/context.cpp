@@ -6,6 +6,8 @@
 #include "nvvk/renderpasses_vk.hpp"
 
 void ContextAware::init(ContextInitSetting cis) {
+  LOG_INFO("{}: creating vulkan instance", "Context");
+
   m_cis = cis;
 
   // Extensions, context and instance
@@ -184,7 +186,7 @@ bool ContextAware::getOfflineMode() { return m_cis.offline; }
 void ContextAware::createGlfwWindow() {
   // Check initialization of glfw library
   if (!glfwInit()) {
-    LOGE("[x] %-20s: failed to initalize glfw", "Context Error");
+    LOG_ERROR("{}: failed to initalize glfw", "Context");
     exit(1);
   }
   // Create a window without OpenGL context
@@ -193,7 +195,7 @@ void ContextAware::createGlfwWindow() {
                               nullptr, nullptr);
   // Check glfw support for Vulkan
   if (!glfwVulkanSupported()) {
-    LOGE("[x] %-20s: glfw does not support vulkan", "Context Error");
+    LOG_ERROR("{}: glfw does not support vulkan", "Context");
     exit(1);
   }
   assert(glfwVulkanSupported() == 1);
@@ -250,10 +252,13 @@ void ContextAware::initializeVulkan() {
   m_contextInfo.instanceCreateInfoExt = &validationInfo;
 #ifdef _WIN32
   _putenv_s("DEBUG_PRINTF_TO_STDOUT", "1");
-#else   // If not _WIN32
+#else  // If not _WIN32
   putenv("DEBUG_PRINTF_TO_STDOUT=1");
-#endif  // _WIN32                                                                                                      \
-        // Create the Vulkan instance and then first compatible device based on info
+#endif
+  m_contextInfo.verboseAvailable = false;
+  m_contextInfo.verboseCompatibleDevices = false;
+  m_contextInfo.verboseUsed = false;
+  // Create the Vulkan instance and then first compatible device based on info
   m_vkcontext.init(m_contextInfo);
   // Device must support acceleration structures and ray tracing pipelines:
   if (asFeatures.accelerationStructure != VK_TRUE ||

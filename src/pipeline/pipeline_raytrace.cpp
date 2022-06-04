@@ -6,10 +6,10 @@
 
 void PipelineRaytrace::init(ContextAware* pContext, Scene* pScene,
                             PipelineRaytraceInitSetting& pis) {
+  LOG_INFO("{}: creating raytrace pipeline", "Pipeline");
   m_pContext = pContext;
   m_pScene = pScene;
   // Ray tracing
-  nvh::Stopwatch sw_;
   initRayTracing();
   createBottomLevelAS();
   createTopLevelAS();
@@ -20,8 +20,6 @@ void PipelineRaytrace::init(ContextAware* pContext, Scene* pScene,
   bind(RtBindSet::RtScene, pis.pDswScene);
   createRtPipeline();
   updateRtDescriptorSet();
-  LOGI("[ ] %-20s: %6.2fms Raytrace pipeline creation\n", "Pipeline",
-       sw_.elapsed());
 }
 
 void PipelineRaytrace::deinit() {

@@ -162,6 +162,7 @@ void Tracer::runOffline() {
 
     // Progress bar
     tqdm bar;
+    bar.set_theme_arrow();
 
     for (int spp = 0; spp < tot; spp++) {
       bar.progress(spp, tot);
@@ -197,6 +198,8 @@ void Tracer::runOffline() {
     static char outputName[50];
     sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(), shotId);
     saveBufferToImage(pixelBuffer, outputName);
+    sprintf(outputName, "%s_shot_%04d.exr", m_tis.outputname.c_str(), shotId);
+    saveBufferToImage(pixelBuffer, outputName, 0);
   }
   // Destroy temporary buffer
   m_alloc.destroy(pixelBuffer);
@@ -254,7 +257,8 @@ void Tracer::vkTextureToBuffer(const nvvk::Texture& imgIn,
 
 void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
                                int channelId) {
-  bool isRelativePath = path(outputpath).is_relative();
+  auto fp = path(outputpath);
+  bool isRelativePath = fp.is_relative();
   if (isRelativePath) outputpath = NVPSystem::exePath() + outputpath;
 
   auto& m_alloc = m_context.getAlloc();

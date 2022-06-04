@@ -37,16 +37,14 @@ static json defaultSceneOptions = json::parse(R"(
 }
 )");
 
-Loader::Loader(Scene* pScene) : m_pScene(pScene) {}
-
 VkExtent2D Loader::loadSizeFirst(std::string sceneFilePath,
                                  const std::string& root) {
   bool isRelativePath = path(sceneFilePath).is_relative();
   if (isRelativePath)
     sceneFilePath = nvh::findFile(sceneFilePath, {root}, true);
   if (sceneFilePath.empty()) {
-    LOGE("[x] %-20s: failed to load scene from %s", "Loader Error",
-         sceneFilePath.c_str());
+    LOG_ERROR("{}: failed to load scene from file [{}]", "Loader",
+              sceneFilePath);
     exit(1);
   }
   m_sceneFileDir = path(sceneFilePath).parent_path().string();
@@ -68,12 +66,14 @@ VkExtent2D Loader::loadSizeFirst(std::string sceneFilePath,
 
 void Loader::loadSceneFromJson(std::string sceneFilePath,
                                const std::string& root, Scene* pScene) {
+  LOG_INFO("{}: loading scene assets, this may take tens of seconds", "Loader");
+
   bool isRelativePath = path(sceneFilePath).is_relative();
   if (isRelativePath)
     sceneFilePath = nvh::findFile(sceneFilePath, {root}, true);
   if (sceneFilePath.empty()) {
-    LOGE("[x] %-20s: failed to load scene from %s", "Loader Error",
-         sceneFilePath.c_str());
+    LOG_ERROR("{}: failed to load scene from file [{}]", "Loader",
+              sceneFilePath);
     exit(1);
   }
   m_sceneFileDir = path(sceneFilePath).parent_path().string();
@@ -186,6 +186,11 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
       tmType = ToneMappingTypePbrt;
     else if (strToneMapping == "custom")
       tmType = ToneMappingTypeCustom;
+    else
+      LOG_WARN(
+          "{}: no matching tone mapper for [{}], use default"
+          "Loader",
+          strToneMapping);
 
     postState.tmType = tmType;
   }
@@ -219,7 +224,8 @@ void Loader::addCamera(const nlohmann::json& cameraJson) {
                 cameraJson["cy"]};
     m_pScene->addCamera(filmResolution, fxfycxcy);
   } else {
-    // TODO
+    LOG_ERROR("{}: unrecognized camera type [{}]", "Loader",
+              cameraJson["type"]);
     exit(1);
   }
 }
@@ -271,7 +277,7 @@ void Loader::addLight(const nlohmann::json& lightJson) {
     light.direction = Json2Vec3(lightJson["direction"]);
     light.type = LightTypeDirectional;
   } else {
-    // TODO
+    LOG_ERROR("{}: unrecognized light type [{}]", "Loader", lightJson["type"]);
     exit(1);
   }
 
@@ -283,8 +289,8 @@ void Loader::addTexture(const nlohmann::json& textureJson) {
   std::string textureName = textureJson["name"];
   auto texturePath = nvh::findFile(textureJson["path"], {m_sceneFileDir}, true);
   if (texturePath.empty()) {
-    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
-         std::string(textureJson["path"]).c_str());
+    LOG_ERROR("{}: failed to load texture from file [{%s}]", "Loader",
+              textureJson["path"]);
     exit(1);
   }
   float gamma = defaultSceneOptions["textures"]["gamma"];
@@ -369,7 +375,7 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
     material.tangentTextureId =
         m_pScene->getTextureId(materialJson["tangent_texture"]);
   } else {
-    // TODO
+    LOG_ERROR("{}: unrecognized material type [{}]", "Loader", materialJson["type"]);
     exit(1);
   }
 
@@ -381,7 +387,8 @@ void Loader::addMesh(const nlohmann::json& meshJson) {
   std::string meshName = meshJson["name"];
   auto meshPath = nvh::findFile(meshJson["path"], {m_sceneFileDir}, true);
   if (meshPath.empty()) {
-    // TODO: LOGE
+    LOG_ERROR("{}: failed to load mesh from file [{}]", "Loader",
+              meshPath);
     exit(1);
   }
   bool recomputeNormal = false;
@@ -416,7 +423,8 @@ void Loader::addInstance(const nlohmann::json& instanceJson) {
       } else if (singleton["type"] == "rotz") {
         t = nvmath::rotation_mat4_z(float(singleton["value"]));
       } else {
-        // TODO
+        LOG_ERROR("{}: unrecognized toworld singleton type [{}]", "Loader",
+                  singleton["type"]);
         exit(1);
       }
       transform = t * transform;
@@ -441,6 +449,10 @@ void Loader::addShot(const nlohmann::json& shotJson) {
     // ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 =
     // -ext.a03; ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22,
     // ext.a23 = -ext.a23;
+  } else {
+    LOG_ERROR("{}: unrecognized shot type [{}]", "Loader",
+              shotJson["type"]);
+    exit(1);
   }
   CameraShot shot;
   shot.ext = ext;
@@ -462,8 +474,8 @@ void Loader::addEnvMap(const nlohmann::json& envmapJson) {
   JsonCheckKeys(envmapJson, {"path"});
   auto texturePath = nvh::findFile(envmapJson["path"], {m_sceneFileDir}, true);
   if (texturePath.empty()) {
-    LOGE("[x] %-20s: failed to load texture from %s\n", "Scene Error",
-         std::string(envmapJson["path"]).c_str());
+    LOG_ERROR("{}: failed to load envmap from file [{%s}]", "Loader",
+              envmapJson["path"]);
     exit(1);
   }
   m_pScene->addEnvMap(texturePath);
