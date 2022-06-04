@@ -14,7 +14,8 @@
 class Mesh {
 public:
   Mesh(Primitive& prim);
-  Mesh(const std::string& meshPath, bool recomputeNormal = false);
+  Mesh(const std::string& meshPath, bool recomputeNormal = false,
+       vec2 uvScale = {1.f, 1.f});
   uint getVerticesNum() { return m_vertices.size(); }
   uint getIndicesNum() { return m_indices.size(); }
   const vector<GpuVertex>& getVertices() { return m_vertices; }

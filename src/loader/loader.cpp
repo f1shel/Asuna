@@ -392,10 +392,13 @@ void Loader::addMesh(const nlohmann::json& meshJson) {
     exit(1);
   }
   bool recomputeNormal = false;
+  vec2 uvScale = {1.f, 1.f};
   if (meshJson.contains("recompute_normal"))
     recomputeNormal = meshJson["recompute_normal"];
+  if (meshJson.contains("uv_scale"))
+    uvScale = Json2Vec2(meshJson["uv_scale"]);
 
-  m_pScene->addMesh(meshName, meshPath, recomputeNormal);
+  m_pScene->addMesh(meshName, meshPath, recomputeNormal, uvScale);
 }
 
 void Loader::addInstance(const nlohmann::json& instanceJson) {
@@ -415,13 +418,13 @@ void Loader::addInstance(const nlohmann::json& instanceJson) {
       } else if (singleton["type"] == "translate") {
         t.set_translation(Json2Vec3(singleton["value"]));
       } else if (singleton["type"] == "scale") {
-        t.set_scale(Json2Vec3(singleton["scale"]));
+        t.set_scale(Json2Vec3(singleton["value"]));
       } else if (singleton["type"] == "rotx") {
-        t = nvmath::rotation_mat4_x(float(singleton["value"]));
+        t = nvmath::rotation_mat4_x(nv_to_rad * float(singleton["value"]));
       } else if (singleton["type"] == "roty") {
-        t = nvmath::rotation_mat4_y(float(singleton["value"]));
+        t = nvmath::rotation_mat4_y(nv_to_rad * float(singleton["value"]));
       } else if (singleton["type"] == "rotz") {
-        t = nvmath::rotation_mat4_z(float(singleton["value"]));
+        t = nvmath::rotation_mat4_z(nv_to_rad * float(singleton["value"]));
       } else {
         LOG_ERROR("{}: unrecognized toworld singleton type [{}]", "Loader",
                   singleton["type"]);

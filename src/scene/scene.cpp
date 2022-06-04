@@ -267,8 +267,8 @@ void Scene::addMaterial(const std::string& materialName,
 }
 
 void Scene::addMesh(const std::string& meshName, const std::string& meshPath,
-                    bool recomputeNormal) {
-  Mesh* pMesh = new Mesh(meshPath, recomputeNormal);
+                    bool recomputeNormal, vec2 uvScale) {
+  Mesh* pMesh = new Mesh(meshPath, recomputeNormal, uvScale);
   m_pMeshes[meshName] = std::make_pair(pMesh, m_pMeshes.size());
 }
 
@@ -280,18 +280,6 @@ void Scene::addInstance(const nvmath::mat4f& transform,
 }
 
 void Scene::addShot(const CameraShot& shot) { m_shots.emplace_back(shot); }
-
-// void Scene::addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat,
-// const nvmath::vec3f& up)
-//{
-//   m_shots.emplace_back(CameraShot{lookat, eye, up, nvmath::mat4f_zero});
-// }
-//
-// void Scene::addShot(const mat4& ext)
-//{
-//   vec3 zero{0.f};
-//   m_shots.emplace_back(CameraShot{zero, zero, zero, ext});
-// }
 
 int Scene::getMeshId(const std::string& meshName) {
   if (m_pMeshes.count(meshName))

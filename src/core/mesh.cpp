@@ -34,7 +34,7 @@ Mesh::Mesh(Primitive& prim) {
   }
 }
 
-Mesh::Mesh(const std::string& meshPath, bool recomputeNormal) {
+Mesh::Mesh(const std::string& meshPath, bool recomputeNormal, vec2 uvScale) {
   tinyobj::ObjReader reader;
   reader.ParseFromFile(meshPath);
   if (!reader.Valid()) {
@@ -69,6 +69,8 @@ Mesh::Mesh(const std::string& meshPath, bool recomputeNormal) {
       if (!attrib.texcoords.empty() && index.texcoord_index >= 0) {
         const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
         vertex.uv = {*tp, 1.0f - *(tp + 1)};
+        vertex.uv.x *= uvScale.x;
+        vertex.uv.y *= uvScale.y;
       }
 
       m_vertices.push_back(vertex);

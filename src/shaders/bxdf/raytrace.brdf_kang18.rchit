@@ -61,6 +61,7 @@ const float DIFFUSE_LOBE_PROBABILITY = 0.5;
 vec3 kangEval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 rhoDiff,
               vec3 rhoSpec, float ax, float ay, float metalness,
               out float pdf) {
+  vec3 f = vec3(0);
   pdf = 0.0;
 
   float NdotL = dot(N, L);
@@ -86,24 +87,29 @@ vec3 kangEval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 rhoDiff,
   vec3 lwo = makeNormal(toLocal(X, Y, N, V));
   vec3 lwi = makeNormal(toLocal(X, Y, N, L));
 
-  float r = rand(payload.seed);
-  if (r < DIFFUSE_LOBE_PROBABILITY) {
-    pdf = cosineHemispherePdf(lwi.z);
-    return diffuse;
-  } else {
-    pdf = importanceAnisoGGXPdf(lwh, lwo, ax, ay);
-    return specular;
-  }
+  f += diffuse;
+  pdf += DIFFUSE_LOBE_PROBABILITY * cosineHemispherePdf(lwi.z);
 
-  return diffuse + specular;
+  f += specular;
+  pdf += (1 - DIFFUSE_LOBE_PROBABILITY) * importanceAnisoGGXPdf(lwh, lwo, ax, ay);
+
+  return f;
 }
 
-vec3 kangSample(vec3 lwo, float ax, float ay) {
+vec3 kangSample(vec3 lwo, float ax, float ay, out float pdf) {
+  vec3 lwi;
   float r = rand(payload.seed);
-  if (r < DIFFUSE_LOBE_PROBABILITY)
-    return cosineSampleHemisphere(rand2(payload.seed));
-  else
-    return importanceSampleAnisoGGX(lwo, ax, ay);
+  pdf = 0.0;
+  if (r < DIFFUSE_LOBE_PROBABILITY) {
+    lwi = cosineSampleHemisphere(rand2(payload.seed));
+    pdf = cosineHemispherePdf(lwi.z);
+  }
+  else {
+    lwi = importanceSampleAnisoGGX(lwo, ax, ay);
+    vec3 lwh = makeNormal(lwi + lwo);
+    pdf = importanceAnisoGGXPdf(lwh, lwo, ax, ay);
+  }
+  return lwi;
 }
 
 void main() {
@@ -115,7 +121,7 @@ void main() {
     state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
   if (state.mat.metalnessTextureId >= 0)
     state.mat.rhoSpec =
-        0.1 * textureEval(state.mat.metalnessTextureId, state.uv).rgb;
+        textureEval(state.mat.metalnessTextureId, state.uv).rgb;
   if (state.mat.roughnessTextureId >= 0)
     state.mat.anisoAlpha =
         textureEval(state.mat.roughnessTextureId, state.uv).rg;
@@ -228,11 +234,12 @@ void main() {
   // Shading frame, local tangent space
   vec3 lwo = makeNormal(
       toLocal(state.tangent, state.bitangent, state.ffnormal, state.viewDir));
-  bsdfSample.direction = kangSample(lwo, ax, ay);
+  bsdfSample.direction = kangSample(lwo, ax, ay, bsdfSample.pdf);
+  float tmpPdf;
   vec3 bsdfVal =
       kangEval(bsdfSample.direction, state.viewDir, state.ffnormal,
                state.tangent, state.bitangent, state.mat.diffuse,
-               state.mat.rhoSpec, ax, ay, state.mat.metalness, bsdfSample.pdf);
+               state.mat.rhoSpec, ax, ay, state.mat.metalness, tmpPdf);
 
   // World space
   bsdfSample.direction = toWorld(state.tangent, state.bitangent, state.ffnormal,

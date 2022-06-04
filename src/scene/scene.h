@@ -29,8 +29,6 @@ public:
 
 public:
   void addState(const State& piplineState);
-  // void addIntegrator(int spp, int maxRecur, ToneMappingType tmType, uint
-  // useFaceNormal, uint ignoreEmissive, vec3 bgColor);
   void addCamera(VkExtent2D filmResolution, float fov, float focalDist,
                  float aperture);                            // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);  // opencv
@@ -41,12 +39,10 @@ public:
   void addMaterial(const std::string& materialName,
                    const GpuMaterial& material);
   void addMesh(const std::string& meshName, const std::string& meshPath,
-               bool recomputeNormal);
+               bool recomputeNormal, vec2 uvScale);
   void addInstance(const nvmath::mat4f& transform, const std::string& meshName,
                    const std::string& materialName);
   void addShot(const CameraShot& shot);
-  // void addShot(const nvmath::vec3f& eye, const nvmath::vec3f& lookat, const
-  // nvmath::vec3f& up); void addShot(const mat4& ext);
 
 public:
   int getMeshId(const std::string& meshName);
