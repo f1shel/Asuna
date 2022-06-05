@@ -169,6 +169,25 @@ void ContextAware::createParallelQueues() {
   m_parallelQueues.push_back(m_vkcontext.m_queueT);
 }
 
+void ContextAware::createSwapchain(const VkSurfaceKHR& surface, uint32_t width,
+                                   uint32_t height, VkFormat colorFormat,
+                                   VkFormat depthFormat, bool vsync) {
+  AppBaseVk::createSwapchain(surface, width, height, colorFormat, depthFormat,
+                             vsync);
+
+  std::vector<VkCommandBuffer> commandBuffers(m_swapChain.getImageCount());
+  VkCommandBufferAllocateInfo allocateInfo{
+      VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  allocateInfo.commandPool = m_cmdPool;
+  allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocateInfo.commandBufferCount = m_swapChain.getImageCount();
+
+  VkResult result =
+      vkAllocateCommandBuffers(m_device, &allocateInfo, commandBuffers.data());
+  m_commandBuffers.insert(m_commandBuffers.end(), commandBuffers.begin(),
+                          commandBuffers.end());
+}
+
 bool ContextAware::shouldGlfwCloseWindow() {
   return glfwWindowShouldClose(m_window);
 }
@@ -250,6 +269,30 @@ void ContextAware::initializeVulkan() {
   validationInfo.enabledValidationFeatureCount = 1;
   validationInfo.pEnabledValidationFeatures = &validationFeatureToEnable;
   m_contextInfo.instanceCreateInfoExt = &validationInfo;
+
+  // Semaphores - interop Vulkan/Cuda
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
+#ifdef WIN32
+  m_contextInfo.addDeviceExtension(
+      VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME);
+#else
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME);
+#endif
+
+  // Buffer - interop
+  m_contextInfo.addDeviceExtension(
+      VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+  m_contextInfo.addDeviceExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+
+  // Synchronization (mix of timeline and binary semaphores)
+  m_contextInfo.addDeviceExtension(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+                                   false);
+
 #ifdef _WIN32
   _putenv_s("DEBUG_PRINTF_TO_STDOUT", "1");
 #else  // If not _WIN32

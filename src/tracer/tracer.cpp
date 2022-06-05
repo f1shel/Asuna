@@ -18,15 +18,34 @@ void Tracer::init(TracerInitSettings tis) {
 
   // Get film size and set size for context
   auto filmResolution =
-      Loader().loadSizeFirst(m_tis.scenefile, m_context.getRoot());
-  m_context.setSize(filmResolution);
+      Loader().loadSizeFirst(m_tis.scenefile, ContextAware::getRoot());
+  ContextAware::setSize(filmResolution);
   if (tis.sceneSpp != 0) m_scene.setSpp(tis.sceneSpp);
 
   // Initialize context and set context pointer for scene
-  m_context.init({m_tis.offline});
-  m_scene.init(&m_context);
+  ContextAware::init({m_tis.offline});
+  m_scene.init(reinterpret_cast<ContextAware*>(this));
 
-  if (m_context.getOfflineMode())
+#ifdef NVP_SUPPORTS_OPTIX7
+  m_denoiser.init(reinterpret_cast<ContextAware*>(this));
+
+  OptixDenoiserOptions dOptions;
+  dOptions.guideAlbedo = true;
+  dOptions.guideNormal = true;
+  m_denoiser.initOptiX(dOptions, OPTIX_PIXEL_FORMAT_FLOAT4, true);
+#endif               // NVP_SUPPORTS_OPTIX7
+  createGbuffers();  // #OPTIX_D
+  // #OPTIX_D
+#ifdef NVP_SUPPORTS_OPTIX7
+  {  // Denoiser
+    m_denoiser.allocateBuffers(m_size);
+    m_denoiser.createSemaphore();
+    m_denoiser.createCopyPipeline();
+    LOG_INFO("{}: creation done", "Denoiser");
+  }
+#endif  // NVP_SUPPORTS_OPTIX7
+
+  if (ContextAware::getOfflineMode())
     parallelLoading();
   else {
     m_busy = true;
@@ -39,7 +58,7 @@ void Tracer::init(TracerInitSettings tis) {
 }
 
 void Tracer::run() {
-  if (m_context.getOfflineMode())
+  if (ContextAware::getOfflineMode())
     runOffline();
   else
     runOnline();
@@ -50,7 +69,7 @@ void Tracer::deinit() {
   m_pipelineRaytrace.deinit();
   m_pipelinePost.deinit();
   m_scene.deinit();
-  m_context.deinit();
+  ContextAware::deinit();
 }
 
 void Tracer::runOnline() {
@@ -59,74 +78,97 @@ void Tracer::runOnline() {
   clearValues[1].depthStencil = {1.0f, 0};
 
   // Main loop
-  while (!m_context.shouldGlfwCloseWindow()) {
+  while (!ContextAware::shouldGlfwCloseWindow()) {
     glfwPollEvents();
-    if (m_context.isMinimized()) continue;
+    if (ContextAware::isMinimized()) continue;
 
     // Start the Dear ImGui frame
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    renderGUI();
+
     // Acquire swap chain
-    m_context.prepareFrame();
+    ContextAware::prepareFrame();
 
     // Start command buffer of this frame
-    uint32_t curFrame = m_context.getCurFrame();
-    const VkCommandBuffer& cmdBuf = m_context.getCommandBuffers()[curFrame];
+    uint32_t curFrame = ContextAware::getCurFrame();
+
+    // Two command buffer in a frame, before and after denoiser
+    const VkCommandBuffer& cmdBuf1 =
+        ContextAware::getCommandBuffers()[2 * curFrame + 0];
+    const VkCommandBuffer& cmdBuf2 =
+        ContextAware::getCommandBuffers()[2 * curFrame + 1];
+
     VkCommandBufferBeginInfo beginInfo = nvvk::make<VkCommandBufferBeginInfo>();
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     {
-      vkBeginCommandBuffer(cmdBuf, &beginInfo);
-
-      renderGUI();
-
       do {
         if (m_busy) break;
+        setImageToDisplay();
+        vkBeginCommandBuffer(cmdBuf1, &beginInfo);
 
         // For procedural rendering
         m_pipelineRaytrace.setSpp(1);
 
         // Update camera and sunsky
-        m_pipelineGraphics.run(cmdBuf);
+        m_pipelineGraphics.run(cmdBuf1);
 
         // Ray tracing
-        m_pipelineRaytrace.run(cmdBuf);
+        m_pipelineRaytrace.run(cmdBuf1);
+
+        copyImagesToCuda(cmdBuf1);
+
+        vkEndCommandBuffer(cmdBuf1);
+        submitWithTLSemaphore(cmdBuf1);
+
       } while (0);
 
-      // Post processing
-      {
-        VkRenderPassBeginInfo postRenderPassBeginInfo{
-            VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-        postRenderPassBeginInfo.clearValueCount = 2;
-        postRenderPassBeginInfo.pClearValues = clearValues.data();
-        postRenderPassBeginInfo.renderPass = m_context.getRenderPass();
-        postRenderPassBeginInfo.framebuffer =
-            m_context.getFramebuffer(curFrame);
-        postRenderPassBeginInfo.renderArea = {{0, 0}, m_context.getSize()};
+      // ---- Cuda part --
+      denoise();
+      // ----
 
-        // Rendering to the swapchain framebuffer the rendered image and
-        // apply a tonemapper
-        vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
-                             VK_SUBPASS_CONTENTS_INLINE);
+      do {
+        vkBeginCommandBuffer(cmdBuf2, &beginInfo);
+        copyCudaImagesToVulkan(cmdBuf2);
 
-        if (!m_busy) m_pipelinePost.run(cmdBuf);
+        // Post processing
+        {
+          VkRenderPassBeginInfo postRenderPassBeginInfo{
+              VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+          postRenderPassBeginInfo.clearValueCount = 2;
+          postRenderPassBeginInfo.pClearValues = clearValues.data();
+          postRenderPassBeginInfo.renderPass = ContextAware::getRenderPass();
+          postRenderPassBeginInfo.framebuffer =
+              ContextAware::getFramebuffer(curFrame);
+          postRenderPassBeginInfo.renderArea = {{0, 0},
+                                                ContextAware::getSize()};
 
-        // Rendering UI
-        ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
+          // Rendering to the swapchain framebuffer the rendered image and
+          // apply a tonemapper
+          vkCmdBeginRenderPass(cmdBuf2, &postRenderPassBeginInfo,
+                               VK_SUBPASS_CONTENTS_INLINE);
 
-        // Display axis in the lower left corner.
-        // vkAxis.display(cmdBuf, CameraManip.getMatrix(),
-        // vkSample.getSize());
+          if (!m_busy) m_pipelinePost.run(cmdBuf2);
 
-        vkCmdEndRenderPass(cmdBuf);
-      }
+          // Rendering UI
+          ImGui::Render();
+          ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf2);
+
+          // Display axis in the lower left corner.
+          // vkAxis.display(cmdBuf, CameraManip.getMatrix(),
+          // vkSample.getSize());
+
+          vkCmdEndRenderPass(cmdBuf2);
+        }
+        vkEndCommandBuffer(cmdBuf2);
+      } while (0);
     }
-    vkEndCommandBuffer(cmdBuf);
-    m_context.submitFrame();
+
+    submitFrame(cmdBuf2);
   }
-  vkDeviceWaitIdle(m_context.getDevice());
+  vkDeviceWaitIdle(ContextAware::getDevice());
 }
 
 void Tracer::runOffline() {
@@ -135,8 +177,8 @@ void Tracer::runOffline() {
   clearValues[1].depthStencil = {1.0f, 0};
 
   // Vulkan allocator and image size
-  auto& m_alloc = m_context.getAlloc();
-  auto m_size = m_context.getSize();
+  auto& m_alloc = ContextAware::getAlloc();
+  auto m_size = ContextAware::getSize();
 
   // Create a temporary buffer to hold the output pixels of the image
   VkBufferUsageFlags usage{VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -145,8 +187,8 @@ void Tracer::runOffline() {
   nvvk::Buffer pixelBuffer = m_alloc.createBuffer(
       bufferSize, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-  nvvk::CommandPool genCmdBuf(m_context.getDevice(),
-                              m_context.getQueueFamily());
+  nvvk::CommandPool genCmdBuf(ContextAware::getDevice(),
+                              ContextAware::getQueueFamily());
 
   // Multi-view rendering
   int shotsNum = m_scene.getShotsNum();
@@ -181,9 +223,9 @@ void Tracer::runOffline() {
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
         postRenderPassBeginInfo.clearValueCount = 2;
         postRenderPassBeginInfo.pClearValues = clearValues.data();
-        postRenderPassBeginInfo.renderPass = m_context.getRenderPass();
-        postRenderPassBeginInfo.framebuffer = m_context.getFramebuffer();
-        postRenderPassBeginInfo.renderArea = {{0, 0}, m_context.getSize()};
+        postRenderPassBeginInfo.renderPass = ContextAware::getRenderPass();
+        postRenderPassBeginInfo.framebuffer = ContextAware::getFramebuffer();
+        postRenderPassBeginInfo.renderArea = {{0, 0}, ContextAware::getSize()};
         vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
                              VK_SUBPASS_CONTENTS_INLINE);
         m_pipelinePost.run(cmdBuf);
@@ -192,7 +234,7 @@ void Tracer::runOffline() {
       genCmdBuf.submitAndWait(cmdBuf);
     }
     bar.finish();
-    vkDeviceWaitIdle(m_context.getDevice());
+    vkDeviceWaitIdle(ContextAware::getDevice());
 
     // Save image
     static char outputName[50];
@@ -207,27 +249,28 @@ void Tracer::runOffline() {
 
 void Tracer::parallelLoading() {
   // Load resources into scene
-  Loader().loadSceneFromJson(m_tis.scenefile, m_context.getRoot(), &m_scene);
+  Loader().loadSceneFromJson(m_tis.scenefile, ContextAware::getRoot(),
+                             &m_scene);
 
   // Create graphics pipeline
-  m_pipelineGraphics.init(&m_context, &m_scene);
+  m_pipelineGraphics.init(reinterpret_cast<ContextAware*>(this), &m_scene);
 
   // Raytrace pipeline use some resources from graphics pipeline
   PipelineRaytraceInitSetting pis;
   pis.pDswOut = &m_pipelineGraphics.getOutDescriptorSet();
   pis.pDswEnv = &m_pipelineGraphics.getEnvDescriptorSet();
   pis.pDswScene = &m_pipelineGraphics.getSceneDescriptorSet();
-  m_pipelineRaytrace.init(&m_context, &m_scene, pis);
+  m_pipelineRaytrace.init(reinterpret_cast<ContextAware*>(this), &m_scene, pis);
 
   // Post pipeline processes hdr output
-  m_pipelinePost.init(&m_context, &m_scene,
+  m_pipelinePost.init(reinterpret_cast<ContextAware*>(this), &m_scene,
                       &m_pipelineGraphics.getHdrOutImageInfo());
 }
 
 void Tracer::vkTextureToBuffer(const nvvk::Texture& imgIn,
                                const VkBuffer& pixelBufferOut) {
-  nvvk::CommandPool genCmdBuf(m_context.getDevice(),
-                              m_context.getQueueFamily());
+  nvvk::CommandPool genCmdBuf(ContextAware::getDevice(),
+                              ContextAware::getQueueFamily());
   VkCommandBuffer cmdBuf = genCmdBuf.createCommandBuffer();
 
   // Make the image layout eTransferSrcOptimal to copy to buffer
@@ -238,12 +281,12 @@ void Tracer::vkTextureToBuffer(const nvvk::Texture& imgIn,
   // Copy the image to the buffer
   VkBufferImageCopy copyRegion;
   copyRegion.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-  copyRegion.imageExtent = {m_context.getSize().width,
-                            m_context.getSize().height, 1};
+  copyRegion.imageExtent = {ContextAware::getSize().width,
+                            ContextAware::getSize().height, 1};
   copyRegion.imageOffset = {0};
   copyRegion.bufferOffset = 0;
-  copyRegion.bufferImageHeight = m_context.getSize().height;
-  copyRegion.bufferRowLength = m_context.getSize().width;
+  copyRegion.bufferImageHeight = ContextAware::getSize().height;
+  copyRegion.bufferRowLength = ContextAware::getSize().width;
   vkCmdCopyImageToBuffer(cmdBuf, imgIn.image,
                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pixelBufferOut,
                          1, &copyRegion);
@@ -261,12 +304,12 @@ void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
   bool isRelativePath = fp.is_relative();
   if (isRelativePath) outputpath = NVPSystem::exePath() + outputpath;
 
-  auto& m_alloc = m_context.getAlloc();
-  auto m_size = m_context.getSize();
+  auto& m_alloc = ContextAware::getAlloc();
+  auto m_size = ContextAware::getSize();
 
   // Default framebuffer color after post processing
   if (channelId == -1)
-    vkTextureToBuffer(m_context.getOfflineColor(), pixelBuffer.buffer);
+    vkTextureToBuffer(ContextAware::getOfflineColor(), pixelBuffer.buffer);
   // Hdr channel before post processing
   else
     vkTextureToBuffer(m_pipelineGraphics.getColorTexture(channelId),
@@ -279,39 +322,180 @@ void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
   m_alloc.unmap(pixelBuffer);
 }
 
-void Tracer::renderGUI() {
-  static bool showGui = true;
+void Tracer::submitWithTLSemaphore(const VkCommandBuffer& cmdBuf) {
+  // Increment for signaling
+  m_fenceValue++;
 
-  if (m_busy) {
-    guiBusy();
-    return;
+  VkCommandBufferSubmitInfoKHR cmdBufInfo{
+      VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR};
+  cmdBufInfo.commandBuffer = cmdBuf;
+
+  VkSemaphoreSubmitInfoKHR waitSemaphore{
+      VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR};
+  waitSemaphore.semaphore = m_swapChain.getActiveReadSemaphore();
+  waitSemaphore.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
+
+#ifdef NVP_SUPPORTS_OPTIX7
+  VkSemaphoreSubmitInfoKHR signalSemaphore{
+      VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR};
+  signalSemaphore.semaphore = m_denoiser.getTLSemaphore();
+  signalSemaphore.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR;
+  signalSemaphore.value = m_fenceValue;
+#endif  // NVP_SUPPORTS_OPTIX7
+
+  VkSubmitInfo2KHR submits{VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR};
+  submits.commandBufferInfoCount = 1;
+  submits.pCommandBufferInfos = &cmdBufInfo;
+  submits.waitSemaphoreInfoCount = 1;
+  submits.pWaitSemaphoreInfos = &waitSemaphore;
+#ifdef NVP_SUPPORTS_OPTIX7
+  submits.signalSemaphoreInfoCount = 1;
+  submits.pSignalSemaphoreInfos = &signalSemaphore;
+#endif  // _DEBUG
+
+  vkQueueSubmit2(m_queue, 1, &submits, {});
+}
+
+void Tracer::submitFrame(const VkCommandBuffer& cmdBuf) {
+  uint32_t imageIndex = m_swapChain.getActiveImageIndex();
+  VkFence fence = m_waitFences[imageIndex];
+  vkResetFences(m_device, 1, &fence);
+
+  VkCommandBufferSubmitInfoKHR cmdBufInfo{
+      VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR};
+  cmdBufInfo.commandBuffer = cmdBuf;
+
+#ifdef NVP_SUPPORTS_OPTIX7
+  VkSemaphoreSubmitInfoKHR waitSemaphore{
+      VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR};
+  waitSemaphore.semaphore = m_denoiser.getTLSemaphore();
+  waitSemaphore.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR;
+  waitSemaphore.value = m_fenceValue;
+#endif  // NVP_SUPPORTS_OPTIX7
+
+  VkSemaphoreSubmitInfoKHR signalSemaphore{
+      VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR};
+  signalSemaphore.semaphore = m_swapChain.getActiveWrittenSemaphore();
+  signalSemaphore.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR;
+
+  VkSubmitInfo2KHR submits{VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR};
+  submits.commandBufferInfoCount = 1;
+  submits.pCommandBufferInfos = &cmdBufInfo;
+#ifdef NVP_SUPPORTS_OPTIX7
+  submits.waitSemaphoreInfoCount = 1;
+  submits.pWaitSemaphoreInfos = &waitSemaphore;
+#endif  // NVP_SUPPORTS_OPTIX7
+  submits.signalSemaphoreInfoCount = 1;
+  submits.pSignalSemaphoreInfos = &signalSemaphore;
+
+  vkQueueSubmit2(m_queue, 1, &submits, fence);
+
+  // Presenting frame
+  m_swapChain.present(m_queue);
+}
+
+void Tracer::createGbuffers() {
+  auto& m_alloc = ContextAware::getAlloc();
+  auto& m_debug = ContextAware::getDebug();
+
+  m_alloc.destroy(m_gAlbedo);
+  m_alloc.destroy(m_gNormal);
+  m_alloc.destroy(m_gDenoised);
+
+  VkImageUsageFlags usage{VK_IMAGE_USAGE_SAMPLED_BIT |
+                          VK_IMAGE_USAGE_STORAGE_BIT};
+  VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+  {  // Albedo RGBA8
+    auto colorCreateInfo =
+        nvvk::makeImage2DCreateInfo(m_size, VK_FORMAT_R8G8B8A8_UNORM, usage);
+    nvvk::Image image = m_alloc.createImage(colorCreateInfo);
+    VkImageViewCreateInfo ivInfo =
+        nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
+    m_gAlbedo = m_alloc.createTexture(image, ivInfo, sampler);
+    m_gAlbedo.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    NAME_VK(m_gAlbedo.image);
   }
 
-  if (ImGui::IsKeyPressed(ImGuiKey_H)) showGui = !showGui;
-  if (!showGui) return;
+  {  // Normal RGBA8
+    auto colorCreateInfo =
+        nvvk::makeImage2DCreateInfo(m_size, VK_FORMAT_R8G8B8A8_UNORM, usage);
+    nvvk::Image image = m_alloc.createImage(colorCreateInfo);
+    VkImageViewCreateInfo ivInfo =
+        nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
+    m_gNormal = m_alloc.createTexture(image, ivInfo, sampler);
+    m_gNormal.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    NAME_VK(m_gNormal.image);
+  }
 
-  // Show UI panel window.
-  float panelAlpha = 1.0f;
-  ImGuiH::Control::style.ctrlPerc = 0.55f;
-  ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
+  {  // Denoised RGBA32
+    auto colorCreateInfo = nvvk::makeImage2DCreateInfo(
+        m_size, VK_FORMAT_R32G32B32A32_SFLOAT, usage);
+    nvvk::Image image = m_alloc.createImage(colorCreateInfo);
+    VkImageViewCreateInfo ivInfo =
+        nvvk::makeImageViewCreateInfo(image.image, colorCreateInfo);
+    m_gDenoised = m_alloc.createTexture(image, ivInfo, sampler);
+    m_gDenoised.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    NAME_VK(m_gDenoised.image);
+  }
 
-  bool changed{false};
+  // Setting the image layout  to general
+  {
+    nvvk::CommandPool genCmdBuf(m_device, m_graphicsQueueIndex);
+    auto cmdBuf = genCmdBuf.createCommandBuffer();
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gAlbedo.image,
+                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_GENERAL);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gNormal.image,
+                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_GENERAL);
+    nvvk::cmdBarrierImageLayout(cmdBuf, m_gDenoised.image,
+                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_GENERAL);
+    genCmdBuf.submitAndWait(cmdBuf);
+  }
+}
 
-  if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-    changed |= guiCamera();
-  if (ImGui::CollapsingHeader(
-          "Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-    changed |= guiEnvironment();
-  if (ImGui::CollapsingHeader(
-          "PathTracer" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-    changed |= guiPathTracer();
-  if (ImGui::CollapsingHeader(
-          "Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
-    changed |= guiTonemapper();
+void Tracer::denoise() {
+  if (needToDenoise()) {
+#ifdef NVP_SUPPORTS_OPTIX7
+    m_denoiser.denoiseImageBuffer(m_fenceValue);
+#endif  // NVP_SUPPORTS_OPTIX7
+  }
+}
 
-  ImGui::End();  // ImGui::Panel::end()
+void Tracer::setImageToDisplay() {
+  auto curFrame = m_scene.getPipelineState().rtxState.curFrame;
+  bool showDenoised = m_denoiseApply && (curFrame >= m_denoiseEveryNFrames ||
+                                         m_denoiseFirstFrame);
+  m_pipelinePost.updatePostDescriptorSet(
+      showDenoised ? &m_gDenoised.descriptor
+                   : &m_pipelineGraphics.getHdrOutImageInfo());
+}
 
-  if (changed) {
-    m_pipelineRaytrace.resetFrame();
+bool Tracer::needToDenoise() {
+  if (m_denoiseApply && !m_busy) {
+    auto curFrame = m_scene.getPipelineState().rtxState.curFrame;
+    if (m_denoiseFirstFrame && curFrame == 0) return true;
+    if (curFrame % m_denoiseEveryNFrames == 0) return true;
+  }
+  return false;
+}
+
+void Tracer::copyImagesToCuda(const VkCommandBuffer& cmdBuf) {
+  if (needToDenoise()) {
+#ifdef NVP_SUPPORTS_OPTIX7
+    m_denoiser.imageToBuffer(cmdBuf, {m_pipelineGraphics.getColorTexture(0),
+                                      m_pipelineGraphics.getColorTexture(1),
+                                      m_pipelineGraphics.getColorTexture(2)});
+#endif  // NVP_SUPPORTS_OPTIX7
+  }
+}
+
+void Tracer::copyCudaImagesToVulkan(const VkCommandBuffer& cmdBuf) {
+  if (needToDenoise()) {
+#ifdef NVP_SUPPORTS_OPTIX7
+    m_denoiser.bufferToImage(cmdBuf, &m_gDenoised);
+#endif  // NVP_SUPPORTS_OPTIX7
   }
 }

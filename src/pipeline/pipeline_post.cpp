@@ -59,17 +59,19 @@ void PipelinePost::initPushconstant()
 void PipelinePost::createPostDescriptorSetLayout() {
   auto m_device = m_pContext->getDevice();
 
-  auto& inputWrap = m_holdSetWrappers[uint(HoldSet::Input)];
-  auto& inputBind = inputWrap.getDescriptorSetBindings();
-  auto& inputPool = inputWrap.getDescriptorPool();
-  auto& inputSet = inputWrap.getDescriptorSet();
-  auto& inputLayout = inputWrap.getDescriptorSetLayout();
-  inputBind.addBinding(InputBindings::InputSampler,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
-                       VK_SHADER_STAGE_FRAGMENT_BIT);
-  inputLayout = inputBind.createLayout(m_device);
-  inputPool = inputBind.createPool(m_device);
-  inputSet = nvvk::allocateDescriptorSet(m_device, inputPool, inputLayout);
+  for (uint idx = 0; idx < uint(HoldSet::Num); idx++) {
+    auto& inputWrap = m_holdSetWrappers[idx];
+    auto& inputBind = inputWrap.getDescriptorSetBindings();
+    auto& inputPool = inputWrap.getDescriptorPool();
+    auto& inputSet = inputWrap.getDescriptorSet();
+    auto& inputLayout = inputWrap.getDescriptorSetLayout();
+    inputBind.addBinding(InputBindings::InputSampler,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                         VK_SHADER_STAGE_FRAGMENT_BIT);
+    inputLayout = inputBind.createLayout(m_device);
+    inputPool = inputBind.createPool(m_device);
+    inputSet = nvvk::allocateDescriptorSet(m_device, inputPool, inputLayout);
+  }
 }
 
 void PipelinePost::createPostPipeline() {
@@ -110,7 +112,8 @@ void PipelinePost::updatePostDescriptorSet(
     const VkDescriptorImageInfo* pImageInfo) {
   auto m_device = m_pContext->getDevice();
 
-  auto& inputWrap = m_holdSetWrappers[uint(HoldSet::Input)];
+  m_postFrame = (m_postFrame + 1) % uint(HoldSet::Num);
+  auto& inputWrap = m_holdSetWrappers[m_postFrame];
   auto& inputBind = inputWrap.getDescriptorSetBindings();
   auto& inputPool = inputWrap.getDescriptorPool();
   auto& inputSet = inputWrap.getDescriptorSet();
@@ -123,4 +126,6 @@ void PipelinePost::updatePostDescriptorSet(
   wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   wds.pImageInfo = pImageInfo;
   vkUpdateDescriptorSets(m_device, 1, &wds, 0, nullptr);
+
+  bind(PostBindSet::PostInput, {&m_holdSetWrappers[m_postFrame]});
 }

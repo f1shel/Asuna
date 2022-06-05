@@ -4,6 +4,13 @@ set_property(
     PROPERTY VS_STARTUP_PROJECT
     asuna)
 project(asuna)
+if(WIN32 AND NOT GLUT_FOUND)
+  add_definitions(/wd4996) #remove printf warning
+  add_definitions(/wd4244) #remove double to float conversion warning
+  add_definitions(/wd4305) #remove double to float truncation warning
+else()
+  add_definitions(-fpermissive)
+endif()
 
 set(PROJNAME ${CMAKE_PROJECT_NAME})
 set(PROJ_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -55,7 +62,11 @@ endif()
 # Packages
 _add_package_VulkanSDK()
 _add_package_ImGUI()
-# _add_package_NVML()
+_add_package_Cuda()
+_add_package_Optix7()
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
 _add_nvpro_core_lib()
 
 #--------------------------------------------------------------------------------------------------
@@ -79,14 +90,18 @@ SET(ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
 
 ADD_SUBDIRECTORY(${THIRD_PARTY_DIR}/openexr)
 
-#--------------------------------------------------------------------------------------------------
-# SpdLog
-include_directories(${THIRD_PARTY_DIR}/spdlog/include)
-
 # For std::binary_function
 set_property(TARGET IlmImf-obj PROPERTY CXX_STANDARD 14)
 # Remove error exception warning
 set_property(TARGET Imath IlmImf PROPERTY CXX_STANDARD 14)
+
+#--------------------------------------------------------------------------------------------------
+# SpdLog
+target_include_directories(${PROJNAME} PRIVATE ${THIRD_PARTY_DIR}/spdlog/include)
+
+#--------------------------------------------------------------------------------------------------
+# OptiX
+target_include_directories(${PROJNAME} PRIVATE ${OPTIX_INCLUDE_DIR})
 
 INCLUDE_DIRECTORIES (
   ${THIRD_PARTY_DIR}/openexr/IlmBase/Imath
@@ -125,9 +140,9 @@ file(GLOB SRC_LOADER
     ${SOURCE_DIR}/loader/*.cpp)
 
 file(GLOB SRC_TRACER
-    ${SOURCE_DIR}/tracer/gui.cpp
-    ${SOURCE_DIR}/tracer/tracer.h
-    ${SOURCE_DIR}/tracer/tracer.cpp)
+    ${SOURCE_DIR}/tracer/*.cpp
+    ${SOURCE_DIR}/tracer/*.h
+    ${SOURCE_DIR}/tracer/*.hpp)
 
 file(GLOB SRC_CONTEXT
     ${SOURCE_DIR}/context/*.h
@@ -176,6 +191,7 @@ file(GLOB SRC_SHADERS_GRAPHICS
 file(GLOB SRC_SHADERS_POST
     ${SOURCE_DIR}/shaders/post.*.frag
     ${SOURCE_DIR}/shaders/post.*.vert
+    ${SOURCE_DIR}/shaders/post.*.comp
 )
 
 # file(GLOB SRC_3RDPARTY
@@ -243,7 +259,7 @@ compile_glsl(
     DST
         "${OUTPUT_PATH}/shaders"
     VULKAN_TARGET
-        "vulkan1.3"
+        "vulkan1.2"
     HEADER OFF
     DEPENDENCY ON
 )

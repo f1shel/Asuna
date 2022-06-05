@@ -5,6 +5,7 @@
 #include "pipeline/pipeline_post.h"
 #include "pipeline/pipeline_raytrace.h"
 #include "scene/scene.h"
+#include "denoiser.h"
 
 struct TracerInitSettings {
   bool offline = false;
@@ -13,7 +14,7 @@ struct TracerInitSettings {
   int sceneSpp = 0;
 };
 
-class Tracer {
+class Tracer : public ContextAware {
 public:
   void init(TracerInitSettings tis);
   void run();
@@ -21,7 +22,6 @@ public:
 
 private:
   TracerInitSettings m_tis;
-  ContextAware m_context;
   Scene m_scene;
   PipelineGraphics m_pipelineGraphics;
   PipelineRaytrace m_pipelineRaytrace;
@@ -49,5 +49,30 @@ private:
   bool guiEnvironment();
   bool guiTonemapper();
   bool guiPathTracer();
+  bool guiDenoiser();
   void guiBusy();
+
+private:
+  // #OPTIX_D
+#ifdef NVP_SUPPORTS_OPTIX7
+  DenoiserOptix m_denoiser;
+#endif  // NVP_SUPPORTS_OPTIX7
+  // Timeline semaphores
+  uint64_t m_fenceValue{0};
+  bool m_denoiseApply{true};
+  bool m_denoiseFirstFrame{false};
+  int m_denoiseEveryNFrames{100};
+  // #OPTIX_D
+  uint32_t m_postFrame{0};
+  nvvk::Texture m_gAlbedo;
+  nvvk::Texture m_gNormal;
+  nvvk::Texture m_gDenoised;
+  void submitWithTLSemaphore(const VkCommandBuffer& cmdBuf);
+  void submitFrame(const VkCommandBuffer& cmdBuf);
+  void createGbuffers();
+  void denoise();
+  void setImageToDisplay();
+  bool needToDenoise();
+  void copyImagesToCuda(const VkCommandBuffer& cmdBuf);
+  void copyCudaImagesToVulkan(const VkCommandBuffer& cmdBuf);
 };

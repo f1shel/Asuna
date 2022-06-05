@@ -79,6 +79,8 @@ void main() {
     payload.radiance = vec3(0.0);
     payload.throughput = vec3(1.0);
     payload.stop = false;
+    payload.denoiserAlbedo = vec3(0.0);
+    payload.denoiserNormal = vec3(0.0);
 
     for (payload.depth = 1; payload.depth <= pc.maxPathDepth; payload.depth++) {
       // Initialize direct light setting
@@ -114,9 +116,12 @@ void main() {
   radiance /= float(pc.spp);
 
   // Saving result
-  if (pc.curFrame == 0)
+  if (pc.curFrame == 0) {
     // First frame, replace the value in the buffer
     imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(radiance, 1.f));
+    imageStore(images[1], ivec2(gl_LaunchIDEXT.xy), vec4(payload.denoiserAlbedo, 1.f));
+    imageStore(images[2], ivec2(gl_LaunchIDEXT.xy), vec4(payload.denoiserNormal, 1.f));
+  }
   else {
     // Do accumulation over time
     float a = 1.0f / float(pc.curFrame + 1);

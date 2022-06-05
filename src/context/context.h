@@ -26,6 +26,9 @@ using std::array;
 using std::string;
 using std::vector;
 
+// We are using this to change the image to display on the fly
+constexpr int FRAMES_IN_FLIGHT = 3;
+
 struct ContextInitSetting {
   bool offline{false};
 };
@@ -81,6 +84,13 @@ private:
   void createAppContext();
   void createOfflineResources();
   void createParallelQueues();
+
+  // Overriding to create 2x more command buffer per frame
+  void createSwapchain(const VkSurfaceKHR& surface, uint32_t width,
+                       uint32_t height,
+                       VkFormat colorFormat = VK_FORMAT_B8G8R8A8_UNORM,
+                       VkFormat depthFormat = VK_FORMAT_UNDEFINED,
+                       bool vsync = false) override;
 
 private:
   VkRenderPass m_offlineRenderPass{VK_NULL_HANDLE};

@@ -6,6 +6,46 @@
 
 using GuiH = ImGuiH::Control;
 
+void Tracer::renderGUI() {
+  static bool showGui = true;
+
+  if (m_busy) {
+    guiBusy();
+    return;
+  }
+
+  if (ImGui::IsKeyPressed(ImGuiKey_H)) showGui = !showGui;
+  if (!showGui) return;
+
+  // Show UI panel window.
+  float panelAlpha = 1.0f;
+  ImGuiH::Control::style.ctrlPerc = 0.55f;
+  ImGuiH::Panel::Begin(ImGuiH::Panel::Side::Right, panelAlpha);
+
+  bool changed{false};
+
+  if (ImGui::CollapsingHeader("Camera" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiCamera();
+  if (ImGui::CollapsingHeader(
+          "Environment" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiEnvironment();
+  if (ImGui::CollapsingHeader(
+          "PathTracer" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiPathTracer();
+  if (ImGui::CollapsingHeader(
+          "Denoiser" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiDenoiser();
+  if (ImGui::CollapsingHeader(
+          "Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+    changed |= guiTonemapper();
+
+  ImGui::End();  // ImGui::Panel::end()
+
+  if (changed) {
+    m_pipelineRaytrace.resetFrame();
+  }
+}
+
 bool Tracer::guiCamera() {
   static GpuCamera dc{
       nvmath::mat4f_zero,        // rasterToCamera
@@ -243,4 +283,24 @@ void Tracer::guiBusy() {
   }
   ImGui::PopStyleVar();
   ImGui::End();
+}
+
+bool Tracer::guiDenoiser() {
+  // #OPTIX_D
+  if (ImGui::CollapsingHeader("Denoiser", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Checkbox("Denoise", (bool*)&m_denoiseApply);
+    ImGui::Checkbox("First Frame", &m_denoiseFirstFrame);
+    ImGui::SliderInt("N-frames", &m_denoiseEveryNFrames, 1, 500);
+    int denoisedFrame = -1;
+    auto curFrame = m_pipelineRaytrace.getFrame();
+    if (m_denoiseApply) {
+      if (m_denoiseFirstFrame && (curFrame < m_denoiseEveryNFrames))
+        denoisedFrame = 0;
+      else if (curFrame > m_denoiseEveryNFrames)
+        denoisedFrame =
+            (curFrame / m_denoiseEveryNFrames) * m_denoiseEveryNFrames;
+    }
+    ImGui::Text("Denoised Frame: %d", denoisedFrame);
+  }
+  return false;
 }

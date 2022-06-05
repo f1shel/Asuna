@@ -36,6 +36,13 @@ void main() {
     basis(state.ffnormal, state.tangent, state.bitangent);
   }
 
+  // Configure information for denoiser
+  if (payload.depth == 1)
+  {
+    payload.denoiserAlbedo = state.mat.diffuse;
+    payload.denoiserNormal = state.ffnormal;
+  }
+
   // Direct light
   {
     // Light and environment contribution

@@ -100,6 +100,13 @@ void main() {
   float ax = max(sqr(state.mat.roughness), 0.001);
   float ay = ax;
 
+  // Configure information for denoiser
+  if (payload.depth == 1)
+  {
+    payload.denoiserAlbedo = state.mat.diffuse;
+    payload.denoiserNormal = state.ffnormal;
+  }
+
   // Direct light
   {
     // Light and environment contribution

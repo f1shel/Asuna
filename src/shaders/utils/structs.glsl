@@ -44,6 +44,9 @@ struct RayPayload {
   vec3 directHitPos;
   vec3 directDir;
   vec3 directContribution;
+  // for denoiser
+  vec3 denoiserAlbedo;
+  vec3 denoiserNormal;
 };
 
 #endif
