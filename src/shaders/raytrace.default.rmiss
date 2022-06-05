@@ -7,6 +7,7 @@
 #include "../shared/binding.h"
 #include "../shared/sun_and_sky.h"
 #include "../shared/pushconstant.h"
+#include "../shared/camera.h"
 #include "utils/math.glsl"
 #include "utils/structs.glsl"
 #include "utils/sun_and_sky.glsl"
@@ -16,6 +17,7 @@
 layout(location = 0) rayPayloadInEXT RayPayload payload;
 layout(set = RtEnv, binding = EnvSunsky, scalar) uniform _SunAndSky { GpuSunAndSky sunAndSky; };
 layout(set = RtEnv, binding = EnvAccelMap)       uniform sampler2D  envmapSamplers[3];
+layout(set = RtScene, binding = SceneCamera)     uniform _Camera    { GpuCamera cameraInfo; };
 layout(push_constant)                            uniform _RtxState  { GpuPushConstantRaytrace pc; };
 // clang-format on
 
@@ -30,10 +32,10 @@ void main() {
     env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
     envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);
   } else if (pc.hasEnvMap == 1) {
-    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, pc.envRotateAngle,
+    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, cameraInfo.envTransform,
                      pc.envMapIntensity);
     envPdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
-                       pc.envRotateAngle, pc.envMapResolution);
+                       cameraInfo.envTransform, pc.envMapResolution);
   } else {
     env = pc.bgColor;
     envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);

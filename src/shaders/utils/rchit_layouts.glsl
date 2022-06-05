@@ -8,6 +8,7 @@
 #include "../../shared/instance.h"
 #include "../../shared/sun_and_sky.h"
 #include "../../shared/vertex.h"
+#include "../../shared/camera.h"
 #include "structs.glsl"
 #include "math.glsl"
 #include "sample_light.glsl"
@@ -23,6 +24,7 @@ layout(set = RtAccel, binding = AccelTlas)              uniform accelerationStru
 layout(set = RtScene, binding = SceneTextures)          uniform sampler2D  textureSamplers[];
 layout(set = RtScene, binding = SceneInstances, scalar) buffer  _Instances { GpuInstance i[];        } instances;
 layout(set = RtScene, binding = SceneLights, scalar)    buffer  _Lights    { GpuLight l[];           } lights;
+layout(set = RtScene, binding = SceneCamera)            uniform _Camera    { GpuCamera cameraInfo; };
 layout(set = RtEnv,   binding = EnvSunsky, scalar)      uniform _SunAndSky { GpuSunAndSky sunAndSky; };
 layout(set = RtEnv,   binding = EnvAccelMap)            uniform sampler2D  envmapSamplers[3];
 //
@@ -60,9 +62,10 @@ HitState getHitState() {
   state.uv = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
   state.hitPos = gl_ObjectToWorldEXT *
                  vec4(v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z, 1.f);
-  state.shadingNormal =
-      normalize(v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z);
+  state.shadingNormal = v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z;
+  state.shadingNormal = makeNormal((state.shadingNormal * gl_WorldToObjectEXT).xyz);
   state.faceNormal = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));
+  state.faceNormal = makeNormal((state.faceNormal * gl_WorldToObjectEXT).xyz);
   state.viewDir = -normalize(gl_WorldRayDirectionEXT);
   if (state.lightId < 0) state.mat = Materials(_inst.materialAddress).m[0];
   if (pc.useFaceNormal == 1)
@@ -112,10 +115,10 @@ void sampleEnvironmentLight(inout LightSample lightSample) {
     lightSample.pdf = uniformSpherePdf();
   } else if (pc.hasEnvMap == 1) {
     lightSample.direction =
-        sampleEnvmap(payload.seed, envmapSamplers, pc.envRotateAngle,
+        sampleEnvmap(payload.seed, envmapSamplers, cameraInfo.envTransform,
                      pc.envMapResolution, lightSample.pdf);
     lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction,
-                                       pc.envRotateAngle, pc.envMapIntensity);
+                                       cameraInfo.envTransform, pc.envMapIntensity);
   } else {
     lightSample.direction =
         uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));

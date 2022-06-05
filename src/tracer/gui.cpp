@@ -32,8 +32,7 @@ void Tracer::renderGUI() {
   if (ImGui::CollapsingHeader(
           "PathTracer" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
     changed |= guiPathTracer();
-  if (ImGui::CollapsingHeader(
-          "Denoiser" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
+  if (ImGui::CollapsingHeader("Denoiser" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
     changed |= guiDenoiser();
   if (ImGui::CollapsingHeader(
           "Tonemapper" /*, ImGuiTreeNodeFlags_DefaultOpen*/))
@@ -48,8 +47,9 @@ void Tracer::renderGUI() {
 
 bool Tracer::guiCamera() {
   static GpuCamera dc{
-      nvmath::mat4f_zero,        // rasterToCamera
-      nvmath::mat4f_zero,        // cameraToWorld
+      nvmath::mat4f_zero,  // rasterToCamera
+      nvmath::mat4f_zero,  // cameraToWorld
+      nvmath::mat4f_id,
       vec4(0.f, 0.f, 0.f, 0.f),  // fxfycxcy
       CameraTypeUndefined,       // type
       0.f,                       // aperture
@@ -97,8 +97,21 @@ bool Tracer::guiEnvironment() {
   auto& sunAndSky(m_scene.getSunsky());
   auto& rtxState = m_pipelineRaytrace.getPushconstant();
 
-  changed |= GuiH::Slider("Rotate Envmap", "", &rtxState.envRotateAngle,
-                          nullptr, GuiH::Flags::Normal, 0.f, 360.f);
+  static float rotx{0.f}, roty{0.f}, rotz{0.f};
+  bool rotChanged = false;
+  rotChanged |= GuiH::Slider("Rotate Envmap X", "", &rotx, nullptr,
+                             GuiH::Flags::Normal, 0.f, 360.f);
+  rotChanged |= GuiH::Slider("Rotate Envmap Y", "", &roty, nullptr,
+                             GuiH::Flags::Normal, 0.f, 360.f);
+  rotChanged |= GuiH::Slider("Rotate Envmap Z", "", &rotz, nullptr,
+                             GuiH::Flags::Normal, 0.f, 360.f);
+  if (rotChanged) {
+    mat4 envR = nvmath::rotation_mat4_z(nv_to_rad * rotz) *
+                nvmath::rotation_mat4_y(nv_to_rad * roty) *
+                nvmath::rotation_mat4_x(nv_to_rad * rotx);
+    m_scene.getCamera().setEnvRotate(envR);
+  }
+  changed |= rotChanged;
   changed |= GuiH::Slider("Envmap Intensity", "", &rtxState.envMapIntensity,
                           nullptr, GuiH::Flags::Normal, 0.f, 20.f);
   changed |= ImGui::Checkbox("Use Sun & Sky", (bool*)&sunAndSky.in_use);
@@ -287,19 +300,17 @@ void Tracer::guiBusy() {
 
 bool Tracer::guiDenoiser() {
   // #OPTIX_D
-  if (ImGui::CollapsingHeader("Denoiser", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::Checkbox("Denoise", (bool*)&m_denoiseApply);
-    ImGui::Checkbox("First Frame", &m_denoiseFirstFrame);
-    ImGui::SliderInt("N-frames", &m_denoiseEveryNFrames, 1, 500);
-    int denoisedFrame = -1;
-    auto curFrame = m_pipelineRaytrace.getFrame();
-    if (m_denoiseApply) {
-      if (m_denoiseFirstFrame && (curFrame < m_denoiseEveryNFrames))
-        denoisedFrame = 0;
-      else if (curFrame > m_denoiseEveryNFrames)
-        denoisedFrame =
-            (curFrame / m_denoiseEveryNFrames) * m_denoiseEveryNFrames;
-    }
+  ImGui::Checkbox("Denoise", (bool*)&m_denoiseApply);
+  ImGui::Checkbox("First Frame", &m_denoiseFirstFrame);
+  ImGui::SliderInt("N-frames", &m_denoiseEveryNFrames, 1, 500);
+  int denoisedFrame = -1;
+  auto curFrame = m_pipelineRaytrace.getFrame();
+  if (m_denoiseApply) {
+    if (m_denoiseFirstFrame && (curFrame < m_denoiseEveryNFrames))
+      denoisedFrame = 0;
+    else if (curFrame > m_denoiseEveryNFrames)
+      denoisedFrame =
+          (curFrame / m_denoiseEveryNFrames) * m_denoiseEveryNFrames;
     ImGui::Text("Denoised Frame: %d", denoisedFrame);
   }
   return false;

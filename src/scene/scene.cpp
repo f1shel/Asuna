@@ -25,9 +25,9 @@ void Scene::deinit() {
 
 void Scene::submit() {
   LOG_INFO("{}: submitting resources to gpu", "Scene");
-  LOG_INFO("{}: {} light(s), {} textures(s), {} material(s), {} mesh(es)", "Scene",
-           getLightsNum() - 1, getTexturesNum() - 1, getMaterialsNum() - 1,
-           getMeshesNum());
+  LOG_INFO("{}: {} light(s), {} textures(s), {} material(s), {} mesh(es)",
+           "Scene", getLightsNum() - 1, getTexturesNum() - 1,
+           getMaterialsNum() - 1, getMeshesNum());
 
   // configure pipeline state
   m_pipelineState.rtxState.numLights = getLightsNum() - 1;
@@ -511,5 +511,5 @@ void Scene::fitCamera() {
                   m_size.width / static_cast<float>(m_size.height));
   auto cam = CameraManip.getCamera();
   m_shots.emplace_back(CameraShot{cam.ctr, cam.eye, cam.up, nvmath::mat4f_zero,
-                                  getPipelineState()});
+                                  nvmath::mat4f_id, getPipelineState()});
 }

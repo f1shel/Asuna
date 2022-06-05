@@ -43,14 +43,9 @@ void sampleOneLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
 }
 
 float pdfEnvmap(in sampler2D envmapSamplers[3], in vec3 direction,
-                in float rotAngle, in vec2 hdrResolution) {
+                in mat4 envTransform, in vec2 hdrResolution) {
+  direction = transformVector(transpose(envTransform), direction);
   direction = normalize(direction);
-  float rotRadian = rotAngle / 180.f * PI;
-  mat3 rayRotMat;
-  rayRotMat[0] = vec3(cos(-rotRadian), 0, -sin(-rotRadian));
-  rayRotMat[1] = vec3(0, 1, 0);
-  rayRotMat[2] = vec3(sin(-rotRadian), 0, cos(-rotRadian));
-  direction = rayRotMat * direction;
 
   float theta = acos(clamp(direction.y, -1.0, 1.0));
   vec2 uv =
@@ -61,15 +56,9 @@ float pdfEnvmap(in sampler2D envmapSamplers[3], in vec3 direction,
 }
 
 vec3 evalEnvmap(in sampler2D envmapSamplers[3], in vec3 evalDir,
-                in float rotAngle, in float intensity) {
+                in mat4 envTransform, in float intensity) {
+  evalDir = transformVector(transpose(envTransform), evalDir);
   evalDir = normalize(evalDir);
-
-  float rotRadian = rotAngle / 180.f * PI;
-  mat3 rayRotMat;
-  rayRotMat[0] = vec3(cos(-rotRadian), 0, -sin(-rotRadian));
-  rayRotMat[1] = vec3(0, 1, 0);
-  rayRotMat[2] = vec3(sin(-rotRadian), 0, cos(-rotRadian));
-  evalDir = rayRotMat * evalDir;
 
   float theta = acos(clamp(evalDir.y, -1.0, 1.0));
   vec2 uv = vec2((PI + atan(evalDir.z, evalDir.x)) * INV_2PI, theta * INV_PI);
@@ -77,7 +66,7 @@ vec3 evalEnvmap(in sampler2D envmapSamplers[3], in vec3 evalDir,
 }
 
 vec3 sampleEnvmap(in uint seed, in sampler2D envmapSamplers[3],
-                  in float rotAngle, in vec2 hdrResolution, inout float pdf) {
+                  in mat4 envTransform, in vec2 hdrResolution, inout float pdf) {
   float r1 = rand(seed);
   float r2 = rand(seed);
 
@@ -96,13 +85,7 @@ vec3 sampleEnvmap(in uint seed, in sampler2D envmapSamplers[3],
   vec3 rayDir =
       vec3(-sin(theta) * cos(phi), cos(theta), -sin(theta) * sin(phi));
 
-  float rotRadian = rotAngle / 180.f * PI;
-  mat3 envRotMat;
-  envRotMat[0] = vec3(cos(rotRadian), 0, -sin(rotRadian));
-  envRotMat[1] = vec3(0, 1, 0);
-  envRotMat[2] = vec3(sin(rotRadian), 0, cos(rotRadian));
-  rayDir = envRotMat * rayDir;
-
+  rayDir = transformVector(envTransform, rayDir);
   return rayDir;
 }
 

@@ -375,7 +375,8 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
     material.tangentTextureId =
         m_pScene->getTextureId(materialJson["tangent_texture"]);
   } else {
-    LOG_ERROR("{}: unrecognized material type [{}]", "Loader", materialJson["type"]);
+    LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
+              materialJson["type"]);
     exit(1);
   }
 
@@ -387,18 +388,48 @@ void Loader::addMesh(const nlohmann::json& meshJson) {
   std::string meshName = meshJson["name"];
   auto meshPath = nvh::findFile(meshJson["path"], {m_sceneFileDir}, true);
   if (meshPath.empty()) {
-    LOG_ERROR("{}: failed to load mesh from file [{}]", "Loader",
-              meshPath);
+    LOG_ERROR("{}: failed to load mesh from file [{}]", "Loader", meshPath);
     exit(1);
   }
   bool recomputeNormal = false;
   vec2 uvScale = {1.f, 1.f};
   if (meshJson.contains("recompute_normal"))
     recomputeNormal = meshJson["recompute_normal"];
-  if (meshJson.contains("uv_scale"))
-    uvScale = Json2Vec2(meshJson["uv_scale"]);
+  if (meshJson.contains("uv_scale")) uvScale = Json2Vec2(meshJson["uv_scale"]);
 
   m_pScene->addMesh(meshName, meshPath, recomputeNormal, uvScale);
+}
+
+static void parseToWorld(const json& toworldJson, mat4& transform,
+                         bool banTranslation = false) {
+  transform = nvmath::mat4f_id;
+  for (const auto& singleton : toworldJson) {
+    nvmath::mat4f t = nvmath::mat4f_id;
+    JsonCheckKeys(singleton, {"type", "value"});
+    if (singleton["type"] == "matrix") {
+      t = Json2Mat4(singleton["value"]);
+    } else if (singleton["type"] == "translate" && !banTranslation) {
+      t.set_translation(Json2Vec3(singleton["value"]));
+    } else if (singleton["type"] == "scale") {
+      t.set_scale(Json2Vec3(singleton["value"]));
+    } else if (singleton["type"] == "rotx") {
+      t = nvmath::rotation_mat4_x(nv_to_rad * float(singleton["value"]));
+    } else if (singleton["type"] == "roty") {
+      t = nvmath::rotation_mat4_y(nv_to_rad * float(singleton["value"]));
+    } else if (singleton["type"] == "rotz") {
+      t = nvmath::rotation_mat4_z(nv_to_rad * float(singleton["value"]));
+    } else if (singleton["type"] == "rotate") {
+      vec3 xyz = Json2Vec3(singleton["value"]);
+      t *= nvmath::rotation_mat4_z(nv_to_rad * xyz.z);
+      t *= nvmath::rotation_mat4_y(nv_to_rad * xyz.y);
+      t *= nvmath::rotation_mat4_x(nv_to_rad * xyz.x);
+    } else {
+      LOG_ERROR("{}: unrecognized toworld singleton type [{}]", "Loader",
+                singleton["type"]);
+      exit(1);
+    }
+    transform = t * transform;
+  }
 }
 
 void Loader::addInstance(const nlohmann::json& instanceJson) {
@@ -409,36 +440,8 @@ void Loader::addInstance(const nlohmann::json& instanceJson) {
   else
     materialName = defaultSceneOptions["materials"]["name"];
   nvmath::mat4f transform = nvmath::mat4f_id;
-  if (instanceJson.contains("toworld")) {
-    for (const auto& singleton : instanceJson["toworld"]) {
-      nvmath::mat4f t = nvmath::mat4f_id;
-      JsonCheckKeys(singleton, {"type", "value"});
-      if (singleton["type"] == "matrix") {
-        t = Json2Mat4(singleton["value"]);
-      } else if (singleton["type"] == "translate") {
-        t.set_translation(Json2Vec3(singleton["value"]));
-      } else if (singleton["type"] == "scale") {
-        t.set_scale(Json2Vec3(singleton["value"]));
-      } else if (singleton["type"] == "rotx") {
-        t = nvmath::rotation_mat4_x(nv_to_rad * float(singleton["value"]));
-      } else if (singleton["type"] == "roty") {
-        t = nvmath::rotation_mat4_y(nv_to_rad * float(singleton["value"]));
-      } else if (singleton["type"] == "rotz") {
-        t = nvmath::rotation_mat4_z(nv_to_rad * float(singleton["value"]));
-      } else if (singleton["type"] == "rotate") {
-        vec3 xyz = Json2Vec3(singleton["value"]);
-        t *= nvmath::rotation_mat4_z(nv_to_rad * xyz.z);
-        t *= nvmath::rotation_mat4_y(nv_to_rad * xyz.y);
-        t *= nvmath::rotation_mat4_x(nv_to_rad * xyz.x);
-      } else {
-        LOG_ERROR("{}: unrecognized toworld singleton type [{}]", "Loader",
-                  singleton["type"]);
-        exit(1);
-      }
-      transform = t * transform;
-    }
-  }
-
+  if (instanceJson.contains("toworld"))
+    parseToWorld(instanceJson["toworld"], transform);
   m_pScene->addInstance(transform, meshName, materialName);
 }
 
@@ -458,10 +461,10 @@ void Loader::addShot(const nlohmann::json& shotJson) {
     // -ext.a03; ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22,
     // ext.a23 = -ext.a23;
   } else {
-    LOG_ERROR("{}: unrecognized shot type [{}]", "Loader",
-              shotJson["type"]);
+    LOG_ERROR("{}: unrecognized shot type [{}]", "Loader", shotJson["type"]);
     exit(1);
   }
+
   CameraShot shot;
   shot.ext = ext;
   shot.eye = eye;
@@ -474,6 +477,9 @@ void Loader::addShot(const nlohmann::json& shotJson) {
     State& pipelineState = shot.state;
     parseState(stateJson, pipelineState);
   }
+
+  if (shotJson.contains("env_toworld"))
+    parseToWorld(shotJson["env_toworld"], shot.envTransform, true);
 
   m_pScene->addShot(shot);
 }

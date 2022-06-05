@@ -222,7 +222,8 @@ void PipelineGraphics::createGraphicsDescriptorSetLayout() {
   // Camera matrices
   sceneBind.addBinding(
       SceneBindings::SceneCamera, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
-      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR);
+      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+          VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR);
   // Instance description
   sceneBind.addBinding(
       SceneBindings::SceneInstances, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
