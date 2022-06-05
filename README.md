@@ -36,6 +36,7 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 + [CMake](https://cmake.org/download/). `Version 3.16` was tested.
 + [NVIDIA driver](https://www.nvidia.com/Download/index.aspx). Should be released on or after December 15th, 2020, for the implementations of the new official versions of the Vulkan ray tracing extensions. `RTX 3060 Ti` with Driver `Version 512.15` was tested. *Whether this project supports non NVIDIA graphics cards has not been determined.*
 + [Vulkan SDK](https://vulkan.lunarg.com/). `Version 1.3.204.1` was tested.
++ [OptiX 7](https://developer.nvidia.com/designworks/optix/download). `Version 7.4.0` was tested.
 
 ## Compile
 
@@ -74,7 +75,7 @@ Note that `nvidia-container-toolkit` is required for accessing GPU in the docker
 ### Usage
 
 ```bash
-$ ./asuna.exe --scene scenes/cornell_box/scene.json [--offline] [--spp 1024] [--out cbox]
+$ ./asuna.exe --scene scenes/cornell_box/scene.json [--offline] [--out cbox]
 ```
 
 ### Architecture
