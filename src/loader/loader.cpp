@@ -425,6 +425,11 @@ void Loader::addInstance(const nlohmann::json& instanceJson) {
         t = nvmath::rotation_mat4_y(nv_to_rad * float(singleton["value"]));
       } else if (singleton["type"] == "rotz") {
         t = nvmath::rotation_mat4_z(nv_to_rad * float(singleton["value"]));
+      } else if (singleton["type"] == "rotate") {
+        vec3 xyz = Json2Vec3(singleton["value"]);
+        t *= nvmath::rotation_mat4_z(nv_to_rad * xyz.z);
+        t *= nvmath::rotation_mat4_y(nv_to_rad * xyz.y);
+        t *= nvmath::rotation_mat4_x(nv_to_rad * xyz.x);
       } else {
         LOG_ERROR("{}: unrecognized toworld singleton type [{}]", "Loader",
                   singleton["type"]);
