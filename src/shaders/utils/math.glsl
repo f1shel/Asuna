@@ -50,7 +50,10 @@ float tanTheta(vec3 v) {
   return sqrt(temp) / v.z;
 }
 
-float safeSqrt(float value) { return sqrt(max(0, value)); }
+float safeSqrt(float value) { 
+  if(isnan(value)) return 0;
+  return sqrt(max(0, value));
+}
 
 vec3 transformPoint(in mat4 transform, in vec3 point) {
   vec4 homoPoint = vec4(point, 1.f);

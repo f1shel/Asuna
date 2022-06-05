@@ -18,13 +18,13 @@ float fresnelSchlick(float cosThetaI, float f0) {
 float dAnisoGGX(float HdotN, float HdotX, float HdotY, float ax, float ay) {
   return 1 /
          // ---------------------------------------------------------
-         (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + sqr(HdotN)));
+         (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + sqr(HdotN)) + EPS);
 }
 
 vec3 importanceSampleAnisoGGX(vec3 lwo, float ax, float ay) {
   float u1 = rand(payload.seed);
   float u2 = rand(payload.seed);
-  float factor = sqrt(u1 / (1 - u1));
+  float factor = safeSqrt(u1 / max(1 - u1, EPS));
   float phi = TWO_PI * u2;
 
   vec3 lwh = vec3(0, 0, 1);
@@ -149,8 +149,8 @@ void main() {
   state.bitangent = makeNormal(cross(state.ffnormal, state.tangent));
   state.tangent = makeNormal(cross(state.bitangent, state.ffnormal));
 
-  float ax = state.mat.anisoAlpha.x;
-  float ay = state.mat.anisoAlpha.y;
+  float ax = max(state.mat.anisoAlpha.x, EPS);
+  float ay = max(state.mat.anisoAlpha.y, EPS);
 
   // Direct light
   {
