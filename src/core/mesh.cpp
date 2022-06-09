@@ -6,98 +6,73 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+static void updateAabb(const GpuVertex& v, vec3& posMin, vec3& posMax) {
+  posMin.x = std::min(posMin.x, v.pos.x);
+  posMin.y = std::min(posMin.y, v.pos.y);
+  posMin.z = std::min(posMin.z, v.pos.z);
+  posMax.x = std::max(posMax.x, v.pos.x);
+  posMax.y = std::max(posMax.y, v.pos.y);
+  posMax.z = std::max(posMax.z, v.pos.z);
+}
+
 Mesh::Mesh(Primitive& prim) {
   if (prim.type == PrimitiveTypeRect) {
-    m_vertices.reserve(4);
-    m_indices.reserve(6);
-    GpuVertex v[4];
+    m_vertices.resize(4);
+    m_indices.resize(6);
     /*
      * 0________1
      * |        |
      * |________|
      * 3        2
      */
-    v[0].pos = prim.position;
-    v[1].pos = prim.position + prim.u;
-    v[2].pos = prim.position + prim.u + prim.v;
-    v[3].pos = prim.position + prim.v;
+    m_vertices[0].pos = prim.position;
+    m_vertices[1].pos = prim.position + prim.u;
+    m_vertices[2].pos = prim.position + prim.u + prim.v;
+    m_vertices[3].pos = prim.position + prim.v;
     m_indices = {0, 1, 2, 0, 2, 3};
-    for (auto& i : v) {
-      m_posMin.x = std::min(m_posMin.x, i.pos.x);
-      m_posMin.y = std::min(m_posMin.y, i.pos.y);
-      m_posMin.z = std::min(m_posMin.z, i.pos.z);
-      m_posMax.x = std::max(m_posMax.x, i.pos.x);
-      m_posMax.y = std::max(m_posMax.y, i.pos.y);
-      m_posMax.z = std::max(m_posMax.z, i.pos.z);
-      m_vertices.emplace_back(i);
-    }
+
+  } else if (prim.type == PrimitiveTypeTriangle) {
+    m_vertices.resize(3);
+    m_indices.resize(3);
+    /*
+     * 0__1
+     * | /
+     * |/
+     * 2
+     */
+    m_vertices[0].pos = prim.position;
+    m_vertices[1].pos = prim.position + prim.u;
+    m_vertices[2].pos = prim.position + prim.v;
+    m_indices = {0, 1, 2};
   }
+  for (auto& i : m_vertices) updateAabb(i, m_posMin, m_posMax);
 }
 
 Mesh::Mesh(const std::string& meshPath, bool recomputeNormal, vec2 uvScale) {
-  tinyobj::ObjReader reader;
-  reader.ParseFromFile(meshPath);
-  if (!reader.Valid()) {
-    LOGE("[x] %-20s: load mesh from %s ----> %s\n", "Scene Error",
-         meshPath.c_str(), reader.Error().c_str());
-    exit(1);
-  }
-  // if(reader.GetShapes().size() != 1)
-  //{
-  //   LOGE(
-  //       "[x] %-20s: load mesh from %s ----> asuna tracer supports only one
-  //       shape " "per mesh\n", "Scene Error", meshPath.c_str());
-  //   exit(1);
-  // }
   m_vertices.clear();
   m_indices.clear();
-  const auto& shapes = reader.GetShapes();
-  const auto& attrib = reader.GetAttrib();
-  for (const auto& shape : shapes) {
-    m_vertices.reserve(m_vertices.size() + shape.mesh.indices.size());
-    m_indices.reserve(m_indices.size() + shape.mesh.indices.size());
-    for (const auto& index : shape.mesh.indices) {
-      GpuVertex vertex = {};
-      const float* vp = &attrib.vertices[3 * index.vertex_index];
-      vertex.pos = {*(vp + 0), *(vp + 1), *(vp + 2)};
+  loadMesh(meshPath, m_vertices, m_indices);
 
-      if (!attrib.normals.empty() && index.normal_index >= 0) {
-        const float* np = &attrib.normals[3 * index.normal_index];
-        vertex.normal = {*(np + 0), *(np + 1), *(np + 2)};
-      }
+  for (size_t i = 0; i < m_indices.size(); i += 3) {
+    GpuVertex& v0 = m_vertices[m_indices[i + 0]];
+    GpuVertex& v1 = m_vertices[m_indices[i + 1]];
+    GpuVertex& v2 = m_vertices[m_indices[i + 2]];
 
-      if (!attrib.texcoords.empty() && index.texcoord_index >= 0) {
-        const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
-        vertex.uv = {*tp, 1.0f - *(tp + 1)};
-        vertex.uv.x *= uvScale.x;
-        vertex.uv.y *= uvScale.y;
-      }
-
-      m_vertices.push_back(vertex);
-      m_indices.push_back(static_cast<int>(m_indices.size()));
-
-      m_posMin.x = std::min(m_posMin.x, vertex.pos.x);
-      m_posMin.y = std::min(m_posMin.y, vertex.pos.y);
-      m_posMin.z = std::min(m_posMin.z, vertex.pos.z);
-      m_posMax.x = std::max(m_posMax.x, vertex.pos.x);
-      m_posMax.y = std::max(m_posMax.y, vertex.pos.y);
-      m_posMax.z = std::max(m_posMax.z, vertex.pos.z);
+    if (recomputeNormal) {
+      nvmath::vec3f n = nvmath::normalize(
+          nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
+      v0.normal = n;
+      v1.normal = n;
+      v2.normal = n;
     }
 
-    // Compute normal when no normal were provided or recomputing is required.
-    if (attrib.normals.empty() || recomputeNormal) {
-      for (size_t i = 0; i < m_indices.size(); i += 3) {
-        GpuVertex& v0 = m_vertices[m_indices[i + 0]];
-        GpuVertex& v1 = m_vertices[m_indices[i + 1]];
-        GpuVertex& v2 = m_vertices[m_indices[i + 2]];
+    v0.uv = uvScale * v0.uv;
+    v1.uv = uvScale * v1.uv;
+    v2.uv = uvScale * v2.uv;
 
-        nvmath::vec3f n = nvmath::normalize(
-            nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
-        v0.normal = n;
-        v1.normal = n;
-        v2.normal = n;
-      }
-    }
+    updateAabb(v0, m_posMin, m_posMax);
+    updateAabb(v1, m_posMin, m_posMax);
+    updateAabb(v2, m_posMin, m_posMax);
   }
 }
 
@@ -132,6 +107,36 @@ void MeshAlloc::deinit(ContextAware* pContext) {
   m_alloc.destroy(m_bIndices);
 
   intoReleased();
+}
+
+void loadMesh(const std::string& meshPath, vector<GpuVertex>& vertices,
+              vector<uint>& indices) {
+  tinyobj::ObjReader reader;
+  reader.ParseFromFile(meshPath);
+  if (!reader.Valid()) {
+    LOG_ERROR("{}: load mesh from [{}] --- {}", "Scene", meshPath.c_str(),
+              reader.Error().c_str());
+    exit(1);
+  }
+  const auto& shapes = reader.GetShapes();
+  const auto& attrib = reader.GetAttrib();
+  for (const auto& shape : shapes) {
+    vertices.reserve(vertices.size() + shape.mesh.indices.size());
+    indices.reserve(indices.size() + shape.mesh.indices.size());
+    for (const auto& index : shape.mesh.indices) {
+      GpuVertex vertex = {};
+      const float* vp = &attrib.vertices[3 * index.vertex_index];
+      vertex.pos = {*(vp + 0), *(vp + 1), *(vp + 2)};
+
+      if (!attrib.normals.empty() && index.normal_index >= 0) {
+        const float* np = &attrib.normals[3 * index.normal_index];
+        vertex.normal = {*(np + 0), *(np + 1), *(np + 2)};
+      }
+
+      vertices.push_back(vertex);
+      indices.push_back(static_cast<int>(indices.size()));
+    }
+  }
 }
 
 nvvk::RaytracingBuilderKHR::BlasInput MeshBufferToBlas(VkDevice device,

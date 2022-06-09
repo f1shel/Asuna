@@ -43,27 +43,21 @@ void Scene::submit() {
   m_pTexturesAlloc.resize(getTexturesNum());
   for (auto& record : m_pTextures) {
     const auto& textureName = record.first;
-    const auto& valuePair = record.second;
-    auto pTexture = valuePair.first;
-    auto textureId = valuePair.second;
+    auto [pTexture, textureId] = record.second;
     allocTexture(m_pContext, textureId, textureName, pTexture, cmdBuf);
   }
 
   m_pMaterialsAlloc.resize(getMaterialsNum());
   for (auto& record : m_pMaterials) {
     const auto& materialName = record.first;
-    const auto& valuePair = record.second;
-    auto pMaterial = valuePair.first;
-    auto materialId = valuePair.second;
+    auto [pMaterial, materialId] = record.second;
     allocMaterial(m_pContext, materialId, materialName, pMaterial, cmdBuf);
   }
 
   m_pMeshesAlloc.resize(getMeshesNum());
   for (auto& record : m_pMeshes) {
     const auto& meshName = record.first;
-    const auto& valuePair = record.second;
-    auto pMesh = valuePair.first;
-    auto meshId = valuePair.second;
+    auto [pMesh, meshId] = record.second;
     allocMesh(m_pContext, meshId, meshName, pMesh, cmdBuf);
   }
 
@@ -244,6 +238,45 @@ void Scene::addLight(const GpuLight& light) {
   }
   // add light
   m_lights.emplace_back(light);
+}
+
+void Scene::addLight(const GpuLight& light, const std::string& lightMeshPath) {
+  vector<GpuVertex> m_vertices{};
+  vector<uint> m_indices{};
+
+  loadMesh(lightMeshPath, m_vertices, m_indices);
+
+  // Add every facet of mesh as a triangle light
+  static char lightMeshName[40];
+  Primitive prim;
+  prim.type = PrimitiveTypeTriangle;
+  GpuLight light_ = light;
+  light_.type = LightTypeTriangle;
+  for (size_t i = 0; i < m_indices.size(); i += 3) {
+    GpuVertex& v0 = m_vertices[m_indices[i + 0]];
+    GpuVertex& v1 = m_vertices[m_indices[i + 1]];
+    GpuVertex& v2 = m_vertices[m_indices[i + 2]];
+
+    light_.position = prim.position = v0.pos;
+    light_.u = prim.u = v1.pos - v0.pos;
+    light_.v = prim.v = v2.pos - v0.pos;
+    light_.area = nvmath::length(nvmath::cross(light_.u, light_.v)) * 0.5f;
+    light_.doubleSide = 1;
+
+    // Add mesh
+    Mesh* pMesh = new Mesh(prim);
+    int lightId = getLightsNum();
+    auto meshId = m_pMeshes.size();
+    sprintf(lightMeshName, "__meshLight:%d", lightId);
+    m_pMeshes[std::string(lightMeshName)] = std::make_pair(pMesh, meshId);
+    m_mesh2light[meshId] = std::make_pair(true, lightId);
+
+    // Add instance
+    m_instances.emplace_back(Instance(meshId, lightId));
+
+    // add light
+    m_lights.emplace_back(light_);
+  }
 }
 
 void Scene::addEnvMap(const std::string& envmapPath) {

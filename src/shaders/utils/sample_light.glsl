@@ -5,6 +5,24 @@
 #include "math.glsl"
 #include "structs.glsl"
 
+void sampleTriangleLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
+                     inout LightSample lightSample) {
+  float r1 = rand(seed);
+  float r2 = (1 - r1) * rand(seed);
+
+  vec3 lightSurfacePos = light.position + light.u * r1 + light.v * r2;
+  lightSample.direction = lightSurfacePos - scatterPos;
+  lightSample.dist = length(lightSample.direction);
+  float distSq = lightSample.dist * lightSample.dist;
+  lightSample.direction /= lightSample.dist;
+  lightSample.normal = normalize(cross(light.u, light.v));
+  lightSample.emittance = light.emittance;
+  lightSample.pdf =
+      distSq /
+      (light.area * abs(dot(lightSample.normal, lightSample.direction)));
+  lightSample.shouldMis = 1.0;
+}
+
 void sampleRectLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
                      inout LightSample lightSample) {
   float r1 = rand(seed);
@@ -40,6 +58,8 @@ void sampleOneLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
     sampleRectLight(seed, light, scatterPos, lightSample);
   else if (type == LightTypeDirectional)
     sampleDistantLight(seed, light, scatterPos, lightSample);
+  else if (type == LightTypeTriangle)
+    sampleTriangleLight(seed, light, scatterPos, lightSample);
 }
 
 float pdfEnvmap(in sampler2D envmapSamplers[3], in vec3 direction,

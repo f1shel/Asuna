@@ -33,6 +33,7 @@ public:
                  float aperture);                            // perspective
   void addCamera(VkExtent2D filmResolution, vec4 fxfycxcy);  // opencv
   void addLight(const GpuLight& light);
+  void addLight(const GpuLight& light, const std::string& lightMeshPath);
   void addEnvMap(const std::string& envmapPath);
   void addTexture(const std::string& textureName,
                   const std::string& texturePath, float gamma);
@@ -56,13 +57,7 @@ public:
   int getShotsNum();
   CameraShot& getShot(int shotId);
   State& getPipelineState();
-  // int                                   getSpp();
   void setSpp(int spp);
-  // int                                   getMaxPathDepth();
-  // uint                                  getUseFaceNormal();
-  // uint                                  getToneMappingType();
-  // uint                                  getIgnoreEmissive();
-  // vec3                                  getBackGroundColor();
   Camera& getCamera();
   CameraType getCameraType();
   MaterialType getMaterialType(uint matId);

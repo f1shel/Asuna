@@ -244,7 +244,7 @@ void Loader::addLight(const nlohmann::json& lightJson) {
       0,                   // double side
   };
   light.emittance = Json2Vec3(lightJson["emittance"]);
-  if (lightJson["type"] == "rect") {
+  if (lightJson["type"] == "rect" || lightJson["type"] == "triangle") {
     JsonCheckKeys(lightJson, {"position", "v1", "v2"});
     vec3 v1 = Json2Vec3(lightJson["v1"]);
     vec3 v2 = Json2Vec3(lightJson["v2"]);
@@ -255,6 +255,7 @@ void Loader::addLight(const nlohmann::json& lightJson) {
     light.type = LightTypeRect;
     if (lightJson.contains("double_side"))
       light.doubleSide = lightJson["double_side"] ? 1 : 0;
+    if (lightJson["type"] == "triangle") light.area *= 0.5f;
   }
   //   else if(lightJson["type"] == "sphere")
   //   {
@@ -276,6 +277,18 @@ void Loader::addLight(const nlohmann::json& lightJson) {
     JsonCheckKeys(lightJson, {"direction"});
     light.direction = Json2Vec3(lightJson["direction"]);
     light.type = LightTypeDirectional;
+  } else if (lightJson["type"] == "mesh") {
+    JsonCheckKeys(lightJson, {"path"});
+    string meshPath = lightJson["path"];
+    meshPath = nvh::findFile(meshPath, {m_sceneFileDir});
+    if (meshPath.empty()) {
+      LOG_ERROR("{}: failed to load mesh light from [{}]", "Loader",
+                lightJson["path"]);
+      exit(1);
+    }
+    light.type = LightTypeTriangle;
+    m_pScene->addLight(light, meshPath);
+    return;
   } else {
     LOG_ERROR("{}: unrecognized light type [{}]", "Loader", lightJson["type"]);
     exit(1);

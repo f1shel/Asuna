@@ -11,6 +11,9 @@
 #include <string>
 #include <vector>
 
+void loadMesh(const std::string& meshPath, vector<GpuVertex>& vertices,
+              vector<uint>& indices);
+
 class Mesh {
 public:
   Mesh(Primitive& prim);
