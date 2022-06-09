@@ -89,7 +89,7 @@ void hitLight(in int lightId, in vec3 hitPos) {
 
   payload.stop = true;
   // Single side light
-  if (lightSideProjection > 0) return;
+  if (lightSideProjection > 0 && light.doubleSide == 0) return;
   // Do not mis
   if (payload.depth == 1) {
     payload.radiance = light.emittance;
