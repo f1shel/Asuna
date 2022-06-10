@@ -58,13 +58,13 @@ Mesh::Mesh(const std::string& meshPath, bool recomputeNormal, vec2 uvScale) {
     GpuVertex& v1 = m_vertices[m_indices[i + 1]];
     GpuVertex& v2 = m_vertices[m_indices[i + 2]];
 
-    if (recomputeNormal) {
-      nvmath::vec3f n = nvmath::normalize(
-          nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
-      v0.normal = n;
-      v1.normal = n;
-      v2.normal = n;
-    }
+    // if (recomputeNormal) {
+    nvmath::vec3f n =
+        nvmath::normalize(nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
+    v0.normal = n;
+    v1.normal = n;
+    v2.normal = n;
+    //}
 
     v0.uv = uvScale * v0.uv;
     v1.uv = uvScale * v1.uv;
@@ -127,6 +127,11 @@ void loadMesh(const std::string& meshPath, vector<GpuVertex>& vertices,
       GpuVertex vertex = {};
       const float* vp = &attrib.vertices[3 * index.vertex_index];
       vertex.pos = {*(vp + 0), *(vp + 1), *(vp + 2)};
+
+      if (!attrib.texcoords.empty() && index.texcoord_index >= 0) {
+        const float* tp = &attrib.texcoords[2 * index.texcoord_index + 0];
+        vertex.uv = {*tp, 1.0f - *(tp + 1)};
+      }
 
       if (!attrib.normals.empty() && index.normal_index >= 0) {
         const float* np = &attrib.normals[3 * index.normal_index];
