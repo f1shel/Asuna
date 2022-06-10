@@ -9,7 +9,8 @@ START_ENUM(MaterialType)
   MaterialTypeBrdfEmissive              = 1,
   MaterialTypeBrdfPbrMetalnessRoughness = 2,
   MaterialTypeBrdfKang18                = 3,
-  MaterialTypeNum                       = 4
+  MaterialTypeBsdfDielectric            = 4,
+  MaterialTypeNum                       = 5
 END_ENUM();
 // clang-format on
 
@@ -17,6 +18,7 @@ struct GpuMaterial {
   vec3 diffuse;            // diffuse albedo
   vec3 rhoSpec;            // kang18
   vec2 anisoAlpha;         // kang18
+  float ior;               // dielectric
   float roughness;         // disney
   float subsurface;        // disney
   float specular;          // disney

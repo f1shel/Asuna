@@ -58,13 +58,13 @@ Mesh::Mesh(const std::string& meshPath, bool recomputeNormal, vec2 uvScale) {
     GpuVertex& v1 = m_vertices[m_indices[i + 1]];
     GpuVertex& v2 = m_vertices[m_indices[i + 2]];
 
-    // if (recomputeNormal) {
-    nvmath::vec3f n =
-        nvmath::normalize(nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
-    v0.normal = n;
-    v1.normal = n;
-    v2.normal = n;
-    //}
+    if (recomputeNormal) {
+      nvmath::vec3f n = nvmath::normalize(
+          nvmath::cross((v1.pos - v0.pos), (v2.pos - v0.pos)));
+      v0.normal = n;
+      v1.normal = n;
+      v2.normal = n;
+    }
 
     v0.uv = uvScale * v0.uv;
     v1.uv = uvScale * v1.uv;

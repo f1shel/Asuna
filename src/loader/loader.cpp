@@ -347,22 +347,6 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
     if (materialJson.contains("roughness_texture"))
       material.roughnessTextureId =
           m_pScene->getTextureId(materialJson["roughness_texture"]);
-    // if(materialJson.contains("subsurface"))
-    //   material.subsurface = materialJson["subsurface"];
-    // if(materialJson.contains("specular"))
-    //   material.specular = materialJson["specular"];
-    // if(materialJson.contains("specular_tint"))
-    //   material.specularTint = materialJson["specular_tint"];
-    // if(materialJson.contains("anisotropic"))
-    //   material.anisotropic = materialJson["anisotropic"];
-    // if(materialJson.contains("sheen"))
-    //   material.sheen = materialJson["sheen"];
-    // if(materialJson.contains("sheen_tint"))
-    //   material.sheenTint = materialJson["sheen_tint"];
-    // if(materialJson.contains("clearcoat"))
-    //   material.clearcoat = materialJson["clearcoat"];
-    // if(materialJson.contains("clearcoat_gloss"))
-    //   material.clearcoatGloss = materialJson["clearcoat_gloss"];
   } else if (materialJson["type"] == "brdf_emissive") {
     material.type = MaterialTypeBrdfEmissive;
     if (materialJson.contains("emittance"))
@@ -387,6 +371,12 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
         m_pScene->getTextureId(materialJson["alpha_texture"]);
     material.tangentTextureId =
         m_pScene->getTextureId(materialJson["tangent_texture"]);
+  } else if (materialJson["type"] == "bsdf_dielectric") {
+    material.type = MaterialTypeBsdfDielectric;
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
+    if (materialJson.contains("ior")) material.ior = materialJson["ior"];
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);

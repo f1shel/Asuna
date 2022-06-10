@@ -40,7 +40,7 @@ struct HitState {
   vec2 uv;             // texture coordinates
   vec3 hitPos;         // hit point position
   vec3 shadingNormal;  // interpolated vertex normal
-  vec3 faceNormal;     // face normal
+  vec3 faceNormal;     // facet normal
   vec3 ffnormal;       // face forward normal, Z
   vec3 tangent;        // tangent, X
   vec3 bitangent;      // bitangent, Y
@@ -48,38 +48,43 @@ struct HitState {
   GpuMaterial mat;     // material
 };
 
+// clang-format off
+void configureShadingFrame(inout HitState state) {
+  if (pc.useFaceNormal == 1) state.shadingNormal = state.faceNormal;
+  basis(state.shadingNormal, state.tangent, state.bitangent);
+  state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0 ? state.shadingNormal : -state.shadingNormal;
+}
+
 HitState getHitState() {
   HitState state;
-  GpuInstance _inst = instances.i[gl_InstanceID];
-  Indices _indices = Indices(_inst.indexAddress);
-  Vertices _vertices = Vertices(_inst.vertexAddress);
-  ivec3 id = _indices.i[gl_PrimitiveID];
+
+  GpuInstance _inst     = instances.i[gl_InstanceID];
+  Indices     _indices  = Indices(_inst.indexAddress);
+  Vertices    _vertices = Vertices(_inst.vertexAddress);
+
+  ivec3     id = _indices.i[gl_PrimitiveID];
   GpuVertex v0 = _vertices.v[id.x];
   GpuVertex v1 = _vertices.v[id.y];
   GpuVertex v2 = _vertices.v[id.z];
-  vec3 bary = vec3(1.0 - _bary.x - _bary.y, _bary.x, _bary.y);
-  state.lightId = _inst.lightId;
-  state.uv = v0.uv * bary.x + v1.uv * bary.y + v2.uv * bary.z;
-  state.hitPos = gl_ObjectToWorldEXT *
-                 vec4(v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z, 1.f);
-  state.shadingNormal = v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z;
+  vec3      ba = vec3(1.0 - _bary.x - _bary.y, _bary.x, _bary.y);
+
+  state.lightId       = _inst.lightId;
+  state.uv            = barymix2(v0.uv, v1.uv, v2.uv, ba);
+  state.hitPos        = gl_ObjectToWorldEXT * vec4(barymix3(v0.pos, v1.pos, v2.pos, ba), 1.f);
+  state.shadingNormal = barymix3(v0.normal, v1.normal, v2.normal, ba);
   state.shadingNormal = makeNormal((state.shadingNormal * gl_WorldToObjectEXT).xyz);
-  state.faceNormal = normalize(cross(v1.pos - v0.pos, v2.pos - v0.pos));
-  state.faceNormal = makeNormal((state.faceNormal * gl_WorldToObjectEXT).xyz);
-  state.viewDir = -normalize(gl_WorldRayDirectionEXT);
+  state.faceNormal    = cross(v1.pos - v0.pos, v2.pos - v0.pos);
+  state.faceNormal    = makeNormal((state.faceNormal * gl_WorldToObjectEXT).xyz);
+  state.viewDir       = makeNormal(-gl_WorldRayDirectionEXT);
+
+  // Get material if hit surface is not emitter
   if (state.lightId < 0) state.mat = Materials(_inst.materialAddress).m[0];
-  if (pc.useFaceNormal == 1)
-    state.ffnormal = dot(state.faceNormal, state.viewDir) > 0.0
-                         ? state.faceNormal
-                         : -state.faceNormal;
-  else
-    state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0.0
-                         ? state.shadingNormal
-                         : -state.shadingNormal;
-  basis(state.ffnormal, state.tangent, state.bitangent);
+
+  configureShadingFrame(state);
 
   return state;
 }
+// clang-format on
 
 void hitLight(in int lightId, in vec3 hitPos) {
   GpuLight light = lights.l[lightId];
@@ -98,7 +103,10 @@ void hitLight(in int lightId, in vec3 hitPos) {
   // Do mis
   float lightDist = length(hitPos - payload.ray.origin);
   float distSquare = lightDist * lightDist;
-  float lightPdf = distSquare / (light.area * abs(lightSideProjection) + EPS);
+  float lightPdf =
+      payload.bsdfShouldMis
+          ? distSquare / (light.area * abs(lightSideProjection) + EPS)
+          : 0.0;
   float misWeight = powerHeuristic(payload.bsdfPdf, lightPdf);
   payload.radiance += payload.throughput * light.emittance * misWeight;
   return;
@@ -106,7 +114,7 @@ void hitLight(in int lightId, in vec3 hitPos) {
 
 void sampleEnvironmentLight(inout LightSample lightSample) {
   // Sample environment light
-  lightSample.shouldMis = 1.0;
+  lightSample.shouldMis = true;
   lightSample.dist = INFINITY;
   if (sunAndSky.in_use == 1) {
     lightSample.direction =
@@ -117,8 +125,9 @@ void sampleEnvironmentLight(inout LightSample lightSample) {
     lightSample.direction =
         sampleEnvmap(payload.seed, envmapSamplers, cameraInfo.envTransform,
                      pc.envMapResolution, lightSample.pdf);
-    lightSample.emittance = evalEnvmap(envmapSamplers, lightSample.direction,
-                                       cameraInfo.envTransform, pc.envMapIntensity);
+    lightSample.emittance =
+        evalEnvmap(envmapSamplers, lightSample.direction,
+                   cameraInfo.envTransform, pc.envMapIntensity);
   } else {
     lightSample.direction =
         uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));

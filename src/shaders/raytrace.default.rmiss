@@ -30,15 +30,21 @@ void main() {
   float envPdf = 0.0;
   if (sunAndSky.in_use == 1) {
     env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
-    envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);
+    envPdf = payload.bsdfShouldMis
+                 ? cosineHemispherePdf(gl_WorldRayDirectionEXT.z)
+                 : 0.0;
   } else if (pc.hasEnvMap == 1) {
-    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT, cameraInfo.envTransform,
-                     pc.envMapIntensity);
-    envPdf = pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
-                       cameraInfo.envTransform, pc.envMapResolution);
+    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
+                     cameraInfo.envTransform, pc.envMapIntensity);
+    envPdf = payload.bsdfShouldMis
+                 ? pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
+                             cameraInfo.envTransform, pc.envMapResolution)
+                 : 0.0;
   } else {
     env = pc.bgColor;
-    envPdf = cosineHemispherePdf(gl_WorldRayDirectionEXT.z);
+    envPdf = payload.bsdfShouldMis
+                 ? cosineHemispherePdf(gl_WorldRayDirectionEXT.z)
+                 : 0.0;
   }
 
   // Multiple importance sampling

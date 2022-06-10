@@ -9,87 +9,49 @@
 
 #include "../utils/rchit_layouts.glsl"
 
-float sqr(float x) { return x * x; }
+float dielectricFresnel(float cosThetaI, float eta) {
+  float sinThetaTSq = eta * eta * (1.0f - cosThetaI * cosThetaI);
 
-vec3 fresnelSchlick(float cosThetaI, vec3 f0) {
-  return f0 + (1 - f0) * pow(clamp(1 - cosThetaI, 0, 1), 5);
+  // Total internal reflection
+  if (sinThetaTSq > 1.0) return 1.0;
+
+  return sinThetaTSq;
+
+  float cosThetaT = sqrt(max(1.0 - sinThetaTSq, 0.0));
+
+  float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
+  float rp = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+
+  return 0.5f * (rs * rs + rp * rp);
 }
 
-float dAnisoGGX(float nDotH, float hDotX, float hDotY, float ax, float ay) {
-  return 1 /
-         max(PI * ax * ay * sqr(sqr(hDotX / ax) + sqr(hDotY / ay) + sqr(nDotH)),
-             EPS);
+vec3 dielectricEval(vec3 L, vec3 V, vec3 N, float eta) {
+  vec3 f = vec3(0);
+  if (abs(dot(refract(-V, N, eta), L) - 1) < EPS) f += vec3(1);
+  return f;
 }
 
-float g1SmithAnisoGGX(float nDotV, float vDotX, float vDotY, float ax,
-                      float ay) {
-  return 1 / (nDotV + safeSqrt(sqr(nDotV) + sqr(ax * vDotX) + sqr(ay * vDotY)));
-}
+float dielectricPdf() { return 0.0; }
 
-vec3 sampleAnisoGGX(vec3 lwo, float ax, float ay) {
-  vec2 u = rand2(payload.seed);
-  float factor = safeSqrt(u.x / (1 - u.x));
-  float xh = ax * factor * cos(TWO_PI * u.y);
-  float yh = ay * factor * sin(TWO_PI * u.y);
-  vec3 lwh = makeNormal(vec3(-xh, -yh, 1));
-  vec3 lwi = reflect(-lwo, lwh);
-  return lwi;
-}
-
-float anisoGGXPdf(vec3 lwh, vec3 lwo, float ax, float ay) {
-  vec3 lwi = reflect(-lwo, lwh);
-  float pdf = 0.0;
-  if (lwi.z > 0.0 && lwo.z > 0.0) {
-    pdf = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay) * lwh.z / (4 * dot(lwh, lwo));
-  }
-  return pdf;
-}
-
-vec3 pbrEval(vec3 lwi, vec3 lwo, vec3 albedo, float ax, float ay,
-             float metalness, float eta) {
-  if (lwi.z <= 0.0 || lwo.z <= 0.0) return vec3(0.0);
-  vec3 lwh = makeNormal(lwi + lwo);
-
-  float hDotV = dot(lwo, lwh);
-  float hDotL = dot(lwi, lwh);
-  float F0 = sqr((eta - 1) / (eta + 1));
-  vec3 Fs = fresnelSchlick(hDotV, mix(vec3(F0), albedo, metalness));
-  float Ds = dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay);
-  float Gs = g1SmithAnisoGGX(max(lwi.z, 0.0), lwi.x, lwi.y, ax, ay);
-  Gs *= g1SmithAnisoGGX(max(lwo.z, 0.0), lwo.x, lwo.y, ax, ay);
-  vec3 diffuse = albedo * (1 - metalness) * INV_PI;
-  vec3 specular = Fs * Ds * Gs;
-  return diffuse + specular;
-}
-
-float pbrPdf(vec3 lwh, vec3 lwo, float ax, float ay) {
-  return anisoGGXPdf(lwh, lwo, ax, ay);
-}
-
-vec3 pbrSample(vec3 lwo, float ax, float ay, out float pdf) {
-  vec3 lwi = sampleAnisoGGX(lwo, ax, ay);
-  vec3 lwh = makeNormal(lwi + lwo);
-  pdf = pbrPdf(lwh, lwo, ax, ay);
-  return lwi;
+void dielectricSample(vec3 V, vec3 N, float eta, inout BsdfSample bsdfSample) {
+  float F = dielectricFresnel(abs(dot(V, N)), eta);
+  bsdfSample.shouldMis = false;
+  bsdfSample.direction = makeNormal(refract(-V, N, eta));
+  bsdfSample.pdf = 1.0;
+  bsdfSample.val = vec3(1);
 }
 
 void main() {
-  // Get hit state
+  // Get hit record
   HitState state = getHitState();
 
   // Hit Light
-  if (state.lightId > 0) {
+  if (state.lightId >= 0) {
     hitLight(state.lightId, state.hitPos);
     return;
   }
 
   // Fetch textures
-  if (state.mat.diffuseTextureId >= 0)
-    state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
-  if (state.mat.metalnessTextureId >= 0)
-    state.mat.metalness = textureEval(state.mat.metalnessTextureId, state.uv).r;
-  if (state.mat.roughnessTextureId >= 0)
-    state.mat.roughness = textureEval(state.mat.roughnessTextureId, state.uv).r;
   if (state.mat.normalTextureId >= 0) {
     vec3 c = textureEval(state.mat.normalTextureId, state.uv).rgb;
     vec3 n = 2 * c - 1;
@@ -99,11 +61,10 @@ void main() {
 
     configureShadingFrame(state);
   }
-  float ax = max(sqr(state.mat.roughness), 0.001);
-  // Isotropic
-  float ay = ax;
-  // eta = ior since there is no refraction
-  float eta = state.mat.ior;
+
+  float eta = dot(state.viewDir, state.shadingNormal) > 0.0
+                  ? (1.0 / state.mat.ior)
+                  : state.mat.ior;
 
   // Configure information for denoiser
   if (payload.depth == 1) {
@@ -163,23 +124,17 @@ void main() {
 
     // Light at the back of the surface is not visible
     payload.directVisible = (dot(lightSample.direction, state.ffnormal) > 0.0);
+
     // Surface on the back of the light is also not illuminated
     payload.directVisible =
         payload.directVisible &&
         (dot(lightSample.normal, lightSample.direction) < 0 || allowDoubleSide);
 
     if (payload.directVisible) {
-      BsdfSample bsdfSample;
-
       // Multi importance sampling
-      vec3 lwi = makeNormal(toLocal(state.tangent, state.bitangent,
-                                    state.ffnormal, lightSample.direction));
-      vec3 lwo = makeNormal(toLocal(state.tangent, state.bitangent,
-                                    state.ffnormal, state.viewDir));
-      vec3 lwh = makeNormal(lwi + lwo);
-      float bsdfPdf = lightSample.shouldMis ? pbrPdf(lwh, lwo, ax, ay) : 0.0;
-      vec3 bsdfVal = pbrEval(lwi, lwo, state.mat.diffuse, ax, ay,
-                             state.mat.metalness, eta);
+      float bsdfPdf = lightSample.shouldMis ? dielectricPdf() : 0.0;
+      vec3 bsdfVal = dielectricEval(lightSample.direction, state.viewDir,
+                                    state.ffnormal, eta);
       float misWeight = powerHeuristic(lightSample.pdf, bsdfPdf);
 
       Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal) *
@@ -192,30 +147,22 @@ void main() {
   // Sample next ray
   BsdfSample bsdfSample;
 
-  // Shading frame, local tangent space
-  vec3 lwo = makeNormal(
-      toLocal(state.tangent, state.bitangent, state.ffnormal, state.viewDir));
-  bsdfSample.direction = pbrSample(lwo, ax, ay, bsdfSample.pdf);
-  vec3 bsdfVal = pbrEval(bsdfSample.direction, lwo, state.mat.diffuse, ax, ay,
-                         state.mat.metalness, eta);
-
   // World space
-  bsdfSample.direction = toWorld(state.tangent, state.bitangent, state.ffnormal,
-                                 bsdfSample.direction);
-  bsdfSample.direction = makeNormal(bsdfSample.direction);
+  dielectricSample(state.viewDir, state.ffnormal, eta, bsdfSample);
 
   // Reject invalid sample
-  if (bsdfSample.pdf <= 0.0 || length(bsdfVal) == 0.0) {
+  if (bsdfSample.pdf <= 0.0 || length(bsdfSample.val) == 0.0) {
     payload.stop = true;
     return;
   }
 
   // Next ray
   payload.bsdfPdf = bsdfSample.pdf;
-  payload.bsdfShouldMis = true;
   payload.ray.direction = bsdfSample.direction;
-  payload.throughput *= bsdfVal *
+  payload.bsdfShouldMis = false;
+  payload.throughput *= bsdfSample.val *
                         abs(dot(state.ffnormal, bsdfSample.direction)) /
                         (bsdfSample.pdf + EPS);
-  payload.ray.origin = payload.directHitPos;
+  payload.ray.origin = offsetPositionAlongNormal(
+      state.hitPos, sign(dot(bsdfSample.direction, state.ffnormal)) * state.ffnormal);
 }

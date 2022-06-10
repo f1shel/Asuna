@@ -10,6 +10,7 @@ public:
     m_material.diffuse = vec3(0.f);
     m_material.anisoAlpha = vec2(0.f);
     m_material.rhoSpec = vec3(0.f);
+    m_material.ior = 1.5f;
     m_material.roughness = 0.f;
     m_material.emittance = vec3(0.f);
     m_material.metalness = 0.f;

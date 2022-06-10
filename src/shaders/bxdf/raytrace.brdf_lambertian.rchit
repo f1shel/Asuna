@@ -25,20 +25,15 @@ void main() {
   if (state.mat.normalTextureId >= 0) {
     vec3 c = textureEval(state.mat.normalTextureId, state.uv).rgb;
     vec3 n = 2 * c - 1;
-    state.ffnormal = toWorld(state.tangent, state.bitangent, state.ffnormal, n);
-    state.ffnormal = makeNormal(state.ffnormal);
+    state.shadingNormal =
+        toWorld(state.tangent, state.bitangent, state.shadingNormal, n);
+    state.shadingNormal = makeNormal(state.shadingNormal);
 
-    // Ensure face forward shading normal
-    if (dot(state.ffnormal, state.viewDir) < 0)
-      state.ffnormal = -state.ffnormal;
-
-    // Rebuild frame
-    basis(state.ffnormal, state.tangent, state.bitangent);
+    configureShadingFrame(state);
   }
 
   // Configure information for denoiser
-  if (payload.depth == 1)
-  {
+  if (payload.depth == 1) {
     payload.denoiserAlbedo = state.mat.diffuse;
     payload.denoiserNormal = state.ffnormal;
   }
@@ -104,10 +99,11 @@ void main() {
     if (payload.directVisible) {
       // Multi importance sampling
       float bsdfPdf =
-          cosineHemispherePdf(dot(lightSample.direction, state.ffnormal));
+          lightSample.shouldMis
+              ? cosineHemispherePdf(dot(lightSample.direction, state.ffnormal))
+              : 0.0;
       vec3 bsdfVal = state.mat.diffuse * INV_PI;
-      float misWeight =
-          bsdfPdf > 0.0 ? powerHeuristic(lightSample.pdf, bsdfPdf) : 1.0;
+      float misWeight = powerHeuristic(lightSample.pdf, bsdfPdf);
 
       Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal) *
             lightSample.emittance / (lightSample.pdf + EPS);
@@ -137,6 +133,7 @@ void main() {
   // Next ray
   payload.bsdfPdf = bsdfSample.pdf;
   payload.ray.direction = bsdfSample.direction;
+  payload.bsdfShouldMis = true;
   payload.throughput *= bsdfVal *
                         abs(dot(state.ffnormal, bsdfSample.direction)) /
                         (bsdfSample.pdf + EPS);

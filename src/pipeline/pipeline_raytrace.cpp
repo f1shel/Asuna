@@ -225,6 +225,13 @@ void PipelineRaytrace::createRtPipeline() {
   stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfKang18] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfKang18");
+  // ClosetHit:BsdfDielectric
+  stage.module = nvvk::createShaderModule(
+      m_device,
+      nvh::loadFile("../shaders/raytrace.bsdf_dielectric.rchit.spv", true, {root}));
+  stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBsdfDielectric] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BsdfDielectric");
   // Shader groups
   VkRayTracingShaderGroupCreateInfoKHR group =
       nvvk::make<VkRayTracingShaderGroupCreateInfoKHR>();

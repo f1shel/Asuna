@@ -6,7 +6,7 @@
 #include "structs.glsl"
 
 void sampleTriangleLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
-                     inout LightSample lightSample) {
+                         inout LightSample lightSample) {
   float r1 = rand(seed);
   float r2 = (1 - r1) * rand(seed);
 
@@ -20,7 +20,7 @@ void sampleTriangleLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
   lightSample.pdf =
       distSq /
       (light.area * abs(dot(lightSample.normal, lightSample.direction)));
-  lightSample.shouldMis = 1.0;
+  lightSample.shouldMis = true;
 }
 
 void sampleRectLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
@@ -38,7 +38,7 @@ void sampleRectLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
   lightSample.pdf =
       distSq /
       (light.area * abs(dot(lightSample.normal, lightSample.direction)));
-  lightSample.shouldMis = 1.0;
+  lightSample.shouldMis = true;
 }
 
 void sampleDistantLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
@@ -48,7 +48,7 @@ void sampleDistantLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
   lightSample.emittance = light.emittance;
   lightSample.dist = INFINITY;
   lightSample.pdf = 1.0;
-  lightSample.shouldMis = 0.0;
+  lightSample.shouldMis = false;
 }
 
 void sampleOneLight(inout uint seed, in GpuLight light, in vec3 scatterPos,
@@ -86,7 +86,8 @@ vec3 evalEnvmap(in sampler2D envmapSamplers[3], in vec3 evalDir,
 }
 
 vec3 sampleEnvmap(in uint seed, in sampler2D envmapSamplers[3],
-                  in mat4 envTransform, in vec2 hdrResolution, inout float pdf) {
+                  in mat4 envTransform, in vec2 hdrResolution,
+                  inout float pdf) {
   float r1 = rand(seed);
   float r2 = rand(seed);
 

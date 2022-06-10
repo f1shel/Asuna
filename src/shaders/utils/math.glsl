@@ -14,6 +14,14 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+vec3 barymix3(vec3 a, vec3 b, vec3 c, vec3 ba) {
+  return a * ba.x + b * ba.y + c * ba.z;
+}
+
+vec2 barymix2(vec2 a, vec2 b, vec2 c, vec3 ba) {
+  return a * ba.x + b * ba.y + c * ba.z;
+}
+
 vec3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi,
                         float cosPhi) {
   return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
@@ -50,8 +58,8 @@ float tanTheta(vec3 v) {
   return sqrt(temp) / v.z;
 }
 
-float safeSqrt(float value) { 
-  if(isnan(value)) return 0;
+float safeSqrt(float value) {
+  if (isnan(value)) return 0;
   return sqrt(max(0, value));
 }
 
