@@ -59,7 +59,7 @@ private:
 #endif  // NVP_SUPPORTS_OPTIX7
   // Timeline semaphores
   uint64_t m_fenceValue{0};
-  bool m_denoiseApply{true};
+  bool m_denoiseApply{false};
   bool m_denoiseFirstFrame{false};
   int m_denoiseEveryNFrames{100};
   // #OPTIX_D

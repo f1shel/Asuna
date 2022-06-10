@@ -15,8 +15,6 @@ float dielectricFresnel(float cosThetaI, float eta) {
   // Total internal reflection
   if (sinThetaTSq > 1.0) return 1.0;
 
-  return sinThetaTSq;
-
   float cosThetaT = sqrt(max(1.0 - sinThetaTSq, 0.0));
 
   float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
@@ -27,18 +25,38 @@ float dielectricFresnel(float cosThetaI, float eta) {
 
 vec3 dielectricEval(vec3 L, vec3 V, vec3 N, float eta) {
   vec3 f = vec3(0);
-  if (abs(dot(refract(-V, N, eta), L) - 1) < EPS) f += vec3(1);
+  if (dot(L, N) > 0) {
+    if (abs(dot(reflect(-V, N), L) - 1) < EPS) f += vec3(1);
+  } else {
+    if (abs(dot(refract(-V, N, eta), L) - 1) < EPS) f += vec3(1) * eta * eta;
+  }
   return f;
 }
 
-float dielectricPdf() { return 0.0; }
+// Do not mis with direct light
+float dielectricPdf(vec3 L, vec3 V, vec3 N, float eta) {
+  float pdf = 0.0;
+  float F = dielectricFresnel(abs(dot(V, N)), eta);
+  if (dot(L, N) > 0) {
+    if (abs(dot(reflect(-V, N), L) - 1) < EPS) pdf = F;
+  } else {
+    if (abs(dot(refract(-V, N, eta), L) - 1) < EPS) pdf = 1 - F;
+  }
+  return pdf;
+}
 
 void dielectricSample(vec3 V, vec3 N, float eta, inout BsdfSample bsdfSample) {
   float F = dielectricFresnel(abs(dot(V, N)), eta);
   bsdfSample.shouldMis = false;
-  bsdfSample.direction = makeNormal(refract(-V, N, eta));
-  bsdfSample.pdf = 1.0;
-  bsdfSample.val = vec3(1);
+  if (rand(payload.seed) < F) {
+    bsdfSample.direction = makeNormal(reflect(-V, N));
+    bsdfSample.pdf = F;
+    bsdfSample.val = vec3(1);
+  } else {
+    bsdfSample.direction = makeNormal(refract(-V, N, eta));
+    bsdfSample.pdf = 1 - F;
+    bsdfSample.val = vec3(1) * eta * eta;
+  }
 }
 
 void main() {
@@ -132,7 +150,8 @@ void main() {
 
     if (payload.directVisible) {
       // Multi importance sampling
-      float bsdfPdf = lightSample.shouldMis ? dielectricPdf() : 0.0;
+      float bsdfPdf = lightSample.shouldMis ? dielectricPdf(lightSample.direction, state.viewDir,
+                                    state.ffnormal, eta) : 0.0;
       vec3 bsdfVal = dielectricEval(lightSample.direction, state.viewDir,
                                     state.ffnormal, eta);
       float misWeight = powerHeuristic(lightSample.pdf, bsdfPdf);
