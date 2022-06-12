@@ -36,23 +36,33 @@ hitAttributeEXT vec2 _bary;
 // clang-format on
 
 struct HitState {
-  int lightId;         // lightId >= 0 if hit point is a emitter
-  vec2 uv;             // texture coordinates
-  vec3 hitPos;         // hit point position
-  vec3 shadingNormal;  // interpolated vertex normal
-  vec3 faceNormal;     // facet normal
-  vec3 ffnormal;       // face forward normal, Z
-  vec3 tangent;        // tangent, X
-  vec3 bitangent;      // bitangent, Y
-  vec3 viewDir;        // normalized view direction
-  GpuMaterial mat;     // material
+  // lightId >= 0 if hit point is a emitter
+  int lightId;
+  // texture coordinates
+  vec2 uv;
+  // hit point position
+  vec3 pos;
+  // normalized view direction in world space
+  vec3 V;
+  // interpolated vertex normal/shading Normal
+  vec3 N;
+  // geo normal
+  vec3 geoN;
+  // face forward normal
+  vec3 ffN;
+  // tangent
+  vec3 X;
+  // bitangent
+  vec3 Y;
+  // material
+  GpuMaterial mat;
 };
 
 // clang-format off
 void configureShadingFrame(inout HitState state) {
-  if (pc.useFaceNormal == 1) state.shadingNormal = state.faceNormal;
-  basis(state.shadingNormal, state.tangent, state.bitangent);
-  state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0 ? state.shadingNormal : -state.shadingNormal;
+  if (pc.useFaceNormal == 1) state.N = state.geoN;
+  basis(state.N, state.X, state.Y);
+  state.ffN = dot(state.N, state.V) > 0 ? state.N : -state.N;
 }
 
 HitState getHitState() {
@@ -68,14 +78,14 @@ HitState getHitState() {
   GpuVertex v2 = _vertices.v[id.z];
   vec3      ba = vec3(1.0 - _bary.x - _bary.y, _bary.x, _bary.y);
 
-  state.lightId       = _inst.lightId;
-  state.uv            = barymix2(v0.uv, v1.uv, v2.uv, ba);
-  state.hitPos        = gl_ObjectToWorldEXT * vec4(barymix3(v0.pos, v1.pos, v2.pos, ba), 1.f);
-  state.shadingNormal = barymix3(v0.normal, v1.normal, v2.normal, ba);
-  state.shadingNormal = makeNormal((state.shadingNormal * gl_WorldToObjectEXT).xyz);
-  state.faceNormal    = cross(v1.pos - v0.pos, v2.pos - v0.pos);
-  state.faceNormal    = makeNormal((state.faceNormal * gl_WorldToObjectEXT).xyz);
-  state.viewDir       = makeNormal(-gl_WorldRayDirectionEXT);
+  state.lightId = _inst.lightId;
+  state.uv      = barymix2(v0.uv, v1.uv, v2.uv, ba);
+  state.pos     = gl_ObjectToWorldEXT * vec4(barymix3(v0.pos, v1.pos, v2.pos, ba), 1.f);
+  state.N       = barymix3(v0.normal, v1.normal, v2.normal, ba);
+  state.N       = makeNormal((state.N * gl_WorldToObjectEXT).xyz);
+  state.ffN     = cross(v1.pos - v0.pos, v2.pos - v0.pos);
+  state.ffN     = makeNormal((state.ffN * gl_WorldToObjectEXT).xyz);
+  state.V       = makeNormal(-gl_WorldRayDirectionEXT);
 
   // Get material if hit surface is not emitter
   if (state.lightId < 0) state.mat = Materials(_inst.materialAddress).m[0];
@@ -86,54 +96,78 @@ HitState getHitState() {
 }
 // clang-format on
 
-void hitLight(in int lightId, in vec3 hitPos) {
-  GpuLight light = lights.l[lightId];
-  vec3 lightDirection = normalize(hitPos - payload.ray.origin);
-  vec3 lightNormal = normalize(cross(light.u, light.v));
-  float lightSideProjection = dot(lightNormal, lightDirection);
-
-  payload.stop = true;
-  // Single side light
-  if (lightSideProjection > 0 && light.doubleSide == 0) return;
-  // Do not mis
-  if (payload.depth == 1) {
-    payload.radiance = light.emittance;
-    return;
-  }
-  // Do mis
-  float lightDist = length(hitPos - payload.ray.origin);
-  float distSquare = lightDist * lightDist;
-  float lightPdf =
-      payload.bsdfShouldMis
-          ? distSquare / (light.area * abs(lightSideProjection) + EPS)
-          : 0.0;
-  float misWeight = powerHeuristic(payload.bsdfPdf, lightPdf);
-  payload.radiance += payload.throughput * light.emittance * misWeight;
-  return;
+vec3 sampleEnvironmentLight(inout LightSamplingRecord lRec) {
+  vec3 radiance = vec3(0);
+  // Sample environment light
+  lRec.flags = EArea;
+  lRec.dist = INFINITY;
+  // Eusure visible light
+  lRec.n = -makeNormal(gl_WorldRayDirectionEXT);
+  if (sunAndSky.in_use == 1)
+    radiance =
+        sampleSunSky(rand2(payload.pRec.seed), sunAndSky, lRec.d, lRec.pdf);
+  else if (pc.hasEnvMap == 1)
+    radiance = sampleEnvmap(rand2(payload.pRec.seed), envmapSamplers,
+                            cameraInfo.envTransform, pc.envMapResolution,
+                            pc.envMapIntensity, lRec.d, lRec.pdf);
+  else
+    radiance = sampleBackGround(rand2(payload.pRec.seed), pc.bgColor, lRec.d,
+                                lRec.pdf);
+  return radiance;
 }
 
-void sampleEnvironmentLight(inout LightSample lightSample) {
-  // Sample environment light
-  lightSample.shouldMis = true;
-  lightSample.dist = INFINITY;
-  if (sunAndSky.in_use == 1) {
-    lightSample.direction =
-        uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
-    lightSample.emittance = sun_and_sky(sunAndSky, lightSample.direction);
-    lightSample.pdf = uniformSpherePdf();
-  } else if (pc.hasEnvMap == 1) {
-    lightSample.direction =
-        sampleEnvmap(payload.seed, envmapSamplers, cameraInfo.envTransform,
-                     pc.envMapResolution, lightSample.pdf);
-    lightSample.emittance =
-        evalEnvmap(envmapSamplers, lightSample.direction,
-                   cameraInfo.envTransform, pc.envMapIntensity);
-  } else {
-    lightSample.direction =
-        uniformSampleSphere(vec2(rand(payload.seed), rand(payload.seed)));
-    lightSample.emittance = pc.bgColor;
-    lightSample.pdf = uniformSpherePdf();
-  }
+vec3 sampleLights(vec3 scatterPos, vec3 scatterNormal, out bool visible, out LightSamplingRecord lRec) {
+    bool allowDoubleSide = false;
+    vec3 radiance = vec3(0);
+
+    // 4 cases:
+    // (1) has env & light: envSelectPdf = 0.5, analyticSelectPdf = 0.5
+    // (2) no env & light: skip direct light
+    // (3) has env, no light: envSelectPdf = 1.0, analyticSelectPdf = 0.0
+    // (4) no env, has light: envSelectPdf = 0.0, analyticSelectPdf = 1.0
+    bool hasEnv = (pc.hasEnvMap == 1 || sunAndSky.in_use == 1);
+    bool hasLight = (pc.numLights > 0);
+    float envSelectPdf, analyticSelectPdf;
+    if (hasEnv && hasLight)
+      envSelectPdf = analyticSelectPdf = 0.5f;
+    else if (hasEnv)
+      envSelectPdf = 1.f, analyticSelectPdf = 0.f;
+    else if (hasLight)
+      envSelectPdf = 0.f, analyticSelectPdf = 1.f;
+    else
+      envSelectPdf = analyticSelectPdf = 0.f;
+    DEBUG_INF_NAN(payload.dRec.radiance, "radiance direct\n");
+
+    float envOrAnalyticSelector = rand(payload.pRec.seed);
+    if (envOrAnalyticSelector < envSelectPdf) {
+      // Sample environment light
+      radiance = sampleEnvironmentLight(lRec) / envSelectPdf;
+      allowDoubleSide = true;
+    } else if (envOrAnalyticSelector < envSelectPdf + analyticSelectPdf) {
+      // Sample analytic light, randomly pick one
+      int lightIndex =
+          min(1 + int(rand(payload.pRec.seed) * pc.numLights), pc.numLights);
+      GpuLight light = lights.l[lightIndex];
+      radiance = sampleOneLight(rand2(payload.pRec.seed), light, scatterPos,
+                                lRec) *
+            pc.numLights / analyticSelectPdf;
+      radiance *= pc.numLights;
+      radiance /= analyticSelectPdf;
+      allowDoubleSide = (light.doubleSide == 1);
+    }
+
+    // Configure direct light setting by light sample
+    payload.dRec.ray.o = offsetPositionAlongNormal(scatterPos, scatterNormal);
+    payload.dRec.ray.d = lRec.d;
+    payload.dRec.dist = lRec.dist;
+
+    // Light at the back of the surface is not visible
+    visible = (dot(lRec.d, scatterNormal) > 0.0 && lRec.pdf > 0.0);
+    // Surface on the back of the light is also not illuminated
+    visible =
+        visible && (dot(lRec.n, lRec.d) < 0 || allowDoubleSide);
+
+    return radiance;
 }
 
 vec4 textureEval(int texId, vec2 uv) {

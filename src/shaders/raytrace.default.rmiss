@@ -5,11 +5,11 @@
 #extension GL_EXT_scalar_block_layout : require
 
 #include "../shared/binding.h"
-#include "../shared/sun_and_sky.h"
-#include "../shared/pushconstant.h"
-#include "../shared/camera.h"
-#include "utils/math.glsl"
 #include "utils/structs.glsl"
+#include "../shared/sun_and_sky.h"
+#include "../shared/camera.h"
+#include "../shared/pushconstant.h"
+#include "utils/math.glsl"
 #include "utils/sun_and_sky.glsl"
 #include "utils/sample_light.glsl"
 
@@ -23,33 +23,35 @@ layout(push_constant)                            uniform _RtxState  { GpuPushCon
 
 void main() {
   // Stop ray if it does not hit anything
-  payload.stop = true;
+  payload.pRec.stop = true;
 
   // Evaluate environment light and only do mis when depth > 1.
-  vec3 env;
+  vec3 env = vec3(0), d = payload.pRec.ray.d;
   float envPdf = 0.0;
-  if (sunAndSky.in_use == 1) {
-    env = sun_and_sky(sunAndSky, gl_WorldRayDirectionEXT);
-    envPdf = payload.bsdfShouldMis
-                 ? cosineHemispherePdf(gl_WorldRayDirectionEXT.z)
-                 : 0.0;
-  } else if (pc.hasEnvMap == 1) {
-    env = evalEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
-                     cameraInfo.envTransform, pc.envMapIntensity);
-    envPdf = payload.bsdfShouldMis
-                 ? pdfEnvmap(envmapSamplers, gl_WorldRayDirectionEXT,
-                             cameraInfo.envTransform, pc.envMapResolution)
-                 : 0.0;
-  } else {
+  if (sunAndSky.in_use == 1)
+    env = sun_and_sky(sunAndSky, d);
+  else if (pc.hasEnvMap == 1)
+    env = evalEnvmap(envmapSamplers, cameraInfo.envTransform,
+                     pc.envMapIntensity, d);
+  else
     env = pc.bgColor;
-    envPdf = payload.bsdfShouldMis
-                 ? cosineHemispherePdf(gl_WorldRayDirectionEXT.z)
-                 : 0.0;
+
+  if (payload.pRec.depth != 1 && isNonSpecular(payload.bRec.flags)) {
+    if (sunAndSky.in_use == 1)
+      envPdf = uniformSpherePdf();
+    else if (pc.hasEnvMap == 1)
+      envPdf = pdfEnvmap(envmapSamplers, cameraInfo.envTransform,
+                         pc.envMapResolution, d);
+    else
+      envPdf = uniformSpherePdf();
   }
 
   // Multiple importance sampling
-  float misWeight =
-      payload.depth > 1 ? powerHeuristic(payload.bsdfPdf, envPdf) : 1.f;
+  float misWeight = 1.0;
+  if (isNonSpecular(payload.bRec.flags) && payload.pRec.depth != 1)
+    misWeight = powerHeuristic(payload.bRec.pdf, envPdf);
 
-  payload.radiance += payload.throughput * env * misWeight;
+  payload.pRec.radiance += payload.pRec.throughput * env * misWeight;
+  DEBUG_INF_NAN(env, "miss\n");
+  DEBUG_INF_NAN1(misWeight, "misWeight\n");
 }

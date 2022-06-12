@@ -11,17 +11,17 @@
 
 void main() {
   // Treat emissive as a light
-  payload.stop = true;
+  payload.pRec.stop = true;
 
   // Get hit state
   HitState state = getHitState();
 
   // Fetch textures
-  if (state.mat.emittanceTextureId >= 0)
-    state.mat.emittance =
-        state.mat.emittanceFactor *
-        textureEval(state.mat.emittanceTextureId, state.uv).rgb;
+  if (state.mat.radianceTextureId >= 0)
+    state.mat.radiance =
+        state.mat.radianceFactor *
+        textureEval(state.mat.radianceTextureId, state.uv).rgb;
 
   if (pc.ignoreEmissive == 0)
-    payload.radiance += state.mat.emittance * payload.throughput;
+    payload.pRec.radiance += state.mat.radiance * payload.pRec.throughput;
 }

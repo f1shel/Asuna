@@ -231,19 +231,19 @@ void Loader::addCamera(const nlohmann::json& cameraJson) {
 }
 
 void Loader::addLight(const nlohmann::json& lightJson) {
-  JsonCheckKeys(lightJson, {"type", "emittance"});
+  JsonCheckKeys(lightJson, {"type", "radiance"});
   GpuLight light = {
       LightTypeUndefined,  // type
       vec3(0.0),           // position
       vec3(0.0),           // direction
-      vec3(0.0),           // emittance
+      vec3(0.0),           // radiance
       vec3(0.0),           // u
       vec3(0.0),           // v
       0.0,                 // radius
       0.0,                 // area
       0,                   // double side
   };
-  light.emittance = Json2Vec3(lightJson["emittance"]);
+  light.radiance = Json2Vec3(lightJson["radiance"]);
   if (lightJson["type"] == "rect" || lightJson["type"] == "triangle") {
     JsonCheckKeys(lightJson, {"position", "v1", "v2"});
     vec3 v1 = Json2Vec3(lightJson["v1"]);
@@ -349,13 +349,13 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
           m_pScene->getTextureId(materialJson["roughness_texture"]);
   } else if (materialJson["type"] == "brdf_emissive") {
     material.type = MaterialTypeBrdfEmissive;
-    if (materialJson.contains("emittance"))
-      material.emittance = Json2Vec3(materialJson["emittance"]);
-    if (materialJson.contains("emittance_factor"))
-      material.emittanceFactor = Json2Vec3(materialJson["emittance_factor"]);
-    if (materialJson.contains("emittance_texture"))
-      material.emittanceTextureId =
-          m_pScene->getTextureId(materialJson["emittance_texture"]);
+    if (materialJson.contains("radiance"))
+      material.radiance = Json2Vec3(materialJson["radiance"]);
+    if (materialJson.contains("radiance_factor"))
+      material.radianceFactor = Json2Vec3(materialJson["radiance_factor"]);
+    if (materialJson.contains("radiance_texture"))
+      material.radianceTextureId =
+          m_pScene->getTextureId(materialJson["radiance_texture"]);
   } else if (materialJson["type"] == "brdf_kang18") {
     material.type = MaterialTypeBrdfKang18;
     JsonCheckKeys(materialJson,

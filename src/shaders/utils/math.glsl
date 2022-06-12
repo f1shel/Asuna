@@ -14,6 +14,69 @@
 #define INFINITY 10000000000.0
 #define MINIMUM 0.00001
 
+// Generate a random seed for the random generator.
+//      https://github.com/Cyan4973/xxHash
+//      https://www.shadertoy.com/view/XlGcRh
+uint xxhash32Seed(uvec3 p) {
+  const uvec4 primes = uvec4(2246822519U, 3266489917U, 668265263U, 374761393U);
+  uint h32;
+  h32 = p.z + primes.w + p.x * primes.y;
+  h32 = primes.z * ((h32 << 17) | (h32 >> (32 - 17)));
+  h32 += p.y * primes.y;
+  h32 = primes.z * ((h32 << 17) | (h32 >> (32 - 17)));
+  h32 = primes.x * (h32 ^ (h32 >> 15));
+  h32 = primes.y * (h32 ^ (h32 >> 13));
+  return h32 ^ (h32 >> 16);
+}
+
+// PCG, A Family of Better Random Number Generators
+//      http://www.pcg-random.org
+uint pcg(inout uint state) {
+  uint prev = state * 747796405u + 2891336453u;
+  uint word = ((prev >> ((prev >> 28u) + 4u)) ^ prev) * 277803737u;
+  state = prev;
+  return (word >> 22u) ^ word;
+}
+
+// Generate a random float in [0, 1) given the previous RNG state
+float rand(inout uint seed) { return pcg(seed) * (1.0 / float(0xffffffffu)); }
+vec2 rand2(inout uint seed) { return vec2(rand(seed), rand(seed)); }
+vec3 rand3(inout uint seed) { return vec3(rand(seed), rand(seed), rand(seed)); }
+
+vec3 transformPoint(in mat4 transform, in vec3 point) {
+  vec4 homoPoint = vec4(point, 1.f);
+  vec4 tHomoPoint = transform * homoPoint;
+  return tHomoPoint.xyz / tHomoPoint.w;
+}
+
+vec3 transformVector(in mat4 transform, in vec3 vector) {
+  vec4 homoVector = vec4(vector, 0.f);
+  vec4 tHomoVector = transform * homoVector;
+  return tHomoVector.xyz;
+}
+
+vec3 makeNormal(vec3 n) {
+  if (length(n) == 0) return n;
+  return normalize(n);
+}
+
+vec3 transformDirection(in mat4 transform, in vec3 direction) {
+  vec3 tDir = transformVector(transform, direction);
+  return makeNormal(tDir);
+}
+
+float safeSqrt(float value) {
+  return sqrt(max(0, value));
+}
+
+vec3 toWorld(vec3 X, vec3 Y, vec3 Z, vec3 V) {
+  return V.x * X + V.y * Y + V.z * Z;
+}
+
+vec3 toLocal(vec3 X, vec3 Y, vec3 Z, vec3 V) {
+  return vec3(dot(V, X), dot(V, Y), dot(V, Z));
+}
+
 vec3 barymix3(vec3 a, vec3 b, vec3 c, vec3 ba) {
   return a * ba.x + b * ba.y + c * ba.z;
 }
@@ -32,8 +95,17 @@ bool checkInfNan(in vec3 M) {
          isinf((M).y) || isinf((M).z);
 }
 
+bool checkInfNan1(in float M) {
+  return isnan((M)) || isinf((M));
+}
+
 #define DEBUG_INF_NAN(M, str) \
   if (checkInfNan(M)) {       \
+    debugPrintfEXT(str);      \
+  }
+
+#define DEBUG_INF_NAN1(M, str) \
+  if (checkInfNan1(M)) {       \
     debugPrintfEXT(str);      \
   }
 
@@ -57,88 +129,6 @@ float tanTheta(vec3 v) {
   if (temp <= 0.0f) return 0.0f;
   return sqrt(temp) / v.z;
 }
-
-float safeSqrt(float value) {
-  if (isnan(value)) return 0;
-  return sqrt(max(0, value));
-}
-
-vec3 transformPoint(in mat4 transform, in vec3 point) {
-  vec4 homoPoint = vec4(point, 1.f);
-  vec4 tHomoPoint = transform * homoPoint;
-  return tHomoPoint.xyz / tHomoPoint.w;
-}
-
-vec3 transformVector(in mat4 transform, in vec3 vector) {
-  vec4 homoVector = vec4(vector, 0.f);
-  vec4 tHomoVector = transform * homoVector;
-  return tHomoVector.xyz;
-}
-
-vec3 transformDirection(in mat4 transform, in vec3 direction) {
-  vec3 tDir = transformVector(transform, direction);
-  return normalize(tDir);
-}
-
-vec3 toWorld(vec3 X, vec3 Y, vec3 Z, vec3 V) {
-  return V.x * X + V.y * Y + V.z * Z;
-}
-
-vec3 toLocal(vec3 X, vec3 Y, vec3 Z, vec3 V) {
-  return vec3(dot(V, X), dot(V, Y), dot(V, Z));
-}
-
-vec3 makeNormal(vec3 n) {
-  if (length(n) == 0) return n;
-  return normalize(n);
-}
-
-/*
- * Generate a random seed for the random generator.
- *
- * Note:
- *  (1) Input: three given unsigned integers
- *  (2) Reference:
- *      https://github.com/Cyan4973/xxHash
- *      https://www.shadertoy.com/view/XlGcRh
- */
-uint xxhash32Seed(uvec3 p) {
-  const uvec4 primes = uvec4(2246822519U, 3266489917U, 668265263U, 374761393U);
-  uint h32;
-  h32 = p.z + primes.w + p.x * primes.y;
-  h32 = primes.z * ((h32 << 17) | (h32 >> (32 - 17)));
-  h32 += p.y * primes.y;
-  h32 = primes.z * ((h32 << 17) | (h32 >> (32 - 17)));
-  h32 = primes.x * (h32 ^ (h32 >> 15));
-  h32 = primes.y * (h32 ^ (h32 >> 13));
-  return h32 ^ (h32 >> 16);
-}
-
-/*
- * PCG, A Family of Better Random Number Generators
- *
- * Note:
- *  (1) Reference:
- *      http://www.pcg-random.org
- */
-uint pcg(inout uint state) {
-  uint prev = state * 747796405u + 2891336453u;
-  uint word = ((prev >> ((prev >> 28u) + 4u)) ^ prev) * 277803737u;
-  state = prev;
-  return (word >> 22u) ^ word;
-}
-
-/*
- * Generate a random float in [0, 1) given the previous RNG state
- */
-float rand(inout uint seed) {
-  uint r = pcg(seed);
-  return r * (1.0 / float(0xffffffffu));
-}
-
-vec2 rand2(inout uint seed) { return vec2(rand(seed), rand(seed)); }
-
-vec3 rand3(inout uint seed) { return vec3(rand(seed), rand(seed), rand(seed)); }
 
 vec3 uniformSampleSphere(in vec2 u) {
   float z = 1 - 2 * u.x;

@@ -12,7 +12,7 @@ public:
     m_material.rhoSpec = vec3(0.f);
     m_material.ior = 1.5f;
     m_material.roughness = 0.f;
-    m_material.emittance = vec3(0.f);
+    m_material.radiance = vec3(0.f);
     m_material.metalness = 0.f;
     m_material.roughness = 0.5f;
     m_material.subsurface = 0.f;
@@ -23,9 +23,9 @@ public:
     m_material.sheenTint = 0.f;
     m_material.clearcoat = 0.f;
     m_material.clearcoatGloss = 0.f;
-    m_material.emittanceFactor = 1.f;
+    m_material.radianceFactor = 1.f;
     m_material.diffuseTextureId = -1;
-    m_material.emittanceTextureId = -1;
+    m_material.radianceTextureId = -1;
     m_material.metalnessTextureId = -1;
     m_material.normalTextureId = -1;
     m_material.roughnessTextureId = -1;

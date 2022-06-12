@@ -16,7 +16,7 @@ struct GpuLight {
   int type;
   vec3 position;
   vec3 direction;
-  vec3 emittance;
+  vec3 radiance;
   vec3 u, v;
   float radius;
   float area;

@@ -22,31 +22,26 @@ float dAnisoGGX(float HdotN, float HdotX, float HdotY, float ax, float ay) {
           EPS);
 }
 
-vec3 importanceSampleAnisoGGX(vec3 lwo, float ax, float ay) {
-  float u1 = rand(payload.seed);
-  float u2 = rand(payload.seed);
+vec3 importanceSampleAnisoGGX(vec2 u, vec3 wo, float ax, float ay) {
+  float u1 = u.x;
+  float u2 = u.y;
   float factor = safeSqrt(u1 / max(1 - u1, EPS));
   float phi = TWO_PI * u2;
 
-  vec3 lwh = vec3(0, 0, 1);
-  lwh.x = -ax * factor * cos(phi);
-  lwh.y = -ay * factor * sin(phi);
-  lwh = makeNormal(lwh);
+  vec3 wh = vec3(0, 0, 1);
+  wh.x = -ax * factor * cos(phi);
+  wh.y = -ay * factor * sin(phi);
+  wh = makeNormal(wh);
 
-  float HdotV = dot(lwh, lwo);
-  vec3 lwi = reflect(-lwo, lwh);
-
-  return lwi;
+  vec3 wi = reflect(-wo, wh);
+  return wi;
 }
 
-float importanceAnisoGGXPdf(in vec3 lwh, in vec3 lwo, in float ax,
-                            in float ay) {
-  float pdf = 0.0, HdotV = dot(lwh, lwo);
-  vec3 lwi = reflect(-lwo, lwh);
-  if (lwi.z > 0.0) {
-    pdf =
-        dAnisoGGX(lwh.z, lwh.x, lwh.y, ax, ay) * abs(lwh.z) / (4 * HdotV + EPS);
-  }
+float importanceAnisoGGXPdf(in vec3 wh, in vec3 wo, in float ax, in float ay) {
+  float pdf = 0.0, HdotV = dot(wh, wo);
+  vec3 wi = reflect(-wo, wh);
+  if (wi.z > 0.0 && wo.z > 0.0 && wh.z > 0.0)
+    pdf = dAnisoGGX(wh.z, wh.x, wh.y, ax, ay) * abs(wh.z) / (4 * HdotV + EPS);
   return pdf;
 }
 
@@ -59,13 +54,14 @@ float g1SmithAnisoGGX(float NdotV, float VdotX, float VdotY, float ax,
 
 const float DIFFUSE_LOBE_PROBABILITY = 0.5;
 
-vec3 kangEval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 rhoDiff,
-              vec3 rhoSpec, float ax, float ay, float metalness, float eta) {
-  vec3 f = vec3(0);
+vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks, float ax,
+          float ay, float eta, uint flags) {
+  vec3 weight = vec3(0);
+  if ((flags & EArea) == 0) return weight;
 
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);
-  if (NdotL <= 0.0 || NdotV <= 0.0) return vec3(0.0);
+  if (NdotL <= 0.0 || NdotV <= 0.0) return weight;
 
   vec3 H = makeNormal(L + V);
 
@@ -80,48 +76,55 @@ vec3 kangEval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 rhoDiff,
   float Ds = dAnisoGGX(HdotN, HdotX, HdotY, ax, ay);
   float Gs = g1SmithAnisoGGX(NdotV, dot(V, X), dot(V, Y), ax, ay);
   Gs *= g1SmithAnisoGGX(NdotL, dot(L, X), dot(L, Y), ax, ay);
-  vec3 diffuse = rhoDiff * INV_PI;
-  vec3 specular = rhoSpec * Fs * Ds * Gs;
+  vec3 diffuse = kd * INV_PI;
+  vec3 specular = ks * Fs * Ds * Gs;
 
-  f += diffuse;
-
-  f += specular;
-
-  return f;
+  weight += diffuse;
+  weight += specular;
+  weight *= NdotL;
+  return weight;
 }
 
-float kangPdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay) {
+float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay,
+          uint flags) {
   float pdf = 0.0;
+  if ((flags & EArea) == 0) return pdf;
+
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);
   if (NdotL <= 0.0 || NdotV <= 0.0) return pdf;
 
   vec3 H = makeNormal(L + V);
-  vec3 lwh = makeNormal(toLocal(X, Y, N, H));
-  vec3 lwo = makeNormal(toLocal(X, Y, N, V));
-  vec3 lwi = makeNormal(toLocal(X, Y, N, L));
+  vec3 wh = makeNormal(toLocal(X, Y, N, H));
+  vec3 wo = makeNormal(toLocal(X, Y, N, V));
+  vec3 wi = makeNormal(toLocal(X, Y, N, L));
 
-  pdf += DIFFUSE_LOBE_PROBABILITY * cosineHemispherePdf(lwi.z);
-  pdf +=
-      (1 - DIFFUSE_LOBE_PROBABILITY) * importanceAnisoGGXPdf(lwh, lwo, ax, ay);
+  pdf += DIFFUSE_LOBE_PROBABILITY * cosineHemispherePdf(wi.z);
+  pdf += (1 - DIFFUSE_LOBE_PROBABILITY) * importanceAnisoGGXPdf(wh, wo, ax, ay);
 
   return pdf;
 }
 
-void kangSample(vec3 lwo, float ax, float ay, inout BsdfSample bsdfSample) {
-  vec3 lwi;
-  float r = rand(payload.seed);
-  bsdfSample.pdf = 0.0;
-  bsdfSample.shouldMis = true;
-  if (r < DIFFUSE_LOBE_PROBABILITY) {
-    lwi = cosineSampleHemisphere(rand2(payload.seed));
-    bsdfSample.pdf = cosineHemispherePdf(lwi.z);
+vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks,
+                float ax, float ay, float eta, out BsdfSamplingRecord bRec) {
+  vec3 wo = makeNormal(toLocal(X, Y, N, V));
+
+  vec3 wi;
+  bRec.pdf = 0.0;
+  if (rand(payload.pRec.seed) < DIFFUSE_LOBE_PROBABILITY) {
+    wi = cosineSampleHemisphere(u);
+    bRec.flags = EDiffuseReflection;
+    bRec.pdf = cosineHemispherePdf(wi.z);
   } else {
-    lwi = importanceSampleAnisoGGX(lwo, ax, ay);
-    vec3 lwh = makeNormal(lwi + lwo);
-    bsdfSample.pdf = importanceAnisoGGXPdf(lwh, lwo, ax, ay);
+    wi = importanceSampleAnisoGGX(u, wo, ax, ay);
+    vec3 wh = makeNormal(wi + wo);
+    bRec.pdf = importanceAnisoGGXPdf(wh, wo, ax, ay);
+    bRec.flags = EGlossyReflection;
   }
-  bsdfSample.direction = lwi;
+  bRec.d = toWorld(X, Y, N, wi);
+  vec3 weight =
+      eval(bRec.d, V, N, X, Y, kd, ks, ax, ay, eta, EArea) * abs(wi.z);
+  return weight;
 }
 
 void main() {
@@ -129,32 +132,24 @@ void main() {
   HitState state = getHitState();
 
   // Fetch textures
-  if (state.mat.diffuseTextureId >= 0)
-    state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
-  if (state.mat.metalnessTextureId >= 0)
-    state.mat.rhoSpec = textureEval(state.mat.metalnessTextureId, state.uv).rgb;
-  if (state.mat.roughnessTextureId >= 0)
-    state.mat.anisoAlpha =
-        textureEval(state.mat.roughnessTextureId, state.uv).rg;
-  if (state.mat.normalTextureId >= 0) {
-    vec3 c = textureEval(state.mat.normalTextureId, state.uv).rgb;
-    vec3 n = 2 * c - 1;
-    state.shadingNormal = makeNormal((n * gl_WorldToObjectEXT).xyz);
+  state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
+  state.mat.rhoSpec = textureEval(state.mat.metalnessTextureId, state.uv).rgb;
+  state.mat.anisoAlpha = textureEval(state.mat.roughnessTextureId, state.uv).rg;
 
-    configureShadingFrame(state);
-  }
-  if (state.mat.tangentTextureId >= 0) {
-    vec3 c = textureEval(state.mat.tangentTextureId, state.uv).rgb;
-    vec3 t = 2 * c - 1;
-    state.tangent = makeNormal((t * gl_WorldToObjectEXT).xyz);
-  }
+  vec3 cn = textureEval(state.mat.normalTextureId, state.uv).rgb;
+  vec3 n = 2 * cn - 1;
+  state.N = makeNormal((n * gl_WorldToObjectEXT).xyz);
+  // Reset shading normal to face normal if needed
+  configureShadingFrame(state);
+
+  vec3 ct = textureEval(state.mat.tangentTextureId, state.uv).rgb;
+  vec3 t = 2 * ct - 1;
+  state.X = makeNormal((t * gl_WorldToObjectEXT).xyz);
 
   // Rebuild tangent and bitangent
-  state.bitangent = makeNormal(cross(state.shadingNormal, state.tangent));
-  state.tangent = makeNormal(cross(state.bitangent, state.shadingNormal));
-  state.ffnormal = dot(state.shadingNormal, state.viewDir) > 0
-                       ? state.shadingNormal
-                       : -state.shadingNormal;
+  state.Y = makeNormal(cross(state.N, state.X));
+  state.X = makeNormal(cross(state.Y, state.N));
+  state.ffN = dot(state.N, state.V) > 0 ? state.N : -state.N;
 
   float ax = max(state.mat.anisoAlpha.x, EPS);
   float ay = max(state.mat.anisoAlpha.y, EPS);
@@ -162,120 +157,51 @@ void main() {
   float eta = state.mat.ior;
 
   // Configure information for denoiser
-  if (payload.depth == 1) {
-    payload.denoiserAlbedo = state.mat.diffuse;
-    payload.denoiserNormal = state.ffnormal;
+  if (payload.pRec.depth == 1) {
+    payload.mRec.albedo = state.mat.diffuse;
+    payload.mRec.normal = state.ffN;
   }
 
   // Direct light
   {
-    // Light and environment contribution
-    vec3 Li = vec3(0);
-    bool allowDoubleSide = false;
-    LightSample lightSample;
+    vec3 Ld = vec3(0);
+    bool visible;
+    LightSamplingRecord lRec;
+    vec3 radiance = sampleLights(state.pos, state.ffN, visible, lRec);
 
-    // 4 cases:
-    // (1) has env & light: envSelectPdf = 0.5, analyticSelectPdf = 0.5
-    // (2) no env & light: skip direct light
-    // (3) has env, no light: envSelectPdf = 1.0, analyticSelectPdf = 0.0
-    // (4) no env, has light: envSelectPdf = 0.0, analyticSelectPdf = 1.0
-    bool hasEnv = (pc.hasEnvMap == 1 || sunAndSky.in_use == 1);
-    bool hasLight = (pc.numLights > 0);
-    float envSelectPdf, analyticSelectPdf;
-    if (hasEnv && hasLight)
-      envSelectPdf = analyticSelectPdf = 0.5f;
-    else if (hasEnv)
-      envSelectPdf = 1.f, analyticSelectPdf = 0.f;
-    else if (hasLight)
-      envSelectPdf = 0.f, analyticSelectPdf = 1.f;
-    else
-      envSelectPdf = analyticSelectPdf = 0.f;
-
-    float envOrAnalyticSelector = rand(payload.seed);
-    if (envOrAnalyticSelector < envSelectPdf) {
-      // Sample environment light
-      sampleEnvironmentLight(lightSample);
-      lightSample.normal = -state.ffnormal;
-      lightSample.emittance /= envSelectPdf;
-    } else if (envOrAnalyticSelector < envSelectPdf + analyticSelectPdf) {
-      // Sample analytic light, randomly pick one
-      int lightIndex =
-          min(1 + int(rand(payload.seed) * pc.numLights), pc.numLights);
-      GpuLight light = lights.l[lightIndex];
-      sampleOneLight(payload.seed, light, state.hitPos, lightSample);
-      lightSample.emittance *= pc.numLights;
-      lightSample.emittance /= analyticSelectPdf;
-      allowDoubleSide = (light.doubleSide == 1);
-    } else {
-      // Skip direct light
-      payload.shouldDirectLight = false;
-    }
-
-    // Configure direct light setting by light sample
-    payload.directHitPos =
-        offsetPositionAlongNormal(state.hitPos, state.ffnormal);
-    payload.directDir = lightSample.direction;
-    payload.directDist = lightSample.dist;
-
-    // Light at the back of the surface is not visible
-    payload.directVisible = (dot(lightSample.direction, state.ffnormal) > 0.0);
-    // Surface on the back of the light is also not illuminated
-    payload.directVisible =
-        payload.directVisible &&
-        (dot(lightSample.normal, lightSample.direction) < 0 || allowDoubleSide);
-
-    if (payload.directVisible) {
-      BsdfSample bsdfSample;
-
+    if (visible) {
+      vec3 bsdfWeight =
+          eval(lRec.d, state.V, state.ffN, state.X, state.Y, state.mat.diffuse,
+               state.mat.rhoSpec, ax, ay, eta, lRec.flags);
       // Multi importance sampling
       float bsdfPdf =
-          lightSample.shouldMis
-              ? kangPdf(lightSample.direction, state.viewDir, state.ffnormal,
-                        state.tangent, state.bitangent, ax, ay)
-              : 0.0;
-      vec3 bsdfVal =
-          kangEval(lightSample.direction, state.viewDir, state.ffnormal,
-                   state.tangent, state.bitangent, state.mat.diffuse,
-                   state.mat.rhoSpec, ax, ay, state.mat.metalness, eta);
+          pdf(lRec.d, state.V, state.ffN, state.X, state.Y, ax, ay, lRec.flags);
 
-      float misWeight = powerHeuristic(lightSample.pdf, bsdfPdf);
+      float misWeight = powerHeuristic(lRec.pdf, bsdfPdf);
 
-      Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal) *
-            lightSample.emittance / (lightSample.pdf + EPS);
-
-      payload.directContribution = Li * payload.throughput;
+      Ld = misWeight * bsdfWeight * radiance * payload.pRec.throughput /
+           (lRec.pdf + EPS);
     }
+
+    payload.dRec.radiance = Ld;
+    payload.dRec.skip = (!visible);
   }
 
   // Sample next ray
-  BsdfSample bsdfSample;
-
-  // Shading frame, local tangent space
-  vec3 lwo = makeNormal(
-      toLocal(state.tangent, state.bitangent, state.ffnormal, state.viewDir));
-  kangSample(lwo, ax, ay, bsdfSample);
-  bsdfSample.val =
-      kangEval(bsdfSample.direction, state.viewDir, state.ffnormal,
-               state.tangent, state.bitangent, state.mat.diffuse,
-               state.mat.rhoSpec, ax, ay, state.mat.metalness, eta);
-
-  // World space
-  bsdfSample.direction = toWorld(state.tangent, state.bitangent, state.ffnormal,
-                                 bsdfSample.direction);
-  bsdfSample.direction = makeNormal(bsdfSample.direction);
+  BsdfSamplingRecord bRec;
+  vec3 bsdfWeight =
+      sampleBsdf(rand2(payload.pRec.seed), state.V, state.ffN, state.X, state.Y,
+                 state.mat.diffuse, state.mat.rhoSpec, ax, ay, eta, bRec);
 
   // Reject invalid sample
-  if (bsdfSample.pdf <= 0.0 || length(bsdfSample.val) == 0.0) {
-    payload.stop = true;
+  if (bRec.pdf <= 0.0 || length(bsdfWeight) == 0.0) {
+    payload.pRec.stop = true;
     return;
   }
 
   // Next ray
-  payload.bsdfPdf = bsdfSample.pdf;
-  payload.bsdfShouldMis = bsdfSample.shouldMis;
-  payload.ray.direction = bsdfSample.direction;
-  payload.throughput *= bsdfSample.val *
-                        abs(dot(state.ffnormal, bsdfSample.direction)) /
-                        (bsdfSample.pdf + EPS);
-  payload.ray.origin = payload.directHitPos;
+  payload.bRec = bRec;
+  payload.pRec.ray.o = payload.dRec.ray.o;
+  payload.pRec.ray.d = bRec.d;
+  payload.pRec.throughput *= bsdfWeight / (bRec.pdf + EPS);
 }

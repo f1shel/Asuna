@@ -98,7 +98,7 @@ void Scene::reset() {
       LightTypeDirectional,  // type
       vec3(0.f),             // position
       vec3(0.f),             // direction
-      vec3(0.f),             // emittance
+      vec3(0.f),             // radiance
       vec3(0.f),             // u
       vec3(0.f),             // v
       0.f,                   // radius

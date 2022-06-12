@@ -23,19 +23,25 @@ float dielectricFresnel(float cosThetaI, float eta) {
   return 0.5f * (rs * rs + rp * rp);
 }
 
-vec3 dielectricEval(vec3 L, vec3 V, vec3 N, float eta) {
-  vec3 f = vec3(0);
+vec3 eval(vec3 L, vec3 V, vec3 N, float eta, uint flags) {
+  vec3 weight = vec3(0);
+  if ((flags & EDelta) == 0) return weight;
+
+  float F = dielectricFresnel(abs(dot(V, N)), eta);
   if (dot(L, N) > 0) {
-    if (abs(dot(reflect(-V, N), L) - 1) < EPS) f += vec3(1);
+    if (abs(dot(reflect(-V, N), L) - 1) < EPS) weight += F * vec3(1);
   } else {
-    if (abs(dot(refract(-V, N, eta), L) - 1) < EPS) f += vec3(1) * eta * eta;
+    if (abs(dot(refract(-V, N, eta), L) - 1) < EPS)
+      weight += (1 - F) * vec3(1) * eta * eta;
   }
-  return f;
+  return weight;
 }
 
-// Do not mis with direct light
-float dielectricPdf(vec3 L, vec3 V, vec3 N, float eta) {
+// Do not mis with area light
+float pdf(vec3 L, vec3 V, vec3 N, float eta, uint flags) {
   float pdf = 0.0;
+  if ((flags & EDelta) == 0) return pdf;
+
   float F = dielectricFresnel(abs(dot(V, N)), eta);
   if (dot(L, N) > 0) {
     if (abs(dot(reflect(-V, N), L) - 1) < EPS) pdf = F;
@@ -45,143 +51,87 @@ float dielectricPdf(vec3 L, vec3 V, vec3 N, float eta) {
   return pdf;
 }
 
-void dielectricSample(vec3 V, vec3 N, float eta, inout BsdfSample bsdfSample) {
+vec3 sampleBsdf(float u, vec3 V, vec3 N, float eta,
+                inout BsdfSamplingRecord bRec) {
+  vec3 weight = vec3(0);
   float F = dielectricFresnel(abs(dot(V, N)), eta);
-  bsdfSample.shouldMis = false;
-  if (rand(payload.seed) < F) {
-    bsdfSample.direction = makeNormal(reflect(-V, N));
-    bsdfSample.pdf = F;
-    bsdfSample.val = vec3(1);
+
+  if (u < F) {
+    bRec.d = makeNormal(reflect(-V, N));
+    bRec.pdf = F;
+    bRec.flags = ESpecularReflection;
+    weight = F * vec3(1);
   } else {
-    bsdfSample.direction = makeNormal(refract(-V, N, eta));
-    bsdfSample.pdf = 1 - F;
-    bsdfSample.val = vec3(1) * eta * eta;
+    bRec.d = makeNormal(refract(-V, N, eta));
+    bRec.pdf = 1 - F;
+    bRec.flags = ESpecularTransmission;
+    weight = (1 - F) * vec3(1) * eta * eta;
   }
+
+  return weight;
 }
 
 void main() {
   // Get hit record
   HitState state = getHitState();
 
-  // Hit Light
-  if (state.lightId >= 0) {
-    hitLight(state.lightId, state.hitPos);
-    return;
-  }
-
   // Fetch textures
   if (state.mat.normalTextureId >= 0) {
     vec3 c = textureEval(state.mat.normalTextureId, state.uv).rgb;
     vec3 n = 2 * c - 1;
-    state.shadingNormal =
-        toWorld(state.tangent, state.bitangent, state.shadingNormal, n);
-    state.shadingNormal = makeNormal(state.shadingNormal);
+    state.N = toWorld(state.X, state.Y, state.N, n);
+    state.N = makeNormal(state.N);
 
     configureShadingFrame(state);
   }
 
-  float eta = dot(state.viewDir, state.shadingNormal) > 0.0
-                  ? (1.0 / state.mat.ior)
-                  : state.mat.ior;
+  float eta =
+      dot(state.V, state.N) > 0.0 ? (1.0 / state.mat.ior) : state.mat.ior;
 
   // Configure information for denoiser
-  if (payload.depth == 1) {
-    payload.denoiserAlbedo = state.mat.diffuse;
-    payload.denoiserNormal = state.ffnormal;
+  if (payload.pRec.depth == 1) {
+    payload.mRec.albedo = state.mat.diffuse;
+    payload.mRec.normal = state.ffN;
   }
 
   // Direct light
   {
     // Light and environment contribution
-    vec3 Li = vec3(0);
-    bool allowDoubleSide = false;
-    LightSample lightSample;
+    vec3 Ld = vec3(0);
+    bool visible;
+    LightSamplingRecord lRec;
+    vec3 radiance = sampleLights(state.pos, state.ffN, visible, lRec);
 
-    // 4 cases:
-    // (1) has env & light: envSelectPdf = 0.5, analyticSelectPdf = 0.5
-    // (2) no env & light: skip direct light
-    // (3) has env, no light: envSelectPdf = 1.0, analyticSelectPdf = 0.0
-    // (4) no env, has light: envSelectPdf = 0.0, analyticSelectPdf = 1.0
-    bool hasEnv = (pc.hasEnvMap == 1 || sunAndSky.in_use == 1);
-    bool hasLight = (pc.numLights > 0);
-    float envSelectPdf, analyticSelectPdf;
-    if (hasEnv && hasLight)
-      envSelectPdf = analyticSelectPdf = 0.5f;
-    else if (hasEnv)
-      envSelectPdf = 1.f, analyticSelectPdf = 0.f;
-    else if (hasLight)
-      envSelectPdf = 0.f, analyticSelectPdf = 1.f;
-    else
-      envSelectPdf = analyticSelectPdf = 0.f;
+    if (visible) {
+      vec3 bsdfWeight = eval(lRec.d, state.V, state.ffN, eta, EArea);
 
-    float envOrAnalyticSelector = rand(payload.seed);
-    if (envOrAnalyticSelector < envSelectPdf) {
-      // Sample environment light
-      sampleEnvironmentLight(lightSample);
-      lightSample.normal = -state.ffnormal;
-      lightSample.emittance /= envSelectPdf;
-    } else if (envOrAnalyticSelector < envSelectPdf + analyticSelectPdf) {
-      // Sample analytic light, randomly pick one
-      int lightIndex =
-          min(1 + int(rand(payload.seed) * pc.numLights), pc.numLights);
-      GpuLight light = lights.l[lightIndex];
-      sampleOneLight(payload.seed, light, state.hitPos, lightSample);
-      lightSample.emittance *= pc.numLights;
-      lightSample.emittance /= analyticSelectPdf;
-      allowDoubleSide = (light.doubleSide == 1);
-    } else {
-      // Skip direct light
-      payload.shouldDirectLight = false;
-    }
-
-    // Configure direct light setting by light sample
-    payload.directHitPos =
-        offsetPositionAlongNormal(state.hitPos, state.ffnormal);
-    payload.directDir = lightSample.direction;
-    payload.directDist = lightSample.dist;
-
-    // Light at the back of the surface is not visible
-    payload.directVisible = (dot(lightSample.direction, state.ffnormal) > 0.0);
-
-    // Surface on the back of the light is also not illuminated
-    payload.directVisible =
-        payload.directVisible &&
-        (dot(lightSample.normal, lightSample.direction) < 0 || allowDoubleSide);
-
-    if (payload.directVisible) {
       // Multi importance sampling
-      float bsdfPdf = lightSample.shouldMis ? dielectricPdf(lightSample.direction, state.viewDir,
-                                    state.ffnormal, eta) : 0.0;
-      vec3 bsdfVal = dielectricEval(lightSample.direction, state.viewDir,
-                                    state.ffnormal, eta);
-      float misWeight = powerHeuristic(lightSample.pdf, bsdfPdf);
+      float bsdfPdf = pdf(lRec.d, state.V, state.ffN, eta, lRec.flags);
+      float misWeight = powerHeuristic(lRec.pdf, bsdfPdf);
 
-      Li += misWeight * bsdfVal * dot(lightSample.direction, state.ffnormal) *
-            lightSample.emittance / (lightSample.pdf + EPS);
-
-      payload.directContribution = Li * payload.throughput;
+      Ld += misWeight * bsdfWeight * radiance * payload.pRec.throughput /
+            (lRec.pdf + EPS);
     }
+
+    payload.dRec.radiance = Ld;
+    payload.dRec.skip = (!visible);
   }
 
   // Sample next ray
-  BsdfSample bsdfSample;
-
-  // World space
-  dielectricSample(state.viewDir, state.ffnormal, eta, bsdfSample);
+  BsdfSamplingRecord bRec;
+  vec3 bsdfWeight =
+      sampleBsdf(rand(payload.pRec.seed), state.V, state.ffN, eta, bRec);
 
   // Reject invalid sample
-  if (bsdfSample.pdf <= 0.0 || length(bsdfSample.val) == 0.0) {
-    payload.stop = true;
+  if (bRec.pdf <= 0.0 || length(bsdfWeight) == 0.0) {
+    payload.pRec.stop = true;
     return;
   }
 
   // Next ray
-  payload.bsdfPdf = bsdfSample.pdf;
-  payload.ray.direction = bsdfSample.direction;
-  payload.bsdfShouldMis = false;
-  payload.throughput *= bsdfSample.val *
-                        abs(dot(state.ffnormal, bsdfSample.direction)) /
-                        (bsdfSample.pdf + EPS);
-  payload.ray.origin = offsetPositionAlongNormal(
-      state.hitPos, sign(dot(bsdfSample.direction, state.ffnormal)) * state.ffnormal);
+  payload.bRec = bRec;
+  payload.pRec.ray.o = offsetPositionAlongNormal(
+      state.pos, sign(dot(bRec.d, state.N)) * state.N);
+  payload.pRec.ray.d = bRec.d;
+  payload.pRec.throughput *= bsdfWeight / (bRec.pdf + EPS);
 }

@@ -6,9 +6,9 @@
 // clang-format off
 START_ENUM(MaterialType)
   MaterialTypeBrdfLambertian            = 0,
-  MaterialTypeBrdfEmissive              = 1,
-  MaterialTypeBrdfPbrMetalnessRoughness = 2,
-  MaterialTypeBrdfKang18                = 3,
+  MaterialTypeBrdfKang18                = 1,
+  MaterialTypeBrdfEmissive              = 2,
+  MaterialTypeBrdfPbrMetalnessRoughness = 3,
   MaterialTypeBsdfDielectric            = 4,
   MaterialTypeNum                       = 5
 END_ENUM();
@@ -28,13 +28,13 @@ struct GpuMaterial {
   float sheenTint;         // disney
   float clearcoat;         // disney
   float clearcoatGloss;    // disney
-  vec3 emittance;          // emittance
+  vec3 radiance;          // radiance
   float metalness;         // metalness
-  vec3 emittanceFactor;    // emittance factor
+  vec3 radianceFactor;    // radiance factor
   int diffuseTextureId;    // diffuse albedo texture id
   int roughnessTextureId;  // roughness texture id
   int metalnessTextureId;  // metalness texture id
-  int emittanceTextureId;  // emittance texture id
+  int radianceTextureId;  // radiance texture id
   int normalTextureId;     // normal texture id
   int tangentTextureId;    // tangent texture id
   uint type;               // material type
