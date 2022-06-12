@@ -377,6 +377,16 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
       material.normalTextureId =
           m_pScene->getTextureId(materialJson["normal_texture"]);
     if (materialJson.contains("ior")) material.ior = materialJson["ior"];
+  } else if (materialJson["type"] == "brdf_plastic") {
+    material.type = MaterialTypeBrdfPlastic;
+    if (materialJson.contains("diffuse_reflectance"))
+      material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+    if (materialJson.contains("diffuse_texture"))
+      material.diffuseTextureId =
+          m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);
