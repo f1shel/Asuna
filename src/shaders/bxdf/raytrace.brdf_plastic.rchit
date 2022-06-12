@@ -9,110 +9,122 @@
 
 #include "../utils/rchit_layouts.glsl"
 
-float dielectricFresnel(float cosThetaI, float eta) {
-  float sinThetaTSq = eta * eta * (1.0f - cosThetaI * cosThetaI);
-
-  // Total internal reflection
-  if (sinThetaTSq > 1.0) return 1.0;
-
-  float cosThetaT = sqrt(max(1.0 - sinThetaTSq, 0.0));
-
-  float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
-  float rp = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
-
-  return 0.5f * (rs * rs + rp * rp);
-}
-
-float fresnelDiffuseReflectance(float eta) {
-  // Fast mode: the following code approximates the
-  // diffuse Frensel reflectance for the eta<1 and
-  // eta>1 cases. An evalution of the accuracy led
-  // to the following scheme, which cherry-picks
-  // fits from two papers where they are best.
-  if (eta < 1) {
-    // Fit by Egan and Hilgeman (1973). Works
-    // reasonably well for "normal" IOR values (<2).
-    //
-    // Max rel. error in 1.0 - 1.5 : 0.1%
-    // Max rel. error in 1.5 - 2   : 0.6%
-    // Max rel. error in 2.0 - 5   : 9.5%
-    return -1.4399f * (eta * eta) + 0.7099f * eta + 0.6681f + 0.0636f / eta;
-  } else {
-    // Fit by d'Eon and Irving (2011)
-    //
-    // Maintains a good accuracy even for
-    // unrealistic IOR values.
-    //
-    // Max rel. error in 1.0 - 2.0   : 0.1%
-    // Max rel. error in 2.0 - 10.0  : 0.2%
-    float invEta = 1.0f / eta, invEta2 = invEta * invEta,
-          invEta3 = invEta2 * invEta, invEta4 = invEta3 * invEta,
-          invEta5 = invEta4 * invEta;
-
-    return 0.919317f - 3.4793f * invEta + 6.75335f * invEta2 -
-           7.80989f * invEta3 + 4.98554f * invEta4 - 1.36881f * invEta5;
+float fresnelDielectricExt(float cosThetaI_, inout float cosThetaT_,
+                           float eta) {
+  if (eta == 1) {
+    cosThetaT_ = -cosThetaI_;
+    return 0.0f;
   }
+
+  // Using Snell's law, calculate the squared sine of the
+  // angle between the normal and the transmitted ray
+  float scale = (cosThetaI_ > 0) ? 1 / eta : eta,
+        cosThetaTSqr = 1 - (1 - cosThetaI_ * cosThetaI_) * (scale * scale);
+
+  // Check for total internal reflection
+  if (cosThetaTSqr <= 0.0f) {
+    cosThetaT_ = 0.0f;
+    return 1.0f;
+  }
+
+  // Find the absolute cosines of the incident/transmitted rays
+  float cosThetaI = abs(cosThetaI_);
+  float cosThetaT = sqrt(cosThetaTSqr);
+
+  float Rs = (cosThetaI - eta * cosThetaT) / (cosThetaI + eta * cosThetaT);
+  float Rp = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+
+  cosThetaT_ = (cosThetaI_ > 0) ? -cosThetaT : cosThetaT;
+
+  // No polarization -- return the unpolarized reflectance
+  return 0.5f * (Rs * Rs + Rp * Rp);
 }
 
-vec3 eval(vec3 L, vec3 V, vec3 N, vec3 kd, float eta, uint flags) {
+vec3 eval(vec3 L, vec3 V, vec3 N, vec3 kd, float eta, float fdrInt,
+          float invEta2, uint flags) {
   vec3 weight = vec3(0);
 
   float NdotL = dot(L, N);
   float NdotV = dot(V, N);
   if (NdotL < 0 || NdotV < 0) return weight;
 
-  float Fv = dielectricFresnel(abs(dot(V, N)), eta);
-  if ((flags & EDelta) != 0) {
-    if (abs(dot(reflect(-V, N), L) - 1) < EPS) weight += Fv * vec3(1);
-  } else if ((flags & EArea) != 0) {
-    float Fl = dielectricFresnel(abs(NdotL), eta);
-    vec3 diff = kd * INV_PI * abs(NdotL);
-//    float fdrInt = fresnelDiffuseReflectance(1 / eta);
-//    diff /= (1 - diff * fdrInt);
+  float _, Fo = fresnelDielectricExt(NdotV, _, eta);
+  bool hasSpecular = ((flags & EDelta) != 0);
+  bool hasDiffuse = ((flags & EArea) != 0);
+  if (hasSpecular) {
+    if (abs(dot(reflect(-V, N), L) - 1) < EPS) {
+      weight = Fo * vec3(1);
+    }
+  } else if (hasDiffuse) {
+    float _, Fi = fresnelDielectricExt(NdotL, _, eta);
+    vec3 diff = kd * INV_PI * NdotL;
+    diff /= (1 - diff * fdrInt);
 
-    weight += (1 - Fv) * (1 - Fl) * diff * (eta * eta);
+    weight = (1 - Fi) * (1 - Fo) * diff * invEta2;
   }
   return weight;
 }
 
-float pdf(vec3 L, vec3 V, vec3 N, float eta, uint flags) {
+float pdf(vec3 L, vec3 V, vec3 N, float eta, float specularSamplingWeight,
+          uint flags) {
   float pdf = 0.0;
 
   float NdotL = dot(L, N);
   float NdotV = dot(V, N);
   if (NdotL < 0 || NdotV < 0) return pdf;
 
-  float Fv = dielectricFresnel(abs(dot(V, N)), eta);
-  if ((flags & EDelta) != 0) {
-    if (abs(dot(reflect(-V, N), L) - 1) < EPS) pdf = Fv;
-  } else if ((flags & EArea) != 0) {
-    pdf = (1 - Fv) * cosineHemispherePdf(NdotL);
+  float _, Fo = fresnelDielectricExt(NdotV, _, eta);
+  bool hasSpecular = ((flags & EDelta) != 0);
+  bool hasDiffuse = ((flags & EArea) != 0);
+  float probSpecular =
+      (Fo * specularSamplingWeight) /
+      (Fo * specularSamplingWeight + (1 - Fo) * (1 - specularSamplingWeight));
+
+  if (hasSpecular) {
+    if (abs(dot(reflect(-V, N), L) - 1) < EPS) {
+      pdf = probSpecular;
+    }
+  } else if (hasDiffuse) {
+    pdf = NdotL * (1 - probSpecular);
   }
+
   return pdf;
 }
 
 vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, float eta,
+                float fdrInt, float invEta2, float specularSamplingWeight,
                 inout BsdfSamplingRecord bRec) {
   vec3 weight = vec3(0);
-  float Fv = dielectricFresnel(abs(dot(V, N)), eta);
 
-  if (u.x < Fv) {
+  float NdotV = dot(V, N);
+  if (NdotV <= 0) {
+    bRec.flags = EBsdfNull;
+    bRec.pdf = 0;
+    bRec.d = vec3(0);
+    return weight;
+  }
+
+  float _, Fo = fresnelDielectricExt(NdotV, _, eta);
+  float probSpecular =
+      (Fo * specularSamplingWeight) /
+      (Fo * specularSamplingWeight + (1 - Fo) * (1 - specularSamplingWeight));
+
+  if (u.x < probSpecular) {
     bRec.d = makeNormal(reflect(-V, N));
-    bRec.pdf = Fv;
     bRec.flags = ESpecularReflection;
-    weight = vec3(1) / Fv;
+    bRec.pdf = probSpecular;
+    weight = vec3(1) * Fo / probSpecular;
   } else {
-    u.x = min((u.x - Fv) / (1 - Fv + EPS), 1);
+    u.x = (u.x - probSpecular) / (1 + EPS - probSpecular);
     vec3 wi = cosineSampleHemisphere(u);
-    float Fl = dielectricFresnel(abs(wi.z), eta);
-    bRec.d = toWorld(X, Y, N, wi);
-    bRec.pdf = (1 - Fv) * cosineHemispherePdf(wi.z);
-    bRec.flags = EDiffuseReflection;
+    float _, Fi = fresnelDielectricExt(wi.z, _, eta);
     vec3 diff = kd * INV_PI * abs(wi.z);
-//    float fdrInt = fresnelDiffuseReflectance(1 / eta);
-//    diff /= (1 - diff * fdrInt);
+    diff /= (1 - diff * fdrInt);
+    bRec.pdf = (1 - probSpecular) * cosineHemispherePdf(wi.z);
+    bRec.d = toWorld(X, Y, N, wi);
+    bRec.flags = EDiffuseReflection;
 
-    weight = (1 - Fv) * (1 - Fl) * eta * eta * diff / (1 - Fv);
+    weight = (1 - Fi) * (1 - Fo) * invEta2 * diff / (1 - probSpecular);
   }
 
   return weight;
@@ -134,7 +146,11 @@ void main() {
     configureShadingFrame(state);
   }
 
-  float eta = 1 / state.mat.ior;
+  float eta = state.mat.ior;
+  float fdrInt = state.mat.radiance.x;
+  float dAvg = luminance(state.mat.diffuse), sAvg = luminance(vec3(1));
+  float specularSamplingWeight = sAvg / (dAvg + sAvg);
+  float invEta2 = 1 / (eta * eta);
 
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
@@ -151,11 +167,12 @@ void main() {
     vec3 radiance = sampleLights(state.pos, state.ffN, visible, lRec);
 
     if (visible) {
-      vec3 bsdfWeight =
-          eval(lRec.d, state.V, state.ffN, state.mat.diffuse, eta, EArea);
+      vec3 bsdfWeight = eval(lRec.d, state.V, state.ffN, state.mat.diffuse, eta,
+                             fdrInt, invEta2, EArea);
 
       // Multi importance sampling
-      float bsdfPdf = pdf(lRec.d, state.V, state.ffN, eta, lRec.flags);
+      float bsdfPdf = pdf(lRec.d, state.V, state.ffN, eta,
+                          specularSamplingWeight, lRec.flags);
       float misWeight = powerHeuristic(lRec.pdf, bsdfPdf);
 
       Ld += misWeight * bsdfWeight * radiance * payload.pRec.throughput /
@@ -169,7 +186,8 @@ void main() {
   // Sample next ray
   BsdfSamplingRecord bRec;
   vec3 bsdfWeight = sampleBsdf(rand2(payload.pRec.seed), state.V, state.ffN,
-                               state.X, state.Y, state.mat.diffuse, eta, bRec);
+                               state.X, state.Y, state.mat.diffuse, eta, fdrInt,
+                               invEta2, specularSamplingWeight, bRec);
 
   // Reject invalid sample
   if (bRec.pdf <= 0.0 || length(bsdfWeight) == 0.0) {

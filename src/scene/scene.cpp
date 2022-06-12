@@ -261,7 +261,7 @@ void Scene::addLight(const GpuLight& light, const std::string& lightMeshPath) {
     light_.u = prim.u = v1.pos - v0.pos;
     light_.v = prim.v = v2.pos - v0.pos;
     light_.area = nvmath::length(nvmath::cross(light_.u, light_.v)) * 0.5f;
-    light_.doubleSide = 1;
+    light_.doubleSide = 0;
 
     // Add mesh
     Mesh* pMesh = new Mesh(prim);

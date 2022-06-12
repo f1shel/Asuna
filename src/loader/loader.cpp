@@ -312,6 +312,39 @@ void Loader::addTexture(const nlohmann::json& textureJson) {
   m_pScene->addTexture(textureName, texturePath, gamma);
 }
 
+static inline float dielectricReflectance(float eta, float cosThetaI,
+                                          float& cosThetaT) {
+  if (cosThetaI < 0.0f) {
+    eta = 1.0f / eta;
+    cosThetaI = -cosThetaI;
+  }
+  float sinThetaTSq = eta * eta * (1.0f - cosThetaI * cosThetaI);
+  if (sinThetaTSq > 1.0f) {
+    cosThetaT = 0.0f;
+    return 1.0f;
+  }
+  cosThetaT = std::sqrt(std::max(1.0f - sinThetaTSq, 0.0f));
+
+  float Rs = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+  float Rp = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
+
+  return (Rs * Rs + Rp * Rp) * 0.5f;
+}
+
+static inline float computeDiffuseFresnel(float ior, const int sampleCount) {
+  double diffuseFresnel = 0.0;
+  float _, fb = dielectricReflectance(ior, 0.0f, _);
+  for (int i = 1; i <= sampleCount; ++i) {
+    float cosThetaSq = float(i) / sampleCount;
+    float _, fa = dielectricReflectance(
+                 ior, std::min(std::sqrt(cosThetaSq), 1.0f), _);
+    diffuseFresnel += double(fa + fb) * (0.5 / sampleCount);
+    fb = fa;
+  }
+
+  return float(diffuseFresnel);
+}
+
 void Loader::addMaterial(const nlohmann::json& materialJson) {
   JsonCheckKeys(materialJson, {"type", "name"});
   std::string materialName = materialJson["name"];
@@ -379,6 +412,7 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
     if (materialJson.contains("ior")) material.ior = materialJson["ior"];
   } else if (materialJson["type"] == "brdf_plastic") {
     material.type = MaterialTypeBrdfPlastic;
+    if (materialJson.contains("ior")) material.ior = materialJson["ior"];
     if (materialJson.contains("diffuse_reflectance"))
       material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
     if (materialJson.contains("diffuse_texture"))
@@ -387,6 +421,8 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
     if (materialJson.contains("normal_texture"))
       material.normalTextureId =
           m_pScene->getTextureId(materialJson["normal_texture"]);
+    // fresnel diffuse reflectance, AKA fdrInt
+    material.radiance.x = computeDiffuseFresnel(material.ior, 1000);
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);
