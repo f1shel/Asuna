@@ -20,7 +20,7 @@ vec3 sampleTriangleLight(vec2 r, GpuLight light, vec3 scatterPos,
   lRec.d /= lRec.dist;
   lRec.n = makeNormal(cross(light.u, light.v));
   radiance = light.radiance;
-  lRec.pdf = distSq / (light.area * abs(dot(lRec.n, lRec.d)));
+  lRec.pdf = distSq / (light.area * abs(dot(lRec.n, lRec.d)) + EPS);
   lRec.flags = EArea;
 
   return radiance;
@@ -50,7 +50,7 @@ vec3 sampleRectLight(vec2 r, GpuLight light, vec3 scatterPos,
   lRec.d /= lRec.dist;
   lRec.n = makeNormal(cross(light.u, light.v));
   radiance = light.radiance;
-  lRec.pdf = distSq / (light.area * abs(dot(lRec.n, lRec.d)));
+  lRec.pdf = distSq / (light.area * abs(dot(lRec.n, lRec.d)) + EPS);
   lRec.flags = EArea;
 
   return radiance;
