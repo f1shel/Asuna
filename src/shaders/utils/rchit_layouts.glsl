@@ -136,7 +136,6 @@ vec3 sampleLights(vec3 scatterPos, vec3 scatterNormal, out bool visible, out Lig
       envSelectPdf = 0.f, analyticSelectPdf = 1.f;
     else
       envSelectPdf = analyticSelectPdf = 0.f;
-    DEBUG_INF_NAN(payload.dRec.radiance, "radiance direct\n");
 
     float envOrAnalyticSelector = rand(payload.pRec.seed);
     if (envOrAnalyticSelector < envSelectPdf) {
@@ -151,8 +150,6 @@ vec3 sampleLights(vec3 scatterPos, vec3 scatterNormal, out bool visible, out Lig
       radiance = sampleOneLight(rand2(payload.pRec.seed), light, scatterPos,
                                 lRec) *
             pc.numLights / analyticSelectPdf;
-      radiance *= pc.numLights;
-      radiance /= analyticSelectPdf;
       allowDoubleSide = (light.doubleSide == 1);
     }
 

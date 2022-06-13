@@ -52,7 +52,7 @@ float g1SmithAnisoGGX(float NdotV, float VdotX, float VdotY, float ax,
   return 1 / (NdotV + length(factor));
 }
 
-const float DIFFUSE_LOBE_PROBABILITY = 0.5;
+const float DIFFUSE_LOBE_PROBABILITY = 0.2;
 
 vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 albedo, float ax,
           float ay, float metalness, float eta, uint flags) {

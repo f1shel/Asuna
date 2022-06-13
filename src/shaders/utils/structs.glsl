@@ -1,7 +1,7 @@
 #ifndef STRUCTS_GLSL
 #define STRUCTS_GLSL
 
-#define USE_MIS 0
+#define USE_MIS 1
 
 struct Ray {
   // Origin in world space
