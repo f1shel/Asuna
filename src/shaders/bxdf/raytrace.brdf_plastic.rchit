@@ -113,7 +113,7 @@ vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, float eta,
     bRec.d = makeNormal(reflect(-V, N));
     bRec.flags = ESpecularReflection;
     bRec.pdf = probSpecular;
-    weight = vec3(1) * Fo / probSpecular;
+    weight = vec3(1) * Fo;
   } else {
     u.x = (u.x - probSpecular) / (1 + EPS - probSpecular);
     vec3 wi = cosineSampleHemisphere(u);
@@ -124,7 +124,7 @@ vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, float eta,
     bRec.d = toWorld(X, Y, N, wi);
     bRec.flags = EDiffuseReflection;
 
-    weight = (1 - Fi) * (1 - Fo) * invEta2 * diff / (1 - probSpecular);
+    weight = (1 - Fi) * (1 - Fo) * invEta2 * diff;
   }
 
   return weight;
