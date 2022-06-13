@@ -159,6 +159,7 @@ void main() {
     payload.mRec.normal = state.ffN;
   }
 
+#if USE_MIS
   // Direct light
   {
     vec3 Ld = vec3(0);
@@ -183,6 +184,7 @@ void main() {
     payload.dRec.radiance = Ld;
     payload.dRec.skip = (!visible);
   }
+#endif
 
   // Sample next ray
   BsdfSamplingRecord bRec;
@@ -198,7 +200,7 @@ void main() {
 
   // Next ray
   payload.bRec = bRec;
-  payload.pRec.ray.o = payload.dRec.ray.o;
-  payload.pRec.ray.d = bRec.d;
+  payload.pRec.ray =
+      Ray(offsetPositionAlongNormal(state.pos, state.ffN), payload.bRec.d);
   payload.pRec.throughput *= bsdfWeight / (bRec.pdf + EPS);
 }

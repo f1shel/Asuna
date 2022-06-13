@@ -90,6 +90,7 @@ void main() {
       traceRayEXT(tlas, rayFlags, 0xFF, 0, 0, 0, payload.pRec.ray.o, MINIMUM,
                   payload.pRec.ray.d, INFINITY, 0);
 
+#if USE_MIS
       if (!payload.dRec.skip) {
         // We are adding the contribution to the radiance only if the ray is not
         // occluded by an object. This is done here to minimize live state
@@ -105,6 +106,7 @@ void main() {
           payload.pRec.radiance += payload.dRec.radiance;
         }
       }
+#endif
 
       if (payload.pRec.stop) break;
     }

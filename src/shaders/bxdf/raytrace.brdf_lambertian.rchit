@@ -51,8 +51,10 @@ void hitLight(int lightId, vec3 hitPos) {
   payload.pRec.stop = true;
   // Single side light
   if (lightSideProjection > 0 && light.doubleSide == 0) return;
-  // Do mis
+
   float misWeight = 1.0;
+#if USE_MIS
+  // Do mis
   if (isNonSpecular(payload.bRec.flags) && payload.pRec.depth != 1) {
     // Do mis with area light
     float lightDist = length(hitPos - payload.pRec.ray.o);
@@ -60,6 +62,8 @@ void hitLight(int lightId, vec3 hitPos) {
     float lightPdf = distSquare / (light.area * abs(lightSideProjection) + EPS);
     misWeight = powerHeuristic(payload.bRec.pdf, lightPdf);
   }
+#endif
+
   payload.pRec.radiance += payload.pRec.throughput * light.radiance * misWeight;
 }
 
@@ -91,6 +95,7 @@ void main() {
     payload.mRec.normal = state.ffN;
   }
 
+#if USE_MIS
   // Direct light
   {
     // Light and environment contribution
@@ -114,6 +119,7 @@ void main() {
     payload.dRec.radiance = Ld;
     payload.dRec.skip = (!visible);
   }
+#endif
 
   // Sample next ray
   BsdfSamplingRecord bRec;
@@ -128,6 +134,7 @@ void main() {
 
   // Next ray
   payload.bRec = bRec;
-  payload.pRec.ray = Ray(payload.dRec.ray.o, payload.bRec.d);
+  payload.pRec.ray =
+      Ray(offsetPositionAlongNormal(state.pos, state.ffN), payload.bRec.d);
   payload.pRec.throughput *= bsdfWeight / bRec.pdf;
 }

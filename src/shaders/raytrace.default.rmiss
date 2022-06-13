@@ -27,7 +27,6 @@ void main() {
 
   // Evaluate environment light and only do mis when depth > 1.
   vec3 env = vec3(0), d = payload.pRec.ray.d;
-  float envPdf = 0.0;
   if (sunAndSky.in_use == 1)
     env = sun_and_sky(sunAndSky, d);
   else if (pc.hasEnvMap == 1)
@@ -36,6 +35,10 @@ void main() {
   else
     env = pc.bgColor;
 
+  float misWeight = 1.0;
+#if USE_MIS
+  // Multiple importance sampling
+  float envPdf = 0.0;
   if (payload.pRec.depth != 1 && isNonSpecular(payload.bRec.flags)) {
     if (sunAndSky.in_use == 1)
       envPdf = uniformSpherePdf();
@@ -44,14 +47,10 @@ void main() {
                          pc.envMapResolution, d);
     else
       envPdf = uniformSpherePdf();
-  }
 
-  // Multiple importance sampling
-  float misWeight = 1.0;
-  if (isNonSpecular(payload.bRec.flags) && payload.pRec.depth != 1)
     misWeight = powerHeuristic(payload.bRec.pdf, envPdf);
+  }
+#endif
 
   payload.pRec.radiance += payload.pRec.throughput * env * misWeight;
-  DEBUG_INF_NAN(env, "miss\n");
-  DEBUG_INF_NAN1(misWeight, "misWeight\n");
 }

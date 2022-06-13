@@ -1,6 +1,8 @@
 #ifndef STRUCTS_GLSL
 #define STRUCTS_GLSL
 
+#define USE_MIS 0
+
 struct Ray {
   // Origin in world space
   vec3 o;
