@@ -232,10 +232,25 @@ void PipelineRaytrace::createRtPipeline() {
   stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfPlastic] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfPlastic");
-  // ClosetHit:BsdfDielectric
+  // ClosetHit:BrdfRoughPlastic
   stage.module = nvvk::createShaderModule(
       m_device,
-      nvh::loadFile("../shaders/raytrace.bsdf_dielectric.rchit.spv", true, {root}));
+      nvh::loadFile("../shaders/raytrace.brdf_rough_plastic.rchit.spv", true,
+                    {root}));
+  stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBrdfRoughPlastic] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfPlastic");
+  // ClosetHit:BrdfMirror
+  stage.module = nvvk::createShaderModule(
+      m_device,
+      nvh::loadFile("../shaders/raytrace.brdf_mirror.rchit.spv", true, {root}));
+  stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBrdfMirror] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfMirror");
+  // ClosetHit:BsdfDielectric
+  stage.module = nvvk::createShaderModule(
+      m_device, nvh::loadFile("../shaders/raytrace.bsdf_dielectric.rchit.spv",
+                              true, {root}));
   stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBsdfDielectric] = stage;
   NAME2_VK(stage.module, "ClosetHit:BsdfDielectric");

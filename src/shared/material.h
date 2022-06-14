@@ -10,8 +10,10 @@ START_ENUM(MaterialType)
   MaterialTypeBrdfEmissive              = 2,
   MaterialTypeBrdfPbrMetalnessRoughness = 3,
   MaterialTypeBrdfPlastic               = 4,
-  MaterialTypeBsdfDielectric            = 5,
-  MaterialTypeNum                       = 6
+  MaterialTypeBrdfMirror                = 5,
+  MaterialTypeBrdfRoughPlastic          = 6,
+  MaterialTypeBsdfDielectric            = 7,
+  MaterialTypeNum                       = 8
 END_ENUM();
 // clang-format on
 

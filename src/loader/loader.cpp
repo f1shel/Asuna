@@ -423,6 +423,34 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
           m_pScene->getTextureId(materialJson["normal_texture"]);
     // fresnel diffuse reflectance, AKA fdrInt
     material.radiance.x = computeDiffuseFresnel(material.ior, 1000);
+  } else if (materialJson["type"] == "brdf_rough_plastic") {
+    material.type = MaterialTypeBrdfRoughPlastic;
+    if (materialJson.contains("ior")) material.ior = materialJson["ior"];
+    if (materialJson.contains("diffuse_reflectance"))
+      material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+    if (materialJson.contains("diffuse_texture"))
+      material.diffuseTextureId =
+          m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
+    if (materialJson.contains("alpha"))
+      material.anisoAlpha = Json2Vec2(materialJson["alpha"]);
+    if (materialJson.contains("alpha_texture"))
+      material.roughnessTextureId =
+          m_pScene->getTextureId(materialJson["alpha_texture"]);
+    // fresnel diffuse reflectance, AKA fdrInt
+    material.radiance.x = computeDiffuseFresnel(material.ior, 1000);
+  } else if (materialJson["type"] == "brdf_mirror") {
+    material.type = MaterialTypeBrdfMirror;
+    if (materialJson.contains("diffuse_reflectance"))
+      material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+    if (materialJson.contains("diffuse_texture"))
+      material.diffuseTextureId =
+          m_pScene->getTextureId(materialJson["diffuse_texture"]);
+    if (materialJson.contains("normal_texture"))
+      material.normalTextureId =
+          m_pScene->getTextureId(materialJson["normal_texture"]);
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);

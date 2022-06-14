@@ -57,10 +57,10 @@ vec3 eval(vec3 L, vec3 V, vec3 N, vec3 kd, float eta, float fdrInt,
     }
   } else if (hasDiffuse) {
     float _, Fi = fresnelDielectricExt(NdotL, _, eta);
-    vec3 diff = kd * INV_PI * NdotL;
+    vec3 diff = kd;
     diff /= (1 - diff * fdrInt);
 
-    weight = (1 - Fi) * (1 - Fo) * diff * invEta2;
+    weight = (1 - Fi) * (1 - Fo) * diff * invEta2 * INV_PI * NdotL;
   }
   return weight;
 }
@@ -118,13 +118,13 @@ vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, float eta,
     u.x = (u.x - probSpecular) / (1 + EPS - probSpecular);
     vec3 wi = cosineSampleHemisphere(u);
     float _, Fi = fresnelDielectricExt(wi.z, _, eta);
-    vec3 diff = kd * INV_PI * abs(wi.z);
+    vec3 diff = kd;
     diff /= (1 - diff * fdrInt);
     bRec.pdf = (1 - probSpecular) * cosineHemispherePdf(wi.z);
     bRec.d = toWorld(X, Y, N, wi);
     bRec.flags = EDiffuseReflection;
 
-    weight = (1 - Fi) * (1 - Fo) * invEta2 * diff;
+    weight = (1 - Fi) * (1 - Fo) * invEta2 * diff * INV_PI * abs(wi.z);
   }
 
   return weight;
