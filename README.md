@@ -1,7 +1,16 @@
 # Asuna
+
 Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 
 **还有无数个bug和todo，累了以后有空再写吧**
+
+| Documentation   |
+|      :---:      |
+| [![docs][1]][2] |
+
+
+[1]: https://img.shields.io/badge/docs-passing-brightgreen
+[2]: https://github.com/f1shel/Asuna/wiki/Home
 
 ## Gallery
 
@@ -47,6 +56,7 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 <img src="./demo/panther.png" width="96%">
 </center>
 </div>
+
 ## Features
 
 + GPU-accelerated ray tracing (in vulkan rtx favor)
@@ -76,6 +86,7 @@ Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
     + Triangle
     + Rectangle
     + Image based environment light
+    + Sun and sky
   + Delta light
     + Directional light
     + Point light
