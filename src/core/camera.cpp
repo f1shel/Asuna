@@ -47,12 +47,13 @@ mat4 cameraToRasterTransform(VkExtent2D filmSize, float fov, float near,
   // In x this space ranges from -1 to 1 but y ranges from -invAspect
   // to invAspect, since aspect ratio is not taken into account.
   mat4 cameraToScreen = perspectiveTransform(fov, near, far);
-  // x and y ranges from (0,2) x (-2 * invAspect,0)
+  // x and y ranges from (-1,1) x (-1,1)
+  cameraToScreen = nvmath::scale_mat4(vec3(1.f, aspect, 1.f)) * cameraToScreen;
+  // x and y ranges from (0,2) x (0,2)
   cameraToScreen =
-      nvmath::translation_mat4(vec3(1.f, -invAspect, 0.f)) * cameraToScreen;
+      nvmath::translation_mat4(vec3(1.f, 1.f, 0.f)) * cameraToScreen;
   // x and y ranges from (0,1) x (0,1)
-  mat4 cameraToNdc =
-      nvmath::scale_mat4(vec3(0.5f, -0.5f * aspect, 1.f)) * cameraToScreen;
+  mat4 cameraToNdc = nvmath::scale_mat4(vec3(0.5f, 0.5f, 1.f)) * cameraToScreen;
   // x and y ranges from (0,0) to (width,height)
   mat4 cameraToRaster =
       nvmath::scale_mat4(vec3(filmSize.width, filmSize.height, 1.f)) *

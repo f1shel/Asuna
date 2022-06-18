@@ -24,7 +24,7 @@ public:
   }
   CameraType getType() { return m_type; }
   mat4 getView() {
-    return nvmath::scale_mat4(vec3(1.f, 1.f, -1.f)) * CameraManip.getMatrix();
+    return nvmath::scale_mat4(vec3(1.f, -1.f, -1.f)) * CameraManip.getMatrix();
   }
   VkExtent2D getFilmSize() { return m_size; }
   virtual GpuCamera toGpuStruct() = 0;
