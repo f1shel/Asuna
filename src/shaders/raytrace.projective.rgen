@@ -69,7 +69,19 @@ void main() {
       rayDir = transformDirection(cameraInfo.cameraToWorld, r);
     }
 
-    // TODO: add opencv camera
+    else if (cameraInfo.type == CameraTypeOpencv) {
+      rayOrigin = origin;
+
+      vec4 fxfycxcy = cameraInfo.fxfycxcy;
+      vec2 pRaster;
+      pRaster.x = (pixel.x - fxfycxcy.z) / fxfycxcy.x;
+      pRaster.y = (pixel.y - fxfycxcy.w) / fxfycxcy.y;
+
+      vec3 r = vec3(pRaster, 1.f);
+
+      // Transform ray to world space
+      rayDir = transformDirection(cameraInfo.cameraToWorld, r);
+    }
 
     // Path trace
     payload.pRec.ray = Ray(rayOrigin, rayDir);

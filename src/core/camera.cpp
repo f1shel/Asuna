@@ -82,6 +82,7 @@ GpuCamera CameraOpencv::toGpuStruct() {
   static GpuCamera cam;
   cam.type = getType();
   cam.cameraToWorld = nvmath::invert_rot_trans(getView());
+  cam.envTransform = m_envTransform;
   cam.fxfycxcy = m_fxfycxcy;
   return cam;
 }
