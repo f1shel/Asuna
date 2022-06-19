@@ -81,8 +81,9 @@ void Camera::adaptFilm() {
 GpuCamera CameraOpencv::toGpuStruct() {
   static GpuCamera cam;
   cam.type = getType();
-  cam.cameraToWorld = nvmath::invert_rot_trans(getView());
   cam.envTransform = m_envTransform;
+  mat4 worldToCamera = getView();
+  cam.cameraToWorld = nvmath::invert_rot_trans(worldToCamera);
   cam.fxfycxcy = m_fxfycxcy;
   return cam;
 }
@@ -91,7 +92,8 @@ GpuCamera CameraPerspective::toGpuStruct() {
   static GpuCamera cam;
   auto size = getFilmSize();
   cam.type = getType();
-  cam.cameraToWorld = nvmath::invert_rot_trans(getView());
+  mat4 worldToCamera = getView();
+  cam.cameraToWorld = nvmath::invert_rot_trans(worldToCamera);
   cam.rasterToCamera = nvmath::invert(
       cameraToRasterTransform(getFilmSize(), getFov(), 0.1, 100.0));
   cam.envTransform = m_envTransform;
