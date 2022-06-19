@@ -160,8 +160,6 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
       rtxState.bgColor = Json2Vec3(ptJson["background_color"]);
     if (ptJson.contains("envmap_intensity"))
       rtxState.envMapIntensity = ptJson["envmap_intensity"];
-    if (ptJson.contains("envmap_rotate"))
-      rtxState.envRotateAngle = ptJson["envmap_rotate"];
   }
 
   if (stateJson.contains("post_processing")) {

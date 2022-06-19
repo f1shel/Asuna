@@ -328,7 +328,7 @@ float* readImage(const std::string& imagePath, int& width, int& height,
     stbi_ldr_to_hdr_gamma(gamma);
     pixels = (void*)stbi_loadf(imagePath.c_str(), &width, &height, nullptr,
                                STBI_rgb_alpha);
-    stbi_ldr_to_hdr_gamma(2.2);
+    stbi_ldr_to_hdr_gamma(stbi__l2h_gamma);
   }
   // Handle failure
   if (!pixels) {
@@ -356,6 +356,7 @@ void writeImage(const std::string& imagePath, int width, int height,
   else if (ext == ".exr")
     writeImageEXR(imagePath, data, width, height, width, height, 0, 0);
   else {
+    stbi_hdr_to_ldr_gamma(1.0);
     auto autoDestroyData = reinterpret_cast<float*>(
         STBI_MALLOC(width * height * 4 * sizeof(float)));
     memcpy(autoDestroyData, data, width * height * 4 * sizeof(float));
@@ -368,5 +369,6 @@ void writeImage(const std::string& imagePath, int width, int height,
       stbi_write_tga(imagePath.c_str(), width, height, 4, ldrData);
     else if (ext == ".bmp")
       stbi_write_bmp(imagePath.c_str(), width, height, 4, ldrData);
+    stbi_hdr_to_ldr_gamma(stbi__h2l_gamma_i);
   }
 }
