@@ -37,36 +37,83 @@ vec3 conductorReflectance3(const vec3 eta, const vec3 k, float cosThetaI) {
               conductorReflectance(eta.z, k.z, cosThetaI));
 }
 
-vec3 eval(vec3 L, vec3 V, vec3 N, vec3 kd, vec3 eta, vec3 k, uint flags) {
+float sqr(float x) { return x * x; }
+
+float dAnisoGGX(float HdotN, float HdotX, float HdotY, float ax, float ay) {
+  return 1 /
+         // ---------------------------------------------------------
+         (PI * ax * ay * sqr(sqr(HdotX / ax) + sqr(HdotY / ay) + sqr(HdotN)) +
+          EPS);
+}
+
+vec3 importanceSampleAnisoGGX(vec2 u, vec3 wo, float ax, float ay) {
+  float u1 = u.x;
+  float u2 = u.y;
+  float factor = safeSqrt(u1 / max(1 - u1, EPS));
+  float phi = TWO_PI * u2;
+
+  vec3 wh = vec3(0, 0, 1);
+  wh.x = -ax * factor * cos(phi);
+  wh.y = -ay * factor * sin(phi);
+  wh = makeNormal(wh);
+
+  vec3 wi = reflect(-wo, wh);
+  return wi;
+}
+
+float importanceAnisoGGXPdf(in vec3 wh, in vec3 wo, in float ax, in float ay) {
+  float pdf = 0.0, HdotV = dot(wh, wo);
+  vec3 wi = reflect(-wo, wh);
+  if (wi.z > 0.0 && wo.z > 0.0 && wh.z > 0.0)
+    pdf = dAnisoGGX(wh.z, wh.x, wh.y, ax, ay) * abs(wh.z) / (4 * HdotV + EPS);
+  return pdf;
+}
+
+float g1SmithAnisoGGX(float NdotV, float VdotX, float VdotY, float ax,
+                      float ay) {
+  if (NdotV <= 0.0) return 0.0;
+  vec3 factor = vec3(ax * VdotX, ay * VdotY, NdotV);
+  return 1 / (NdotV + length(factor));
+}
+
+vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 eta, vec3 k,
+          float ax, float ay, uint flags) {
   vec3 weight = vec3(0);
 
   float NdotL = dot(L, N);
   float NdotV = dot(V, N);
-  if (NdotL < 0 || NdotV < 0 || ((flags & EDelta) == 0)) return weight;
+  if (((flags & EArea) == 0) || NdotL < 0 || NdotV < 0) return weight;
 
-  if (abs(dot(reflect(-V, N), L) - 1) < EPS) {
-    weight = kd * conductorReflectance3(eta, k, NdotL);
-  }
+  // Specular
+  vec3 H = makeNormal(L + V);
+  vec3 Fs = conductorReflectance3(eta, k, NdotL);
+  float Gs = g1SmithAnisoGGX(NdotV, dot(V, X), dot(V, Y), ax, ay);
+  Gs *= g1SmithAnisoGGX(NdotL, dot(L, X), dot(L, Y), ax, ay);
+  float Ds = dAnisoGGX(dot(H, N), dot(H, X), dot(H, Y), ax, ay);
+
+  weight += kd * Fs * Gs * Ds * NdotL;
 
   return weight;
 }
 
-float pdf(vec3 L, vec3 V, vec3 N, uint flags) {
+float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay,
+          uint flags) {
   float pdf = 0.0;
 
   float NdotL = dot(L, N);
   float NdotV = dot(V, N);
-  if (NdotL < 0 || NdotV < 0 || ((flags & EDelta) == 0)) return pdf;
+  if (NdotL < 0 || NdotV < 0 || ((flags & EArea) == 0)) return pdf;
 
-  if (abs(dot(reflect(-V, N), L) - 1) < EPS) {
-    pdf = 1.0;
-  }
+  vec3 wi = toLocal(X, Y, N, L);
+  vec3 wo = toLocal(X, Y, N, V);
+  vec3 wh = makeNormal(wi + wo);
+  pdf = importanceAnisoGGXPdf(wh, wo, ax, ay);
 
   return pdf;
 }
 
-vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 kd, vec3 eta, vec3 k,
-                inout BsdfSamplingRecord bRec) {
+vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 eta,
+                vec3 k, float ax, float ay, inout BsdfSamplingRecord bRec) {
   vec3 weight = vec3(0);
 
   float NdotV = dot(V, N);
@@ -77,11 +124,22 @@ vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 kd, vec3 eta, vec3 k,
     return weight;
   }
 
-  bRec.d = reflect(-V, N);
-  bRec.pdf = 1.0f;
-  bRec.flags = ESpecularReflection;
+  vec3 wo = toLocal(X, Y, N, V);
+  vec3 wi = importanceSampleAnisoGGX(u, wo, ax, ay);
+  vec3 L = bRec.d = toWorld(X, Y, N, wi);
+  vec3 H = makeNormal(V + L);
+  vec3 wh = makeNormal(wi + wo);
 
-  weight = kd * conductorReflectance3(eta, k, dot(N, bRec.d));
+  float NdotL = dot(N, L);
+  vec3 Fs = conductorReflectance3(eta, k, NdotL);
+  float Gs = g1SmithAnisoGGX(NdotV, dot(V, X), dot(V, Y), ax, ay);
+  Gs *= g1SmithAnisoGGX(NdotL, dot(L, X), dot(L, Y), ax, ay);
+  float Ds = dAnisoGGX(dot(H, N), dot(H, X), dot(H, Y), ax, ay);
+
+  bRec.flags = EGlossyReflection;
+  bRec.pdf = importanceAnisoGGXPdf(wh, wo, ax, ay);
+
+  weight = kd * Fs * Gs * Ds * NdotL;
 
   return weight;
 }
@@ -93,6 +151,9 @@ void main() {
   // Fetch textures
   if (state.mat.diffuseTextureId >= 0)
     state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
+  if (state.mat.roughnessTextureId >= 0)
+    state.mat.anisoAlpha =
+        textureEval(state.mat.roughnessTextureId, state.uv).rg;
   if (state.mat.normalTextureId >= 0) {
     vec3 c = textureEval(state.mat.normalTextureId, state.uv).rgb;
     vec3 n = 2 * c - 1;
@@ -104,6 +165,8 @@ void main() {
 
   vec3 eta = state.mat.radiance;
   vec3 k = state.mat.radianceFactor;
+  float ax = max(state.mat.anisoAlpha.x, EPS);
+  float ay = max(state.mat.anisoAlpha.y, EPS);
 
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
@@ -121,11 +184,12 @@ void main() {
     vec3 radiance = sampleLights(state.pos, state.ffN, visible, lRec);
 
     if (visible) {
-      vec3 bsdfWeight =
-          eval(lRec.d, state.V, state.ffN, state.mat.diffuse, eta, k, EArea);
+      vec3 bsdfWeight = eval(lRec.d, state.V, state.ffN, state.X, state.Y,
+                             state.mat.diffuse, eta, k, ax, ay, EArea);
 
       // Multi importance sampling
-      float bsdfPdf = pdf(lRec.d, state.V, state.ffN, lRec.flags);
+      float bsdfPdf =
+          pdf(lRec.d, state.V, state.ffN, state.X, state.Y, ax, ay, lRec.flags);
       float misWeight = powerHeuristic(lRec.pdf, bsdfPdf);
 
       Ld += misWeight * bsdfWeight * radiance * payload.pRec.throughput /
@@ -139,8 +203,9 @@ void main() {
 
   // Sample next ray
   BsdfSamplingRecord bRec;
-  vec3 bsdfWeight = sampleBsdf(rand2(payload.pRec.seed), state.V, state.ffN,
-                               state.mat.diffuse, eta, k, bRec);
+  vec3 bsdfWeight =
+      sampleBsdf(rand2(payload.pRec.seed), state.V, state.ffN, state.X, state.Y,
+                 state.mat.diffuse, eta, k, ax, ay, bRec);
 
   // Reject invalid sample
   if (bRec.pdf <= 0.0 || length(bsdfWeight) == 0.0) {

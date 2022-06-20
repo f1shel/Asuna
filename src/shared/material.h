@@ -12,9 +12,10 @@ START_ENUM(MaterialType)
   MaterialTypeBrdfPlastic               = 4,
   MaterialTypeBrdfRoughPlastic          = 5,
   MaterialTypeBrdfConductor             = 6,
-  MaterialTypeBrdfMirror                = 7,
-  MaterialTypeBsdfDielectric            = 8,
-  MaterialTypeNum                       = 9
+  MaterialTypeBrdfRoughConductor        = 7,
+  MaterialTypeBrdfMirror                = 8,
+  MaterialTypeBsdfDielectric            = 9,
+  MaterialTypeNum                       = 10
 END_ENUM();
 // clang-format on
 

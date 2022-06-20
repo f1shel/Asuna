@@ -249,11 +249,18 @@ void PipelineRaytrace::createRtPipeline() {
   NAME2_VK(stage.module, "ClosetHit:BrdfMirror");
   // ClosetHit:BrdfConductor
   stage.module = nvvk::createShaderModule(
-      m_device,
-      nvh::loadFile("../shaders/raytrace.brdf_conductor.rchit.spv", true, {root}));
+      m_device, nvh::loadFile("../shaders/raytrace.brdf_conductor.rchit.spv",
+                              true, {root}));
   stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   stages[NumStages + MaterialTypeBrdfConductor] = stage;
   NAME2_VK(stage.module, "ClosetHit:BrdfConductor");
+  // ClosetHit:BrdfRoughConductor
+  stage.module = nvvk::createShaderModule(
+      m_device, nvh::loadFile("../shaders/raytrace.brdf_rough_conductor.rchit.spv",
+                              true, {root}));
+  stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  stages[NumStages + MaterialTypeBrdfRoughConductor] = stage;
+  NAME2_VK(stage.module, "ClosetHit:BrdfRoughConductor");
   // ClosetHit:BsdfDielectric
   stage.module = nvvk::createShaderModule(
       m_device, nvh::loadFile("../shaders/raytrace.bsdf_dielectric.rchit.spv",

@@ -46,6 +46,7 @@ static void ParseBrdfPlastic(Scene* m_pScene, const nlohmann::json& materialJson
 static void ParseBrdfRoughPlastic(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 static void ParseBrdfMirror(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 static void ParseBrdfConductor(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
+static void ParseBrdfRoughConductor(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 // clang-format on
 
 void Loader::addMaterial(const nlohmann::json& materialJson) {
@@ -80,6 +81,9 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
   } else if (materialJson["type"] == "brdf_conductor") {
     material.type = MaterialTypeBrdfConductor;
     ParseBrdfConductor(m_pScene, materialJson, material);
+  } else if (materialJson["type"] == "brdf_rough_conductor") {
+    material.type = MaterialTypeBrdfRoughConductor;
+    ParseBrdfRoughConductor(m_pScene, materialJson, material);
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);
@@ -290,4 +294,33 @@ static void ParseBrdfConductor(Scene* m_pScene,
   if (materialJson.contains("normal_texture"))
     material.normalTextureId =
         m_pScene->getTextureId(materialJson["normal_texture"]);
+}
+
+static void ParseBrdfRoughConductor(Scene* m_pScene,
+                                    const nlohmann::json& materialJson,
+                                    GpuMaterial& material) {
+  string materialName = "Cu";
+  if (materialJson.contains("material"))
+    materialName = materialJson["material"];
+  bool found = complexIorListLookup(materialName, material.radiance,
+                                    material.radianceFactor);
+  if (!found) {
+    LOG_ERROR("{}: unrecognized material name in brdf_conductor [{}]", "Loader",
+              materialName);
+    exit(1);
+  }
+
+  if (materialJson.contains("diffuse_reflectance"))
+    material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+  if (materialJson.contains("diffuse_texture"))
+    material.diffuseTextureId =
+        m_pScene->getTextureId(materialJson["diffuse_texture"]);
+  if (materialJson.contains("normal_texture"))
+    material.normalTextureId =
+        m_pScene->getTextureId(materialJson["normal_texture"]);
+  if (materialJson.contains("alpha"))
+    material.anisoAlpha = Json2Vec2(materialJson["alpha"]);
+  if (materialJson.contains("alpha_texture"))
+    material.roughnessTextureId =
+        m_pScene->getTextureId(materialJson["alpha_texture"]);
 }
