@@ -66,11 +66,7 @@ void Camera::setToWorld(const vec3& lookat, const vec3& eye, const vec3& up) {
 }
 
 void Camera::setToWorld(CameraShot& shot) {
-  if (shot.ext.a33 == 1.f) {
-    m_view = shot.ext;
-    // TODO: set CameraManip's eye up lookat according to m_view
-  } else
-    setToWorld(shot.lookat, shot.eye, shot.up);
+  setToWorld(shot.lookat, shot.eye, shot.up);
   setEnvRotate(shot.envTransform);
 }
 

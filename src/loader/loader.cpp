@@ -160,6 +160,8 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
       rtxState.bgColor = Json2Vec3(ptJson["background_color"]);
     if (ptJson.contains("envmap_intensity"))
       rtxState.envMapIntensity = ptJson["envmap_intensity"];
+    // if (ptJson.contains("envmap_rotate"))
+    //   rtxState.envRotateAngle = ptJson["envmap_rotate"];
   }
 
   if (stateJson.contains("post_processing")) {
@@ -375,25 +377,34 @@ void Loader::addInstance(const nlohmann::json& instanceJson) {
 void Loader::addShot(const nlohmann::json& shotJson) {
   JsonCheckKeys(shotJson, {"type"});
   vec3 eye, lookat, up;
-  mat4 ext = nvmath::mat4f_zero;
+  // mat4 ext = nvmath::mat4f_zero;
   if (shotJson["type"] == "lookat") {
     JsonCheckKeys(shotJson, {"eye", "lookat", "up"});
     eye = Json2Vec3(shotJson["eye"]);
     lookat = Json2Vec3(shotJson["lookat"]);
     up = Json2Vec3(shotJson["up"]);
+  } else if (shotJson["type"] == "toworld") {
+    // left hand coordinate system
+    // import from mitsuba scene xml
+    JsonCheckKeys(shotJson, {"matrix"});
+    mat4 cameraToWorld = Json2Mat4(shotJson["matrix"]);
+    cameraToWorld.get_translation(eye);
+    up = vec3(cameraToWorld * vec4(0, 1, 0, 0));
+    lookat = vec3(cameraToWorld * vec4(0, 0, 1, 1));
   } else if (shotJson["type"] == "opencv") {
-    JsonCheckKeys(shotJson, {"matrix", "up"});
-    ext = Json2Mat4(shotJson["matrix"]);
-    // ext.a00 = -ext.a00, ext.a01 = -ext.a01, ext.a02 = -ext.a02, ext.a03 =
-    // -ext.a03; ext.a20 = -ext.a20, ext.a21 = -ext.a21, ext.a22 = -ext.a22,
-    // ext.a23 = -ext.a23;
+    JsonCheckKeys(shotJson, {"ext"});
+    mat4 ext = Json2Mat4(shotJson["matrix"]);
+    auto cameraToWorld = nvmath::invert_rot_trans(ext);
+    cameraToWorld.get_translation(eye);
+    up = vec3(cameraToWorld * vec4(0, -1, 0, 0));
+    lookat = vec3(cameraToWorld * vec4(0, 0, 1, 1));
   } else {
     LOG_ERROR("{}: unrecognized shot type [{}]", "Loader", shotJson["type"]);
     exit(1);
   }
 
   CameraShot shot;
-  shot.ext = ext;
+  // shot.ext = ext;
   shot.eye = eye;
   shot.up = up;
   shot.lookat = lookat;
