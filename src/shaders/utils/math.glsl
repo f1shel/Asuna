@@ -182,8 +182,10 @@ float cosineHemispherePdf(in float cosTheta) {
  *      https://pbr-book.org/3ed-2018/Monte_Carlo_Integration/Importance_Sampling
  */
 float powerHeuristic(float a, float b) {
-  float t = a * a;
-  return t / (b * b + t);
+  a = a * a;
+  b = b * b + a;
+  if (b == 0) return 0;
+  return a / b;
 }
 
 /*

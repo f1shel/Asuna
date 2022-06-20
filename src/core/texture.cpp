@@ -176,8 +176,8 @@ EnvMap::EnvMap(const std::string& envmapPath) {
 
     // Convert to range [0,1]
     for (int i = 0; i < width; i++) {
-      pdf2D[j * width + i] /= rowWeightSum;
-      cdf2D[j * width + i] /= rowWeightSum;
+      pdf2D[j * width + i] /= (rowWeightSum + 1e-7);
+      cdf2D[j * width + i] /= (rowWeightSum + 1e-7);
     }
 
     weightSum += rowWeightSum;
@@ -188,8 +188,8 @@ EnvMap::EnvMap(const std::string& envmapPath) {
 
   // Convert to range [0,1]
   for (int j = 0; j < height; j++) {
-    cdf1D[j] /= weightSum;
-    pdf1D[j] /= weightSum;
+    cdf1D[j] /= (weightSum + 1e-7);
+    pdf1D[j] /= (weightSum + 1e-7);
   }
 
   auto lowerBound = [=](const float* array, int lower, int upper,
