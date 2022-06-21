@@ -238,12 +238,12 @@ void Tracer::runOffline() {
 
     // Save image
     static char outputName[50];
-    //sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(), shotId);
-    //saveBufferToImage(pixelBuffer, outputName);
+    sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(), shotId);
+    saveBufferToImage(pixelBuffer, outputName);
     //sprintf(outputName, "%s_shot_%04d.exr", m_tis.outputname.c_str(), shotId);
     //saveBufferToImage(pixelBuffer, outputName, 0);
-    sprintf(outputName, "%s_shot_%04d_channel_1.exr", m_tis.outputname.c_str(), shotId);
-    saveBufferToImage(pixelBuffer, outputName, 1);
+    //sprintf(outputName, "%s_shot_%04d_channel_1.exr", m_tis.outputname.c_str(), shotId);
+    //saveBufferToImage(pixelBuffer, outputName, 1);
   }
   // Destroy temporary buffer
   m_alloc.destroy(pixelBuffer);
