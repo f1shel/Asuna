@@ -79,6 +79,9 @@ struct PathRecord {
 struct MultiChannelRecord {
   vec3 albedo;
   vec3 normal;
+  vec3 custom0;
+  vec3 custom1;
+  vec3 custom2;
 };
 
 struct RayPayload {

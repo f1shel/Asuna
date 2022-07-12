@@ -160,6 +160,9 @@ void main() {
   if (payload.pRec.depth == 1) {
     payload.mRec.albedo = state.mat.diffuse;
     payload.mRec.normal = state.ffN;
+    payload.mRec.custom0 = state.mat.rhoSpec;
+    payload.mRec.custom1 = state.X;
+    payload.mRec.custom2 = vec3(ax, ay, 0);
   }
 
 #if USE_MIS
