@@ -43,21 +43,24 @@ void Scene::submit() {
   m_pTexturesAlloc.resize(getTexturesNum());
   for (auto& record : m_pTextures) {
     const auto& textureName = record.first;
-    auto [pTexture, textureId] = record.second;
+    auto pTexture = record.second.first;
+    auto textureId = record.second.second;
     allocTexture(m_pContext, textureId, textureName, pTexture, cmdBuf);
   }
 
   m_pMaterialsAlloc.resize(getMaterialsNum());
   for (auto& record : m_pMaterials) {
     const auto& materialName = record.first;
-    auto [pMaterial, materialId] = record.second;
+    auto pMaterial = record.second.first;
+    auto materialId = record.second.second;
     allocMaterial(m_pContext, materialId, materialName, pMaterial, cmdBuf);
   }
 
   m_pMeshesAlloc.resize(getMeshesNum());
   for (auto& record : m_pMeshes) {
     const auto& meshName = record.first;
-    auto [pMesh, meshId] = record.second;
+    auto pMesh = record.second.first;
+    auto meshId = record.second.second;
     allocMesh(m_pContext, meshId, meshName, pMesh, cmdBuf);
   }
 
@@ -409,7 +412,10 @@ nvvk::RaytracingBuilderKHR::BlasInput Scene::getBlas(VkDevice device,
 
 vector<Instance>& Scene::getInstances() { return m_instances; }
 
-VkExtent2D Scene::getSize() { return m_pCamera->getFilmSize(); }
+VkExtent2D Scene::getSize() {
+  return m_pContext->getSize();
+  // return m_pCamera->getFilmSize();
+}
 
 VkBuffer Scene::getInstancesDescriptor() {
   return m_pInstancesAlloc->getBuffer();

@@ -31,7 +31,7 @@ message(STATUS "Processing Project ${PROJNAME}:")
 
 #--------------------------------------------------------------------------------------------------
 # C++ target and defines
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 add_executable(${PROJNAME})
 
 if(MSVC)
@@ -98,6 +98,10 @@ set_property(TARGET Imath IlmImf PROPERTY CXX_STANDARD 14)
 #--------------------------------------------------------------------------------------------------
 # SpdLog
 target_include_directories(${PROJNAME} PRIVATE ${THIRD_PARTY_DIR}/spdlog/include)
+
+#--------------------------------------------------------------------------------------------------
+# Filesystem
+target_include_directories(${PROJNAME} PRIVATE ${THIRD_PARTY_DIR}/filesystem)
 
 #--------------------------------------------------------------------------------------------------
 # OptiX

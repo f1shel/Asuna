@@ -10,3 +10,6 @@
 [submodule "src/ext/spdlog"]
 	path = src/ext/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "src/ext/filesystem"]
+	path = src/ext/filesystem
+	url = git@github.com:f1shel/filesystem.git

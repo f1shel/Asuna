@@ -3,15 +3,15 @@
 #include <ImfRgba.h>
 #include <ImfRgbaFile.h>
 #include <shared/binding.h>
+#include <filesystem/path.h>
+using namespace filesystem;
 
-#include <filesystem>
 #include <nvh/nvprint.hpp>
 #include <nvvk/commands_vk.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
-using path = std::filesystem::path;
 
 static float* readImageEXR(const std::string& name, int* width, int* height) {
   using namespace Imf;
@@ -305,12 +305,11 @@ void EnvMapAlloc::deinit(ContextAware* pContext) {
 
 float* readImage(const std::string& imagePath, int& width, int& height,
                  float gamma) {
-  static std::set<std::string> supportExtensions = {".hdr", ".exr", ".jpg",
-                                                    ".png"};
-  std::string ext = path(imagePath).extension().string();
+  static std::set<std::string> supportExtensions = {"hdr", "exr", "jpg", "png"};
+  std::string ext = path(imagePath).extension();
   if (!supportExtensions.count(ext)) {
     LOG_ERROR(
-        "{}: textures only support extensions (.hdr .exr .jpg .png) "
+        "{}: textures only support extensions (hdr exr jpg png) "
         "while [{}] "
         "is passed in",
         "Scene", ext);
@@ -318,10 +317,10 @@ float* readImage(const std::string& imagePath, int& width, int& height,
   }
   void* pixels = nullptr;
   // High dynamic range image
-  if (ext == ".hdr")
+  if (ext == "hdr")
     pixels = (void*)stbi_loadf(imagePath.c_str(), &width, &height, nullptr,
                                STBI_rgb_alpha);
-  else if (ext == ".exr")
+  else if (ext == "exr")
     pixels = readImageEXR(imagePath, &width, &height);
   // 32bit image
   else {
@@ -340,20 +339,20 @@ float* readImage(const std::string& imagePath, int& width, int& height,
 
 void writeImage(const std::string& imagePath, int width, int height,
                 float* data) {
-  static std::set<std::string> supportExtensions = {".hdr", ".exr", ".jpg",
-                                                    ".png", ".tga", ".bmp"};
-  std::string ext = path(imagePath).extension().string();
+  static std::set<std::string> supportExtensions = {"hdr", "exr", "jpg",
+                                                    "png", "tga", "bmp"};
+  std::string ext = path(imagePath).extension();
   if (!supportExtensions.count(ext)) {
     LOG_ERROR(
-        "{}: textures only support extensions (.hdr .exr .jpg .png) "
+        "{}: textures only support extensions (hdr exr jpg png) "
         "while [{}] "
         "is passed in",
         "Scene Error", ext);
     exit(1);
   }
-  if (ext == ".hdr")
+  if (ext == "hdr")
     stbi_write_hdr(imagePath.c_str(), width, height, 4, data);
-  else if (ext == ".exr")
+  else if (ext == "exr")
     writeImageEXR(imagePath, data, width, height, width, height, 0, 0);
   else {
     stbi_hdr_to_ldr_gamma(1.0);
@@ -361,13 +360,13 @@ void writeImage(const std::string& imagePath, int width, int height,
         STBI_MALLOC(width * height * 4 * sizeof(float)));
     memcpy(autoDestroyData, data, width * height * 4 * sizeof(float));
     auto ldrData = stbi__hdr_to_ldr(autoDestroyData, width, height, 4);
-    if (ext == ".jpg")
+    if (ext == "jpg")
       stbi_write_jpg(imagePath.c_str(), width, height, 4, ldrData, 0);
-    else if (ext == ".png")
+    else if (ext == "png")
       stbi_write_png(imagePath.c_str(), width, height, 4, ldrData, 0);
-    else if (ext == ".tga")
+    else if (ext == "tga")
       stbi_write_tga(imagePath.c_str(), width, height, 4, ldrData);
-    else if (ext == ".bmp")
+    else if (ext == "bmp")
       stbi_write_bmp(imagePath.c_str(), width, height, 4, ldrData);
     stbi_hdr_to_ldr_gamma(stbi__h2l_gamma_i);
   }
