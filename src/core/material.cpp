@@ -5,7 +5,8 @@
 MaterialAlloc::MaterialAlloc(ContextAware* pContext, Material* pMaterial,
                              const VkCommandBuffer& cmdBuf) {
   auto& m_alloc = pContext->getAlloc();
-  auto& m_materialData = vector<GpuMaterial>{pMaterial->getMaterial()};
+  vector<GpuMaterial> m_materialData{};
+  m_materialData.emplace_back(pMaterial->getMaterial());
   VkBufferUsageFlags flag = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
   m_type = pMaterial->getType();
   m_bMaterial = m_alloc.createBuffer(cmdBuf, m_materialData,

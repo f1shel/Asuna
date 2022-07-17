@@ -522,7 +522,8 @@ void DenoiserOptix::createSemaphore() {
   handleInfo.semaphore = m_semaphore.vk;
   vkGetSemaphoreWin32HandleKHR(m_device, &handleInfo, &m_semaphore.handle);
 #else
-  VkSemaphoreGetFdInfoKHR{VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
+  VkSemaphoreGetFdInfoKHR handleInfo{
+      VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR};
   handleInfo.handleType = handleType;
   handleInfo.semaphore = m_semaphore.vk;
   vkGetSemaphoreFdKHR(m_device, &handleInfo, &m_semaphore.handle);
