@@ -90,10 +90,9 @@ void main() {
     payload.pRec.throughput = vec3(1.0);
     payload.bRec.flags = EBsdfNull;
     payload.mRec = MultiChannelRecord(vec3(0.0), vec3(0.0), vec3(0.0),
-                                      vec3(0.0), vec3(0.0));
+                                      vec3(0.0), vec3(0.0), vec3(0.0));
 
-    for (payload.pRec.depth = 1; payload.pRec.depth <= pc.maxPathDepth;
-         payload.pRec.depth++) {
+    for (payload.pRec.depth = 1; payload.pRec.depth <= pc.maxPathDepth;) {
       // Initialize direct light setting
       payload.dRec.skip = true;
       payload.dRec.radiance = vec3(0);
@@ -121,6 +120,8 @@ void main() {
 #endif
 
       if (payload.pRec.stop) break;
+
+      payload.pRec.depth++;
     }
 
     radiance += payload.pRec.radiance;
@@ -142,6 +143,8 @@ void main() {
                vec4(payload.mRec.custom1, 1.f));
     imageStore(images[5], ivec2(gl_LaunchIDEXT.xy),
                vec4(payload.mRec.custom2, 1.f));
+    imageStore(images[6], ivec2(gl_LaunchIDEXT.xy),
+               vec4(payload.mRec.custom3, 1.f));
   } else {
     // Do accumulation over time
     float a = 1.0f / float(pc.curFrame + 1);

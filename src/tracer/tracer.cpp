@@ -245,11 +245,14 @@ void Tracer::runOffline() {
     // sprintf(outputName, "%s_shot_%04d_channel_1.exr",
     // m_tis.outputname.c_str(), shotId); saveBufferToImage(pixelBuffer,
     // outputName, 1);
-    for (int channelId = 1; channelId < 6; channelId++) {
-      sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
-              m_tis.outputname.c_str(), shotId, channelId);
-      saveBufferToImage(pixelBuffer, outputName, channelId);
-    }
+    //for (int channelId = 1; channelId < 6; channelId++) {
+    //  sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
+    //          m_tis.outputname.c_str(), shotId, channelId);
+    //  saveBufferToImage(pixelBuffer, outputName, channelId);
+    //}
+    sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
+            m_tis.outputname.c_str(), shotId, 6);
+    saveBufferToImage(pixelBuffer, outputName, 6);
   }
   // Destroy temporary buffer
   m_alloc.destroy(pixelBuffer);

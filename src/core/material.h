@@ -30,6 +30,7 @@ public:
     m_material.normalTextureId = -1;
     m_material.roughnessTextureId = -1;
     m_material.tangentTextureId = -1;
+    m_material.opacityTextureId = -1;
     m_material.type = MaterialTypeBrdfLambertian;
   }
   Material(const GpuMaterial& material) : m_material(material) {}

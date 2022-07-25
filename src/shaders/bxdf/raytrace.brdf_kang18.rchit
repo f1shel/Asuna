@@ -135,6 +135,10 @@ void main() {
   state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
   state.mat.rhoSpec = textureEval(state.mat.metalnessTextureId, state.uv).rgb;
   state.mat.anisoAlpha = textureEval(state.mat.roughnessTextureId, state.uv).rg;
+  // Fetch opacity
+  float opacity = state.mat.metalness;
+  if (state.mat.opacityTextureId >= 0)
+   opacity = textureEval(state.mat.opacityTextureId, state.uv).r;
 
   vec3 cn = textureEval(state.mat.normalTextureId, state.uv).rgb;
   vec3 n = 2 * cn - 1;
@@ -151,6 +155,12 @@ void main() {
   state.X = makeNormal(cross(state.Y, state.N));
   state.ffN = dot(state.N, state.V) > 0 ? state.N : -state.N;
 
+  if (rand(payload.pRec.seed) < opacity) {
+    payload.pRec.ray.o = offsetPositionAlongNormal(state.pos, -state.ffN);
+    payload.pRec.depth--;
+    return;
+  }
+
   float ax = max(state.mat.anisoAlpha.x, EPS);
   float ay = max(state.mat.anisoAlpha.y, EPS);
   // eta = ior since there is no refraction
@@ -163,6 +173,7 @@ void main() {
     payload.mRec.custom0 = state.mat.rhoSpec;
     payload.mRec.custom1 = state.X;
     payload.mRec.custom2 = vec3(ax, ay, 0);
+    payload.mRec.custom3 = state.pos;
   }
 
 #if USE_MIS

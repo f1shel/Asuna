@@ -67,7 +67,7 @@ START_ENUM(InputBindings)
   InputSampler = 0
 END_ENUM();
 
-#define NUM_OUTPUT_IMAGES 6
+#define NUM_OUTPUT_IMAGES 8
 // clang-format on
 
 #endif

@@ -42,6 +42,7 @@ struct GpuMaterial {
   int radianceTextureId;  // radiance texture id
   int normalTextureId;     // normal texture id
   int tangentTextureId;    // tangent texture id
+  int opacityTextureId;    // opacity texture id
   uint type;               // material type
 };
 

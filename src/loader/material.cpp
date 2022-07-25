@@ -154,7 +154,15 @@ static void ParseBrdfKang18(Scene* m_pScene, const nlohmann::json& materialJson,
       m_pScene->getTextureId(materialJson["alpha_texture"]);
   material.tangentTextureId =
       m_pScene->getTextureId(materialJson["tangent_texture"]);
+
+  // Used as opacity
+  material.metalness = 0.f;
+  if (materialJson.count("opacity_texture")) {
+    material.opacityTextureId =
+        m_pScene->getTextureId(materialJson["opacity_texture"]);
+  }
 }
+
 static void ParseBsdfDielectric(Scene* m_pScene,
                                 const nlohmann::json& materialJson,
                                 GpuMaterial& material) {
