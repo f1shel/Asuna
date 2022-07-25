@@ -14,8 +14,9 @@ START_ENUM(MaterialType)
   MaterialTypeBrdfConductor             = 6,
   MaterialTypeBrdfRoughConductor        = 7,
   MaterialTypeBrdfMirror                = 8,
-  MaterialTypeBsdfDielectric            = 9,
-  MaterialTypeNum                       = 10
+  MaterialTypeBrdfDisney                = 9,
+  MaterialTypeBsdfDielectric            = 10,
+  MaterialTypeNum                       = 11
 END_ENUM();
 // clang-format on
 
@@ -23,7 +24,7 @@ struct GpuMaterial {
   vec3 diffuse;            // diffuse albedo
   vec3 rhoSpec;            // kang18
   vec2 anisoAlpha;         // kang18
-  float ior;               // dielectric
+  float ior;               // dielectric/disney
   float roughness;         // disney
   float subsurface;        // disney
   float specular;          // disney
@@ -33,13 +34,13 @@ struct GpuMaterial {
   float sheenTint;         // disney
   float clearcoat;         // disney
   float clearcoatGloss;    // disney
-  vec3 radiance;          // radiance
+  vec3 radiance;           // radiance
   float metalness;         // metalness
-  vec3 radianceFactor;    // radiance factor
+  vec3 radianceFactor;     // radiance factor
   int diffuseTextureId;    // diffuse albedo texture id
   int roughnessTextureId;  // roughness texture id
   int metalnessTextureId;  // metalness texture id
-  int radianceTextureId;  // radiance texture id
+  int radianceTextureId;   // radiance texture id
   int normalTextureId;     // normal texture id
   int tangentTextureId;    // tangent texture id
   int opacityTextureId;    // opacity texture id

@@ -147,6 +147,18 @@ void main() {
 
     configureShadingFrame(state);
   }
+
+  // Fetch opacity
+  float opacity = state.mat.specular;
+  if (state.mat.opacityTextureId >= 0)
+   opacity = textureEval(state.mat.opacityTextureId, state.uv).r;
+
+  if (rand(payload.pRec.seed) < opacity) {
+    payload.pRec.ray.o = offsetPositionAlongNormal(state.pos, -state.ffN);
+    payload.pRec.depth--;
+    return;
+  }
+
   float ax = max(sqr(state.mat.roughness), 0.001);
   // Isotropic
   float ay = ax;
