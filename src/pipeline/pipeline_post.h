@@ -24,10 +24,9 @@ private:
   void createPostDescriptorSetLayout();
   // Create post-processing pipeline
   void createPostPipeline();
-
-#ifdef NVP_SUPPORTS_OPTIX7
+  
+  // #OPTIX_D
   uint m_postFrame = 0;
-#endif
 
 public:
   // Update the descriptor pointer

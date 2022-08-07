@@ -57,16 +57,19 @@ private:
 #ifdef NVP_SUPPORTS_OPTIX7
   DenoiserOptix m_denoiser;
 #endif  // NVP_SUPPORTS_OPTIX7
+
   // Timeline semaphores
   uint64_t m_fenceValue{0};
   bool m_denoiseApply{false};
   bool m_denoiseFirstFrame{false};
   int m_denoiseEveryNFrames{100};
+
   // #OPTIX_D
-  uint32_t m_postFrame{0};
   nvvk::Texture m_gAlbedo;
   nvvk::Texture m_gNormal;
   nvvk::Texture m_gDenoised;
+
+  // #OPTIX_D
   void submitWithTLSemaphore(const VkCommandBuffer& cmdBuf);
   void submitFrame(const VkCommandBuffer& cmdBuf);
   void createGbuffers();
