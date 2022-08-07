@@ -89,6 +89,8 @@ void main() {
     payload.pRec.radiance = vec3(0.0);
     payload.pRec.throughput = vec3(1.0);
     payload.bRec.flags = EBsdfNull;
+
+    // Multi-channel output
     payload.mRec = MultiChannelRecord(vec3(0.0), vec3(0.0), vec3(0.0),
                                       vec3(0.0), vec3(0.0), vec3(0.0));
 

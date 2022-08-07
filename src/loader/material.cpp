@@ -366,6 +366,9 @@ static void ParseBrdfDisney(Scene* m_pScene, const nlohmann::json& materialJson,
 
   // Used as opacity
   material.rhoSpec.x = 0.f;
+  if (materialJson.count("opacity")) {
+    material.rhoSpec.x = materialJson["opacity"];
+  }
   if (materialJson.count("opacity_texture")) {
     material.opacityTextureId =
         m_pScene->getTextureId(materialJson["opacity_texture"]);
