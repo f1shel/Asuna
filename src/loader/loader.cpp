@@ -392,7 +392,7 @@ void Loader::addShot(const nlohmann::json& shotJson) {
     up = vec3(cameraToWorld * vec4(0, 1, 0, 0));
     lookat = vec3(cameraToWorld * vec4(0, 0, 1, 1));
   } else if (shotJson["type"] == "opencv") {
-    JsonCheckKeys(shotJson, {"ext"});
+    JsonCheckKeys(shotJson, {"matrix"});
     mat4 ext = Json2Mat4(shotJson["matrix"]);
     auto cameraToWorld = nvmath::invert_rot_trans(ext);
     cameraToWorld.get_translation(eye);
