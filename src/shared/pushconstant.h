@@ -12,13 +12,25 @@ struct GpuPushConstantRaytrace {
   int curFrame;
   int maxPathDepth;
   int numLights;
+
   vec3 bgColor;
   uint useFaceNormal;
+
   uint ignoreEmissive;
   uint hasEnvMap;
   vec2 envMapResolution;
+
   float envMapIntensity;
-  float envRotateAngle;
+  uint nMultiChannel;
+  int diffuseOutChannel;
+  int specularOutChannel;
+
+  int roughnessOutChannel;
+  int normalOutChannel;
+  int positionOutChannel;
+  int tangentOutChannel;
+
+  int uvOutChannel;
 };
 
 // clang-format off

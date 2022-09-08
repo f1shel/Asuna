@@ -160,8 +160,29 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
       rtxState.bgColor = Json2Vec3(ptJson["background_color"]);
     if (ptJson.contains("envmap_intensity"))
       rtxState.envMapIntensity = ptJson["envmap_intensity"];
-    // if (ptJson.contains("envmap_rotate"))
-    //   rtxState.envRotateAngle = ptJson["envmap_rotate"];
+    if (ptJson.contains("multi_channel")) {
+      auto& multiChannel = ptJson["multi_channel"];
+      uint nMultiChannel = multiChannel.size();
+      if (nMultiChannel > NUM_OUTPUT_IMAGES - 1) {
+        LOG_ERROR("{}: channel numbers can not exceed [{}]", "Loader",
+                  NUM_OUTPUT_IMAGES - 1);
+        exit(1);
+      }
+      rtxState.nMultiChannel = nMultiChannel;
+      for (uint cid = 0; cid < nMultiChannel; cid++) {
+        string cType = multiChannel[cid];
+        auto lambda_ = [&](string channelType, int& channel) {
+          if (cType == channelType) channel = cid;
+        };
+        lambda_("diffuse", rtxState.diffuseOutChannel);
+        lambda_("normal", rtxState.normalOutChannel);
+        lambda_("specular", rtxState.specularOutChannel);
+        lambda_("tangent", rtxState.tangentOutChannel);
+        lambda_("roughness", rtxState.roughnessOutChannel);
+        lambda_("position", rtxState.positionOutChannel);
+        lambda_("uv", rtxState.uvOutChannel);
+      }
+    }
   }
 
   if (stateJson.contains("post_processing")) {
@@ -194,6 +215,11 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
 
     postState.tmType = tmType;
   }
+
+  if (stateJson.contains("output_render_result"))
+    pipelineState.outputRenderResult = stateJson["output_render_result"];
+  if (stateJson.contains("output_hdr"))
+    pipelineState.outputHdr = stateJson["output_hdr"];
 }
 
 void Loader::addState(const nlohmann::json& stateJson) {

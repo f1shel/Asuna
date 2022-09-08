@@ -132,9 +132,12 @@ void main() {
   HitState state = getHitState();
 
   // Fetch textures
-  state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
-  state.mat.rhoSpec = textureEval(state.mat.metalnessTextureId, state.uv).rgb;
-  state.mat.anisoAlpha = textureEval(state.mat.roughnessTextureId, state.uv).rg;
+  if (state.mat.diffuseTextureId >= 0)
+    state.mat.diffuse = textureEval(state.mat.diffuseTextureId, state.uv).rgb;
+  if (state.mat.metalnessTextureId >= 0)
+    state.mat.rhoSpec = textureEval(state.mat.metalnessTextureId, state.uv).rgb;
+  if (state.mat.roughnessTextureId >= 0)
+    state.mat.anisoAlpha = textureEval(state.mat.roughnessTextureId, state.uv).rg;
   // Fetch opacity
   float opacity = state.mat.metalness;
   if (state.mat.opacityTextureId >= 0)
@@ -168,12 +171,20 @@ void main() {
 
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
-    payload.mRec.albedo = state.mat.diffuse;
-    payload.mRec.normal = state.ffN;
-    payload.mRec.custom0 = state.mat.rhoSpec;
-    payload.mRec.custom1 = state.X;
-    payload.mRec.custom2 = vec3(ax, ay, 0);
-    payload.mRec.custom3 = state.pos;
+    if (pc.diffuseOutChannel >= 0)
+      payload.mRec.channel[pc.diffuseOutChannel] = state.mat.diffuse;
+    if (pc.normalOutChannel >= 0)
+      payload.mRec.channel[pc.normalOutChannel] = state.ffN;
+    if (pc.specularOutChannel >= 0)
+      payload.mRec.channel[pc.specularOutChannel] = state.mat.rhoSpec;
+    if (pc.tangentOutChannel >= 0)
+      payload.mRec.channel[pc.tangentOutChannel] = state.X;
+    if (pc.roughnessOutChannel >= 0)
+      payload.mRec.channel[pc.roughnessOutChannel] = vec3(ax, ay, 0);
+    if (pc.positionOutChannel >= 0)
+      payload.mRec.channel[pc.positionOutChannel] = state.pos;
+    if (pc.uvOutChannel >= 0)
+      payload.mRec.channel[pc.uvOutChannel] = vec3(state.uv, 0);
   }
 
 #if USE_MIS

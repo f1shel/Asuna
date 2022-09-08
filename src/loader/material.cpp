@@ -151,19 +151,26 @@ static void ParseBrdfEmissive(Scene* m_pScene,
 }
 static void ParseBrdfKang18(Scene* m_pScene, const nlohmann::json& materialJson,
                             GpuMaterial& material) {
-  JsonCheckKeys(materialJson,
-                {"diffuse_texture", "specular_texture", "normal_texture",
-                 "alpha_texture", "tangent_texture"});
+  JsonCheckKeys(materialJson, {"normal_texture", "tangent_texture"});
   material.normalTextureId =
       m_pScene->getTextureId(materialJson["normal_texture"]);
-  material.diffuseTextureId =
-      m_pScene->getTextureId(materialJson["diffuse_texture"]);
-  material.metalnessTextureId =
-      m_pScene->getTextureId(materialJson["specular_texture"]);
-  material.roughnessTextureId =
-      m_pScene->getTextureId(materialJson["alpha_texture"]);
   material.tangentTextureId =
       m_pScene->getTextureId(materialJson["tangent_texture"]);
+  if (materialJson.contains("diffuse_texture"))
+    material.diffuseTextureId =
+        m_pScene->getTextureId(materialJson["diffuse_texture"]);
+  else
+    material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+  if (materialJson.contains("specular_texture"))
+    material.metalnessTextureId =
+        m_pScene->getTextureId(materialJson["specular_texture"]);
+  else
+    material.rhoSpec = Json2Vec3(materialJson["specular_reflectance"]);
+  if (materialJson.contains("alpha_texture"))
+    material.roughnessTextureId =
+        m_pScene->getTextureId(materialJson["alpha_texture"]);
+  else
+    material.anisoAlpha = Json2Vec2(materialJson["alpha"]);
 
   // Used as opacity
   material.metalness = 0.f;

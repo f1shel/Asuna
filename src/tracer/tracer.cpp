@@ -238,17 +238,22 @@ void Tracer::runOffline() {
 
     // Save image
     static char outputName[200];
-    // sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(),
-    // shotId); saveBufferToImage(pixelBuffer, outputName); sprintf(outputName,
-    // "%s_shot_%04d.exr", m_tis.outputname.c_str(), shotId);
-    // saveBufferToImage(pixelBuffer, outputName, 0);
-    // sprintf(outputName, "%s_shot_%04d_channel_1.exr",
-    // m_tis.outputname.c_str(), shotId); saveBufferToImage(pixelBuffer,
-    // outputName, 1);
-    for (int channelId = 1; channelId < 7; channelId++) {
+    auto& state = m_scene.getPipelineState();
+    if (state.outputRenderResult) {
+      if (state.outputHdr) {
+        sprintf(outputName, "%s_shot_%04d.exr", m_tis.outputname.c_str(),
+                shotId);
+        saveBufferToImage(pixelBuffer, outputName, 0);
+      } else {
+        sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(),
+                shotId);
+        saveBufferToImage(pixelBuffer, outputName);
+      }
+    }
+    for (uint cid = 0; cid < state.rtxState.nMultiChannel; cid++) {
       sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
-              m_tis.outputname.c_str(), shotId, channelId);
-      saveBufferToImage(pixelBuffer, outputName, channelId);
+              m_tis.outputname.c_str(), shotId, cid);
+      saveBufferToImage(pixelBuffer, outputName, cid + 1);
     }
   }
   // Destroy temporary buffer

@@ -3,6 +3,8 @@
 
 #define USE_MIS 1
 
+#include "../../shared/binding.h"
+
 struct Ray {
   // Origin in world space
   vec3 o;
@@ -77,12 +79,7 @@ struct PathRecord {
 };
 
 struct MultiChannelRecord {
-  vec3 albedo;
-  vec3 normal;
-  vec3 custom0;
-  vec3 custom1;
-  vec3 custom2;
-  vec3 custom3;
+  vec3 channel[NUM_OUTPUT_IMAGES-1];
 };
 
 struct RayPayload {

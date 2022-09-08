@@ -450,7 +450,6 @@ void Scene::setShot(int shotId) {
   // m_pipelineState.rtxState.envMapResolution =
   // state.rtxState.envMapResolution;
   m_pipelineState.rtxState.bgColor = state.rtxState.bgColor;
-  m_pipelineState.rtxState.envRotateAngle = state.rtxState.envRotateAngle;
 }
 
 void Scene::allocLights(ContextAware* pContext, const VkCommandBuffer& cmdBuf) {

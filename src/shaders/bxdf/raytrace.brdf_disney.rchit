@@ -427,8 +427,8 @@ void main() {
 
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
-    payload.mRec.albedo = state.mat.diffuse;
-    payload.mRec.normal = state.ffN;
+//    payload.mRec.albedo = state.mat.diffuse;
+//    payload.mRec.normal = state.ffN;
   }
 
   float eta = dot(state.V, state.N) > 0.0 ? (1.0 / mat.ior) : mat.ior;

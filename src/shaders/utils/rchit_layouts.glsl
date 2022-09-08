@@ -12,7 +12,6 @@
 #include "structs.glsl"
 #include "math.glsl"
 #include "sample_light.glsl"
-#include "structs.glsl"
 #include "sun_and_sky.glsl"
 
 // clang-format off

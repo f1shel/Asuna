@@ -7,6 +7,8 @@ public:
   GpuPushConstantGraphics graphicsState;
   GpuPushConstantRaytrace rtxState;
   GpuPushConstantPost postState;
+  bool outputHdr;
+  bool outputRenderResult;
 
   State() {
     graphicsState.placeholder = 0;
@@ -29,7 +31,15 @@ public:
     rtxState.envMapResolution = vec2(0.f);
     // rewrite by Loader::parse()
     rtxState.bgColor = vec3(0.f);
-    rtxState.envRotateAngle = 0.f;
+    // rewrite by Loader::parse()
+    rtxState.nMultiChannel = 0;
+    rtxState.diffuseOutChannel = -1;
+    rtxState.specularOutChannel = -1;
+    rtxState.roughnessOutChannel = -1;
+    rtxState.normalOutChannel = -1;
+    rtxState.positionOutChannel = -1;
+    rtxState.tangentOutChannel = -1;
+    rtxState.uvOutChannel = -1;
 
     // rewrite by gui
     postState.brightness = 1.f;
@@ -44,5 +54,8 @@ public:
     postState.key = 0.5f;
     // rewrite by Loader::parse() & gui
     postState.tmType = ToneMappingTypeFilmic;
+
+    outputHdr = false;
+    outputRenderResult = true;
   }
 };
