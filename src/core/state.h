@@ -1,6 +1,7 @@
 #pragma once
 
 #include <shared/pushconstant.h>
+#include <vector>
 
 class State {
 public:
@@ -9,6 +10,7 @@ public:
   GpuPushConstantPost postState;
   bool outputHdr;
   bool outputRenderResult;
+  std::vector<bool> channelOutputLdr;
 
   State() {
     graphicsState.placeholder = 0;
@@ -57,5 +59,6 @@ public:
 
     outputHdr = false;
     outputRenderResult = true;
+    channelOutputLdr.clear();
   }
 };

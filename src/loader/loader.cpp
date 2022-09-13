@@ -183,6 +183,17 @@ static void parseState(const nlohmann::json& stateJson, State& pipelineState) {
         lambda_("uv", rtxState.uvOutChannel);
       }
     }
+    pipelineState.channelOutputLdr.clear();
+    for (uint cid = 0; cid < rtxState.nMultiChannel; cid++)
+      pipelineState.channelOutputLdr.emplace_back(false);
+    if (ptJson.contains("multi_channel_ldr")) {
+      auto& multiChannelLdr = ptJson["multi_channel_ldr"];
+      for (uint cid = 0;
+           cid < std::min(rtxState.nMultiChannel, uint(multiChannelLdr.size()));
+           cid++) {
+        pipelineState.channelOutputLdr[cid] = multiChannelLdr[cid];
+      }
+    }
   }
 
   if (stateJson.contains("post_processing")) {

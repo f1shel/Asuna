@@ -91,10 +91,8 @@ void main() {
 
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
-//    payload.mRec.albedo = state.mat.diffuse;
-//    payload.mRec.normal = state.ffN;
-//    payload.mRec.custom1 = state.X;
-//    payload.mRec.custom3 = state.pos;
+    if (pc.diffuseOutChannel >= 0)
+      payload.mRec.channel[pc.diffuseOutChannel] = state.mat.diffuse;
   }
 
 #if USE_MIS

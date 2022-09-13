@@ -251,8 +251,12 @@ void Tracer::runOffline() {
       }
     }
     for (uint cid = 0; cid < state.rtxState.nMultiChannel; cid++) {
-      sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
-              m_tis.outputname.c_str(), shotId, cid);
+      if (state.channelOutputLdr[cid])
+        sprintf(outputName, "%s_shot_%04d_channel_%04d.png",
+                m_tis.outputname.c_str(), shotId, cid);
+      else
+        sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
+                m_tis.outputname.c_str(), shotId, cid);
       saveBufferToImage(pixelBuffer, outputName, cid + 1);
     }
   }
