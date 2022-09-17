@@ -12,6 +12,7 @@ struct TracerInitSettings {
   string scenefile = "";
   string outputname = "";
   int sceneSpp = 0;
+  int gpuId = 0;
 };
 
 class Tracer : public ContextAware {

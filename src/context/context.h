@@ -31,6 +31,7 @@ constexpr int FRAMES_IN_FLIGHT = 3;
 
 struct ContextInitSetting {
   bool offline{false};
+  int useGpuId{0};
 };
 
 class ContextAware : public nvvk::AppBaseVk {

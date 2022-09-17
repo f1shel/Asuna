@@ -23,7 +23,7 @@ void Tracer::init(TracerInitSettings tis) {
   if (tis.sceneSpp != 0) m_scene.setSpp(tis.sceneSpp);
 
   // Initialize context and set context pointer for scene
-  ContextAware::init({m_tis.offline});
+  ContextAware::init({m_tis.offline, m_tis.gpuId});
   m_scene.init(reinterpret_cast<ContextAware*>(this));
 
 #ifdef NVP_SUPPORTS_OPTIX7

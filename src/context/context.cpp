@@ -299,8 +299,9 @@ void ContextAware::initializeVulkan() {
   putenv("DEBUG_PRINTF_TO_STDOUT=1");
 #endif
   m_contextInfo.verboseAvailable = false;
-  m_contextInfo.verboseCompatibleDevices = false;
+  m_contextInfo.verboseCompatibleDevices = true;
   m_contextInfo.verboseUsed = false;
+  m_contextInfo.compatibleDeviceIndex = m_cis.useGpuId;
   // Create the Vulkan instance and then first compatible device based on info
   m_vkcontext.init(m_contextInfo);
   // Device must support acceleration structures and ray tracing pipelines:
