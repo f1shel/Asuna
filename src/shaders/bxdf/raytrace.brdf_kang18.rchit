@@ -184,7 +184,7 @@ void main() {
     if (pc.positionOutChannel >= 0)
       payload.mRec.channel[pc.positionOutChannel] = state.pos;
     if (pc.uvOutChannel >= 0)
-      payload.mRec.channel[pc.uvOutChannel] = vec3(state.uv, 0);
+      payload.mRec.channel[pc.uvOutChannel] = vec3(state.uv, 1);
   }
 
 #if USE_MIS
