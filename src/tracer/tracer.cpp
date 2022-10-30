@@ -206,14 +206,17 @@ void Tracer::runOffline() {
     m_pipelineRaytrace.resetFrame();
 
     // Progress bar
-    // tqdm bar;
-    // bar.set_theme_arrow();
+    tqdm bar;
+    bar.set_theme_arrow();
+
+    mat4 envR = nvmath::rotation_mat4_x(nv_to_rad * 90.f);
+    m_scene.getCamera().setEnvRotate(envR);
 
     for (int spp = 0; spp < tot; spp++) {
-      // bar.progress(spp, tot);
+      bar.progress(spp, tot);
 
-      std::chrono::steady_clock::time_point begin =
-          std::chrono::steady_clock::now();
+      // std::chrono::steady_clock::time_point begin =
+      //     std::chrono::steady_clock::now();
 
       const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
 
@@ -240,15 +243,15 @@ void Tracer::runOffline() {
       }
       genCmdBuf.submitAndWait(cmdBuf);
 
-      std::chrono::steady_clock::time_point end =
-          std::chrono::steady_clock::now();
+      // std::chrono::steady_clock::time_point end =
+      //     std::chrono::steady_clock::now();
 
-      LOG_INFO(
-          "[Ray Tracing] Elapsed Time: {} (ms)",
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-              .count());
+      // LOG_INFO(
+      //     "[Ray Tracing] Elapsed Time: {} (ms)",
+      //     std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
+      //         .count());
     }
-    // bar.finish();
+    bar.finish();
     vkDeviceWaitIdle(ContextAware::getDevice());
 
     // Save image
@@ -266,8 +269,8 @@ void Tracer::runOffline() {
       }
     }
     for (uint cid = 0; cid < state.rtxState.nMultiChannel; cid++) {
-      std::chrono::steady_clock::time_point begin =
-          std::chrono::steady_clock::now();
+      // std::chrono::steady_clock::time_point begin =
+      //     std::chrono::steady_clock::now();
       if (state.channelOutputLdr[cid])
         sprintf(outputName, "%s_shot_%04d_channel_%04d.png",
                 m_tis.outputname.c_str(), shotId, cid);
@@ -275,12 +278,12 @@ void Tracer::runOffline() {
         sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
                 m_tis.outputname.c_str(), shotId, cid);
       saveBufferToImage(pixelBuffer, outputName, cid + 1);
-      std::chrono::steady_clock::time_point end =
-          std::chrono::steady_clock::now();
-      LOG_INFO(
-          "[Saving Channel {}] Elapsed Time: {} (ms)", cid,
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-              .count());
+      // std::chrono::steady_clock::time_point end =
+      //     std::chrono::steady_clock::now();
+      // LOG_INFO(
+      //     "[Saving Channel {}] Elapsed Time: {} (ms)", cid,
+      //     std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
+      //         .count());
     }
   }
   // Destroy temporary buffer
@@ -360,31 +363,34 @@ void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
 
   // Write the image to disk
   void* data = m_alloc.map(pixelBuffer);
-  // writeImage(outputpath.c_str(), m_size.width, m_size.height,
-  //            reinterpret_cast<float*>(data));
-
-  float* float_data = reinterpret_cast<float*>(data);
-  if (channelId == 1) {
-    valid_pixel_index.resize(0);
-    valid_pixel_data.clear();
-    for (int idx = 0; idx < m_size.width * m_size.height; idx++) {
-      if (float_data[4 * idx + 2] == 1.0) {
-        valid_pixel_index.emplace_back(idx);
-        float_data[4 * idx + 2] = idx;
+  if (!m_tis.output_scanline || channelId == 0)
+    writeImage(outputpath.c_str(), m_size.width, m_size.height,
+               reinterpret_cast<float*>(data));
+  else {
+    float* float_data = reinterpret_cast<float*>(data);
+    if (channelId == 1) {
+      valid_pixel_index.clear();
+      valid_pixel_data.clear();
+      for (int idx = 0; idx < m_size.width * m_size.height; idx++) {
+        if (float_data[4 * idx + 2] == 1.0) {
+          valid_pixel_index.emplace_back(idx);
+          float_data[4 * idx + 2] = idx;
+        }
       }
+      valid_pixel_data.resize(valid_pixel_index.size() * 3);
+    } else {
+      int sp = 0;
+      for (auto idx : valid_pixel_index) {
+        valid_pixel_data[sp++] = float_data[4 * idx];
+        valid_pixel_data[sp++] = float_data[4 * idx + 1];
+        valid_pixel_data[sp++] = float_data[4 * idx + 2];
+      }
+      const std::vector<unsigned long> shape{(unsigned)valid_pixel_index.size(),
+                                             3};
+      npy::SaveArrayAsNumpy(outputpath, false, shape.size(), shape.data(),
+                            valid_pixel_data.data());
     }
-    // std::cout << valid_pixel_index.size() << std::endl;
-    valid_pixel_data.resize(valid_pixel_index.size() * 3);
   }
-  int sp = 0;
-  for (auto idx : valid_pixel_index) {
-    valid_pixel_data[sp++] = float_data[4 * idx];
-    valid_pixel_data[sp++] = float_data[4 * idx + 1];
-    valid_pixel_data[sp++] = float_data[4 * idx + 2];
-  }
-  const std::vector<unsigned long> shape{(unsigned)valid_pixel_index.size(), 3};
-  npy::SaveArrayAsNumpy(outputpath, false, shape.size(), shape.data(),
-                        valid_pixel_data.data());
 
   m_alloc.unmap(pixelBuffer);
 }

@@ -18,6 +18,7 @@ int main(int argc, char** argv) {
   TracerInitSettings tis;
   if (parser.exist("--offline")) tis.offline = true;
   if (parser.exist("--gpu_id")) tis.gpuId = parser.getInt("--gpu_id");
+  if (parser.exist("--output_scanline")) tis.output_scanline = true;
   tis.outputname = parser.getString("--out", "asuna_out.hdr");
   tis.scenefile = parser.getString("--scene", "PLEASE_SET_SCENE_PATH");
   tis.sceneSpp = parser.getInt("--spp");

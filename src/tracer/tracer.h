@@ -9,6 +9,7 @@
 
 struct TracerInitSettings {
   bool offline = false;
+  bool output_scanline = false;
   string scenefile = "";
   string outputname = "";
   int sceneSpp = 0;

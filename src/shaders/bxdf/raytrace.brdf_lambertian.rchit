@@ -93,6 +93,18 @@ void main() {
   if (payload.pRec.depth == 1) {
     if (pc.diffuseOutChannel >= 0)
       payload.mRec.channel[pc.diffuseOutChannel] = state.mat.diffuse;
+    if (pc.normalOutChannel >= 0)
+      payload.mRec.channel[pc.normalOutChannel] = state.ffN;
+    if (pc.specularOutChannel >= 0)
+      payload.mRec.channel[pc.specularOutChannel] = vec3(0);
+    if (pc.tangentOutChannel >= 0)
+      payload.mRec.channel[pc.tangentOutChannel] = state.X;
+    if (pc.roughnessOutChannel >= 0)
+      payload.mRec.channel[pc.roughnessOutChannel] = vec3(1, 1, 0);
+    if (pc.positionOutChannel >= 0)
+      payload.mRec.channel[pc.positionOutChannel] = state.pos;
+    if (pc.uvOutChannel >= 0)
+      payload.mRec.channel[pc.uvOutChannel] = vec3(state.uv, 1);
   }
 
 #if USE_MIS
