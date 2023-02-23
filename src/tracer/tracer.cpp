@@ -209,9 +209,6 @@ void Tracer::runOffline() {
     tqdm bar;
     bar.set_theme_arrow();
 
-    mat4 envR = nvmath::rotation_mat4_x(nv_to_rad * 90.f);
-    m_scene.getCamera().setEnvRotate(envR);
-
     for (int spp = 0; spp < tot; spp++) {
       bar.progress(spp, tot);
 
@@ -378,18 +375,17 @@ void Tracer::saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
         }
       }
       valid_pixel_data.resize(valid_pixel_index.size() * 3);
-    } else {
-      int sp = 0;
-      for (auto idx : valid_pixel_index) {
-        valid_pixel_data[sp++] = float_data[4 * idx];
-        valid_pixel_data[sp++] = float_data[4 * idx + 1];
-        valid_pixel_data[sp++] = float_data[4 * idx + 2];
-      }
-      const std::vector<unsigned long> shape{(unsigned)valid_pixel_index.size(),
-                                             3};
-      npy::SaveArrayAsNumpy(outputpath, false, shape.size(), shape.data(),
-                            valid_pixel_data.data());
     }
+    int sp = 0;
+    for (auto idx : valid_pixel_index) {
+      valid_pixel_data[sp++] = float_data[4 * idx];
+      valid_pixel_data[sp++] = float_data[4 * idx + 1];
+      valid_pixel_data[sp++] = float_data[4 * idx + 2];
+    }
+    const std::vector<unsigned long> shape{(unsigned)valid_pixel_index.size(),
+                                           3};
+    npy::SaveArrayAsNumpy(outputpath, false, shape.size(), shape.data(),
+                          valid_pixel_data.data());
   }
 
   m_alloc.unmap(pixelBuffer);
