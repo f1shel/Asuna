@@ -113,7 +113,7 @@ void main() {
         // environement)
         const uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT |
                               gl_RayFlagsSkipClosestHitShaderEXT;
-        float maxDist = payload.dRec.dist - 2 * EPS;
+        float maxDist = payload.dRec.dist - 2 *EPS;
         isShadowed = true;
         traceRayEXT(tlas, rayFlags, 0xFF, 0, 0, 1, payload.dRec.ray.o, 0.0,
                     payload.dRec.ray.d, maxDist, 1);

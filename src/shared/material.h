@@ -16,7 +16,8 @@ START_ENUM(MaterialType)
   MaterialTypeBrdfMirror                = 8,
   MaterialTypeBrdfDisney                = 9,
   MaterialTypeBsdfDielectric            = 10,
-  MaterialTypeNum                       = 11
+  MaterialTypeBrdfPhong                 = 11,
+  MaterialTypeNum                       = 12
 END_ENUM();
 // clang-format on
 

@@ -48,6 +48,7 @@ static void ParseBrdfMirror(Scene* m_pScene, const nlohmann::json& materialJson,
 static void ParseBrdfConductor(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 static void ParseBrdfRoughConductor(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 static void ParseBrdfDisney(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
+static void ParseBrdfPhong(Scene* m_pScene, const nlohmann::json& materialJson, GpuMaterial& material);
 // clang-format on
 
 void Loader::addMaterial(const nlohmann::json& materialJson) {
@@ -88,6 +89,9 @@ void Loader::addMaterial(const nlohmann::json& materialJson) {
   } else if (materialJson["type"] == "brdf_disney") {
     material.type = MaterialTypeBrdfDisney;
     ParseBrdfDisney(m_pScene, materialJson, material);
+  } else if (materialJson["type"] == "brdf_phong") {
+    material.type = MaterialTypeBrdfPhong;
+    ParseBrdfPhong(m_pScene, materialJson, material);
   } else {
     LOG_ERROR("{}: unrecognized material type [{}]", "Loader",
               materialJson["type"]);
@@ -380,4 +384,20 @@ static void ParseBrdfDisney(Scene* m_pScene, const nlohmann::json& materialJson,
     material.opacityTextureId =
         m_pScene->getTextureId(materialJson["opacity_texture"]);
   }
+}
+
+void ParseBrdfPhong(Scene* m_pScene, const nlohmann::json& materialJson,
+                    GpuMaterial& material) {
+  if (materialJson.contains("normal_texture"))
+    material.normalTextureId =
+        m_pScene->getTextureId(materialJson["normal_texture"]);
+  if (materialJson.contains("diffuse_reflectance"))
+    material.diffuse = Json2Vec3(materialJson["diffuse_reflectance"]);
+  if (materialJson.contains("diffuse_texture"))
+    material.diffuseTextureId =
+        m_pScene->getTextureId(materialJson["diffuse_texture"]);
+  if (materialJson.contains("specular_reflectance"))
+    material.rhoSpec = Json2Vec3(materialJson["specular_reflectance"]);
+  if (materialJson.contains("shininess"))
+    material.specular = materialJson["shininess"];
 }

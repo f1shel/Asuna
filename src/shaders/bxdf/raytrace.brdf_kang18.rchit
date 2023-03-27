@@ -122,8 +122,7 @@ vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks,
     bRec.flags = EGlossyReflection;
   }
   bRec.d = toWorld(X, Y, N, wi);
-  vec3 weight =
-      eval(bRec.d, V, N, X, Y, kd, ks, ax, ay, eta, EArea) * abs(wi.z);
+  vec3 weight = eval(bRec.d, V, N, X, Y, kd, ks, ax, ay, eta, EArea);
   return weight;
 }
 
