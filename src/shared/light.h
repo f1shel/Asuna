@@ -8,7 +8,8 @@ START_ENUM(LightType)
   LightTypeDirectional = 0,
   LightTypeRect        = 1,
   LightTypeTriangle    = 2,
-  LightTypeUndefined   = 3
+  LightTypePoint       = 3,
+  LightTypeUndefined   = 4
 END_ENUM();
 // clang-format on
 

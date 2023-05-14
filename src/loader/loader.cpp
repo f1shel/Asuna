@@ -302,14 +302,11 @@ void Loader::addLight(const nlohmann::json& lightJson) {
   //     light.area     = 4.0f * PI * light.radius * light.radius;
   //     light.type     = GpuLightType::eSphereLight;
   //   }
-  // else if (lightJson["type"] == "point")
-  //{
-  //    JsonCheckKeys(lightJson, {"position", "radius"});
-  //    light.position = Json2Vec3(lightJson["position"]);
-  //    light.radius   = lightJson["radius"];
-  //    light.area     = 4.0f * PI * light.radius * light.radius;
-  //    light.type     = GpuLightType::eSphereLight;
-  //}
+  else if (lightJson["type"] == "point") {
+    JsonCheckKeys(lightJson, {"position"});
+    light.position = Json2Vec3(lightJson["position"]);
+    light.type = LightTypePoint;
+  } 
   else if (lightJson["type"] == "distant") {
     JsonCheckKeys(lightJson, {"direction"});
     light.direction = Json2Vec3(lightJson["direction"]);

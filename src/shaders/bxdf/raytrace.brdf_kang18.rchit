@@ -57,7 +57,7 @@ const float DIFFUSE_LOBE_PROBABILITY = 0.5;
 vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks, float ax,
           float ay, float eta, uint flags) {
   vec3 weight = vec3(0);
-  if ((flags & EArea) == 0) return weight;
+//  if ((flags & EArea) == 0) return weight;
 
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);

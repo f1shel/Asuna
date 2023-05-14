@@ -37,6 +37,19 @@ vec3 sampleDistantLight(in GpuLight light, in vec3 scatterPos,
   return radiance;
 }
 
+vec3 samplePointLight(in GpuLight light, in vec3 scatterPos,
+                      inout LightSamplingRecord lRec) {
+  lRec.d = light.position - scatterPos;
+  lRec.n = -lRec.d;
+  lRec.dist = length(lRec.d);
+  float distSq = lRec.dist * lRec.dist;
+  lRec.d /= lRec.dist + EPS;
+  vec3 radiance = light.radiance / (distSq + EPS);
+  lRec.pdf = 1.0;
+  lRec.flags = EDelta;
+  return radiance;
+}
+
 vec3 sampleRectLight(vec2 r, GpuLight light, vec3 scatterPos,
                      out LightSamplingRecord lRec) {
   float r1 = r.x;
@@ -61,9 +74,11 @@ vec3 sampleOneLight(vec2 r, GpuLight light, vec3 scatterPos,
   if (type == LightTypeRect)
     return sampleRectLight(r, light, scatterPos, lRec);
   else if (type == LightTypeDirectional)
-    sampleDistantLight(light, scatterPos, lRec);
+    return sampleDistantLight(light, scatterPos, lRec);
+  else if (type == LightTypePoint)
+    return samplePointLight(light, scatterPos, lRec);
   else if (type == LightTypeTriangle)
-    sampleTriangleLight(r, light, scatterPos, lRec);
+    return sampleTriangleLight(r, light, scatterPos, lRec);
 }
 
 float pdfEnvmap(in sampler2D envmapSamplers[3], in mat4 envTransform,
