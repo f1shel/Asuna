@@ -155,10 +155,12 @@ static void ParseBrdfEmissive(Scene* m_pScene,
 }
 static void ParseBrdfKang18(Scene* m_pScene, const nlohmann::json& materialJson,
                             GpuMaterial& material) {
-  JsonCheckKeys(materialJson, {"normal_texture", "tangent_texture"});
-  material.normalTextureId =
+  //JsonCheckKeys(materialJson, {"normal_texture", "tangent_texture"});
+  if (materialJson.contains("normal_texture"))
+    material.normalTextureId =
       m_pScene->getTextureId(materialJson["normal_texture"]);
-  material.tangentTextureId =
+  if (materialJson.contains("tangent_texture"))
+    material.tangentTextureId =
       m_pScene->getTextureId(materialJson["tangent_texture"]);
   if (materialJson.contains("diffuse_texture"))
     material.diffuseTextureId =

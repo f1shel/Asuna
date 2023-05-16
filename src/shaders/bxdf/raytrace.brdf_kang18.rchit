@@ -142,15 +142,19 @@ void main() {
   if (state.mat.opacityTextureId >= 0)
    opacity = textureEval(state.mat.opacityTextureId, state.uv).r;
 
-  vec3 cn = textureEval(state.mat.normalTextureId, state.uv).rgb;
-  vec3 n = 2 * cn - 1;
-  state.N = makeNormal((n * gl_WorldToObjectEXT).xyz);
-  // Reset shading normal to face normal if needed
-  configureShadingFrame(state);
+  if (state.mat.normalTextureId >= 0) {
+    vec3 cn = textureEval(state.mat.normalTextureId, state.uv).rgb;
+    vec3 n = 2 * cn - 1;
+    state.N = makeNormal((n * gl_WorldToObjectEXT).xyz);
+    // Reset shading normal to face normal if needed
+    configureShadingFrame(state);
+  }
 
-  vec3 ct = textureEval(state.mat.tangentTextureId, state.uv).rgb;
-  vec3 t = 2 * ct - 1;
-  state.X = makeNormal((t * gl_WorldToObjectEXT).xyz);
+  if (state.mat.tangentTextureId >= 0) {
+    vec3 ct = textureEval(state.mat.tangentTextureId, state.uv).rgb;
+    vec3 t = 2 * ct - 1;
+    state.X = makeNormal((t * gl_WorldToObjectEXT).xyz);
+  }
 
   // Rebuild tangent and bitangent
   state.Y = makeNormal(cross(state.N, state.X));
