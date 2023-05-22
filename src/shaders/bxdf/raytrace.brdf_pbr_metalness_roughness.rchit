@@ -57,7 +57,7 @@ const float DIFFUSE_LOBE_PROBABILITY = 0.2;
 vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 albedo, float ax,
           float ay, float metalness, float eta, uint flags) {
   vec3 weight = vec3(0);
-  if ((flags & EArea) == 0) return weight;
+//  if ((flags & EArea) == 0) return weight;
 
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);
@@ -168,8 +168,9 @@ void main() {
   // Configure information for denoiser
   if (payload.pRec.depth == 1) {
     if (pc.diffuseOutChannel >= 0)
-      payload.mRec.channel[pc.diffuseOutChannel] = state.ffN;
-//    payload.mRec.normal = state.ffN;
+      payload.mRec.channel[pc.diffuseOutChannel] = state.mat.diffuse;
+    if (pc.normalOutChannel >= 0)
+      payload.mRec.channel[pc.normalOutChannel] = state.ffN;
   }
 
 #if USE_MIS
