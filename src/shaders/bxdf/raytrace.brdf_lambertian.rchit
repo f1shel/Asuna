@@ -94,7 +94,7 @@ void main() {
     if (pc.diffuseOutChannel >= 0)
       payload.mRec.channel[pc.diffuseOutChannel] = state.mat.diffuse;
     if (pc.normalOutChannel >= 0)
-      payload.mRec.channel[pc.normalOutChannel] = state.ffN;
+      payload.mRec.channel[pc.normalOutChannel] = state.N;
     if (pc.specularOutChannel >= 0)
       payload.mRec.channel[pc.specularOutChannel] = vec3(0);
     if (pc.tangentOutChannel >= 0)

@@ -52,7 +52,11 @@ float g1SmithAnisoGGX(float NdotV, float VdotX, float VdotY, float ax,
   return 1 / (NdotV + length(factor));
 }
 
-const float DIFFUSE_LOBE_PROBABILITY = 0.5;
+//const float DIFFUSE_LOBE_PROBABILITY = 0.5;
+
+float Luminance(vec3 c) {
+  return 0.212671 * c.x + 0.715160 * c.y + 0.072169 * c.z;
+}
 
 vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks, float ax,
           float ay, float eta, uint flags) {
@@ -85,7 +89,7 @@ vec3 eval(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks, float ax,
   return weight;
 }
 
-float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay,
+float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay, vec3 kd, vec3 ks,
           uint flags) {
   float pdf = 0.0;
   if ((flags & EArea) == 0) return pdf;
@@ -99,6 +103,10 @@ float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay,
   vec3 wo = makeNormal(toLocal(X, Y, N, V));
   vec3 wi = makeNormal(toLocal(X, Y, N, L));
 
+  float pd_ = Luminance(kd);
+  float ps_ = Luminance(ks);
+  float DIFFUSE_LOBE_PROBABILITY = pd_ / (pd_ + ps_ + EPS);
+
   pdf += DIFFUSE_LOBE_PROBABILITY * cosineHemispherePdf(wi.z);
   pdf += (1 - DIFFUSE_LOBE_PROBABILITY) * importanceAnisoGGXPdf(wh, wo, ax, ay);
 
@@ -108,6 +116,10 @@ float pdf(vec3 L, vec3 V, vec3 N, vec3 X, vec3 Y, float ax, float ay,
 vec3 sampleBsdf(vec2 u, vec3 V, vec3 N, vec3 X, vec3 Y, vec3 kd, vec3 ks,
                 float ax, float ay, float eta, out BsdfSamplingRecord bRec) {
   vec3 wo = makeNormal(toLocal(X, Y, N, V));
+
+  float pd_ = Luminance(kd);
+  float ps_ = Luminance(ks);
+  float DIFFUSE_LOBE_PROBABILITY = pd_ / (pd_ + ps_ + EPS);
 
   vec3 wi;
   bRec.pdf = 0.0;
@@ -204,7 +216,8 @@ void main() {
                state.mat.rhoSpec, ax, ay, eta, lRec.flags);
       // Multi importance sampling
       float bsdfPdf =
-          pdf(lRec.d, state.V, state.ffN, state.X, state.Y, ax, ay, lRec.flags);
+          pdf(lRec.d, state.V, state.ffN, state.X, state.Y, ax, ay, state.mat.diffuse,
+               state.mat.rhoSpec, lRec.flags);
 
       float misWeight = powerHeuristic(lRec.pdf, bsdfPdf);
 

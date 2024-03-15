@@ -21,6 +21,8 @@ layout(set = RtScene, binding = SceneCamera)          uniform _Camera   { GpuCam
 layout(location = 0) rayPayloadEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
+const bool useGaussianFilter = false;
+
 void main() {
   // Initialize the seed for the random number
   payload.pRec.seed = xxhash32Seed(uvec3(gl_LaunchIDEXT.xy, pc.curFrame));
@@ -32,7 +34,8 @@ void main() {
   vec3 rayOrigin, rayDir;
 
   // Multiple samples per frame and finally average them
-  vec3 radiance = vec3(0.f);
+  vec3 radianceWeightSum = vec3(0.f);
+  float filterWeightSum = 0.f;
   for (uint i = 0; i < pc.spp; ++i) {
     // Disturb around the pixel center
     vec2 jitter = pc.curFrame == 0 ? vec2(0.5) : vec2(rand2(payload.pRec.seed));
@@ -128,23 +131,50 @@ void main() {
       payload.pRec.depth++;
     }
 
-    radiance += payload.pRec.radiance;
+    float filterWeight = 0.0f;
+    if (useGaussianFilter) {
+        // https://github.com/mitsuba-renderer/mitsuba/blob/master/src/rfilters/gaussian.cpp
+        // https://pbr-book.org/4ed/Sampling_and_Reconstruction/Image_Reconstruction
+        const float stddev = 0.5f;
+        const float radius = 4 * stddev;
+        const float alpha = -1.0f / (2.0f * stddev*stddev);
+        const float expXY = exp(alpha * radius*radius);
+        vec2 offset = jitter - vec2(0.5);
+        filterWeight = max(0.0f, exp(alpha * offset.x*offset.x) - expXY) * 
+                       max(0.0f, exp(alpha * offset.y*offset.y) - expXY);
+    } else filterWeight = 1.0f;
+
+//    payload.pRec.radiance = clamp(payload.pRec.radiance, 0, 10);
+    radianceWeightSum += filterWeight * payload.pRec.radiance;
+    filterWeightSum += filterWeight;
   }
 
-  radiance /= float(pc.spp);
+//  radiance /= float(pc.spp);
 
   // Saving result
   if (pc.curFrame == 0) {
     // First frame, replace the value in the buffer
+    vec3 radiance = radianceWeightSum / filterWeightSum;
     imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(radiance, 1.f));
     for (uint cid = 0; cid < pc.nMultiChannel; cid++) {
       imageStore(images[cid + 1], ivec2(gl_LaunchIDEXT.xy), vec4(payload.mRec.channel[cid], 1.f));
     }
+    imageStore(images[8], ivec2(gl_LaunchIDEXT.xy), vec4(filterWeightSum));
   } else {
+    /*
     // Do accumulation over time
     float a = 1.0f / float(pc.curFrame + 1);
     vec3 old_color = imageLoad(images[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
     imageStore(images[0], ivec2(gl_LaunchIDEXT.xy),
                vec4(mix(old_color, radiance, a), 1.f));
+     */
+    vec3 oldRadiance = imageLoad(images[0], ivec2(gl_LaunchIDEXT.xy)).xyz;
+    float oldFilterWeightSum = imageLoad(images[8], ivec2(gl_LaunchIDEXT.xy)).x;
+    vec3 oldRadianceWeightSum = oldRadiance * oldFilterWeightSum;
+    float newFilterWeightSum = oldFilterWeightSum + filterWeightSum;
+    vec3 newRadianceWeightSum = oldRadianceWeightSum + radianceWeightSum;
+    vec3 newRadiance = newRadianceWeightSum / newFilterWeightSum;
+    imageStore(images[0], ivec2(gl_LaunchIDEXT.xy), vec4(newRadiance, 1.f));
+    imageStore(images[8], ivec2(gl_LaunchIDEXT.xy), vec4(newFilterWeightSum));
   }
 }
