@@ -21,7 +21,7 @@ layout(set = RtScene, binding = SceneCamera)          uniform _Camera   { GpuCam
 layout(location = 0) rayPayloadEXT RayPayload payload;
 layout(location = 1) rayPayloadEXT bool isShadowed;
 
-const bool useGaussianFilter = false;
+const bool useGaussianFilter = true;
 
 void main() {
   // Initialize the seed for the random number
@@ -144,7 +144,7 @@ void main() {
                        max(0.0f, exp(alpha * offset.y*offset.y) - expXY);
     } else filterWeight = 1.0f;
 
-//    payload.pRec.radiance = clamp(payload.pRec.radiance, 0, 10);
+    payload.pRec.radiance = clamp(payload.pRec.radiance, 0, 10);
     radianceWeightSum += filterWeight * payload.pRec.radiance;
     filterWeightSum += filterWeight;
   }

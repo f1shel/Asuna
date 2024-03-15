@@ -175,6 +175,12 @@ void Tracer::runOnline() {
 }
 
 void Tracer::runOffline() {
+  m_denoiseApply = true;
+  if (m_scene.getPipelineState().rtxState.spp == 1)
+    m_denoiseFirstFrame = true;
+  else
+    m_denoiseEveryNFrames = 1;
+
   std::array<VkClearValue, 2> clearValues{};
   clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.0f};
   clearValues[1].depthStencil = {1.0f, 0};
@@ -211,21 +217,29 @@ void Tracer::runOffline() {
 
     for (int spp = 0; spp < tot; spp++) {
       bar.progress(spp, tot);
+      if (spp < tot - 1) {
+        const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
+        // Update camera and sunsky
+        m_pipelineGraphics.run(cmdBuf);
+        // Ray tracing and do not render gui
+        m_pipelineRaytrace.run(cmdBuf);
+        genCmdBuf.submitAndWait(cmdBuf);
+      } else {
+        const VkCommandBuffer& cmdBuf1 = genCmdBuf.createCommandBuffer();
+        const VkCommandBuffer& cmdBuf2 = genCmdBuf.createCommandBuffer();
+        setImageToDisplay();
+        // Update camera and sunsky
+        m_pipelineGraphics.run(cmdBuf1);
+        // Ray tracing
+        m_pipelineRaytrace.run(cmdBuf1);
+        copyImagesToCuda(cmdBuf1);
+        genCmdBuf.submitAndWait(cmdBuf1);
 
-      // std::chrono::steady_clock::time_point begin =
-      //     std::chrono::steady_clock::now();
+        denoise();
 
-      const VkCommandBuffer& cmdBuf = genCmdBuf.createCommandBuffer();
-
-      // Update camera and sunsky
-      m_pipelineGraphics.run(cmdBuf);
-
-      // Ray tracing and do not render gui
-      m_pipelineRaytrace.run(cmdBuf);
-
-      // Only post-processing in the last pass since
-      // we do not care the intermediate result in offline mode
-      if (spp == tot - 1) {
+        copyCudaImagesToVulkan(cmdBuf2);
+        // Only post-processing in the last pass since
+        // we do not care the intermediate result in offline mode
         VkRenderPassBeginInfo postRenderPassBeginInfo{
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
         postRenderPassBeginInfo.clearValueCount = 2;
@@ -233,37 +247,34 @@ void Tracer::runOffline() {
         postRenderPassBeginInfo.renderPass = ContextAware::getRenderPass();
         postRenderPassBeginInfo.framebuffer = ContextAware::getFramebuffer();
         postRenderPassBeginInfo.renderArea = {{0, 0}, ContextAware::getSize()};
-        vkCmdBeginRenderPass(cmdBuf, &postRenderPassBeginInfo,
+        vkCmdBeginRenderPass(cmdBuf2, &postRenderPassBeginInfo,
                              VK_SUBPASS_CONTENTS_INLINE);
-        m_pipelinePost.run(cmdBuf);
-        vkCmdEndRenderPass(cmdBuf);
+        m_pipelinePost.run(cmdBuf2);
+        vkCmdEndRenderPass(cmdBuf2);
+        genCmdBuf.submitAndWait(cmdBuf2);
       }
-      genCmdBuf.submitAndWait(cmdBuf);
-
-      // std::chrono::steady_clock::time_point end =
-      //     std::chrono::steady_clock::now();
-
-      // LOG_INFO(
-      //     "[Ray Tracing] Elapsed Time: {} (ms)",
-      //     std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-      //         .count());
     }
     bar.finish();
     vkDeviceWaitIdle(ContextAware::getDevice());
 
-    // Save image
-    static char outputName[200];
-    auto& state = m_scene.getPipelineState();
-    if (state.outputRenderResult) {
-      if (state.outputHdr) {
-        sprintf(outputName, "%s_shot_%04d.exr", m_tis.outputname.c_str(),
-                shotId);
-        saveBufferToImage(pixelBuffer, outputName, 0);
-      } else {
-        sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(),
-                shotId);
-        saveBufferToImage(pixelBuffer, outputName);
-      }
+    callSavingImage(m_alloc, pixelBuffer, shotId);
+  }
+  // Destroy temporary buffer
+  m_alloc.destroy(pixelBuffer);
+}
+
+void Tracer::callSavingImage(nvvk::ResourceAllocatorDedicated& m_alloc,
+                             nvvk::Buffer& pixelBuffer, int shotId) {
+  // Save image
+  static char outputName[200];
+  auto& state = m_scene.getPipelineState();
+  if (state.outputRenderResult) {
+    if (state.outputHdr) {
+      sprintf(outputName, "%s_shot_%04d.exr", m_tis.outputname.c_str(), shotId);
+      saveBufferToImage(pixelBuffer, outputName, 0);
+    } else {
+      sprintf(outputName, "%s_shot_%04d.png", m_tis.outputname.c_str(), shotId);
+      saveBufferToImage(pixelBuffer, outputName);
     }
     for (uint cid = 0; cid < state.rtxState.nMultiChannel; cid++) {
       // std::chrono::steady_clock::time_point begin =
@@ -275,16 +286,8 @@ void Tracer::runOffline() {
         sprintf(outputName, "%s_shot_%04d_channel_%04d.exr",
                 m_tis.outputname.c_str(), shotId, cid);
       saveBufferToImage(pixelBuffer, outputName, cid + 1);
-      // std::chrono::steady_clock::time_point end =
-      //     std::chrono::steady_clock::now();
-      // LOG_INFO(
-      //     "[Saving Channel {}] Elapsed Time: {} (ms)", cid,
-      //     std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)
-      //         .count());
     }
   }
-  // Destroy temporary buffer
-  m_alloc.destroy(pixelBuffer);
 }
 
 void Tracer::parallelLoading() {

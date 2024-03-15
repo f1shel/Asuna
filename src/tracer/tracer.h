@@ -43,6 +43,9 @@ private:
   void saveBufferToImage(nvvk::Buffer pixelBuffer, std::string outputpath,
                          int channelId = -1);
 
+  void callSavingImage(nvvk::ResourceAllocatorDedicated& m_alloc,
+                       nvvk::Buffer& pixelBuffer, int shotId);
+
 private:
   bool m_busy = false;
   string m_busyReasonText = "";
