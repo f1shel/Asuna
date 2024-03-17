@@ -2,10 +2,11 @@
 
 Asuna is a renderer base on vulkan ray tracing pipeline with NVIDIA card.
 
+**NEW FEATURE: RENDERING ON HEADLESS SERVER (SEE DOCUMENTATION)**
+
 | Documentation   |
 |      :---:      |
 | [![docs][1]][2] |
-
 
 [1]: https://img.shields.io/badge/docs-passing-brightgreen
 [2]: https://github.com/f1shel/Asuna/wiki/Home
